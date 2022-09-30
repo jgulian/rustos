@@ -14,4 +14,5 @@ edition = "2018"
 structopt = "0.1.0"
 structopt-derive = "0.1.0"
 serial = "0.4"
+clap = "=2.32.0"
 xmodem = { path = "../xmodem/" }

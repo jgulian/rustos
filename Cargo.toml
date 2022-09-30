@@ -1,0 +1,8 @@
+[workspace]
+members = [
+    "lib/pi",
+    "lib/shim",
+    "lib/stack-vec",
+    "lib/xmodem",
+    "lib/ttywrite",
+]

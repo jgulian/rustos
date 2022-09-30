@@ -1,15 +1,17 @@
 mod parsers;
 
+use std::io;
 use serial;
 use structopt;
 use structopt_derive::StructOpt;
-use xmodem::Xmodem;
+use xmodem::{Progress, Xmodem};
 
 use std::path::PathBuf;
 use std::time::Duration;
 
 use structopt::StructOpt;
-use serial::core::{CharSize, BaudRate, StopBits, FlowControl, SerialDevice, SerialPortSettings};
+use serial::core::{CharSize, BaudRate, StopBits, FlowControl, SerialDevice};
+use serial::{PortSettings, SerialPort};
 
 use parsers::{parse_width, parse_stop_bits, parse_flow_control, parse_baud_rate};
 
@@ -46,12 +48,34 @@ struct Opt {
     raw: bool,
 }
 
+fn progress_fn(_progress: Progress) {
+    print!(".");
+}
+
 fn main() {
     use std::fs::File;
-    use std::io::{self, BufReader};
 
     let opt = Opt::from_args();
     let mut port = serial::open(&opt.tty_path).expect("path points to invalid TTY");
 
-    // FIXME: Implement the `ttywrite` utility.
+    port.configure(&PortSettings {
+        baud_rate: opt.baud_rate,
+        char_size: opt.char_width,
+        parity: serial::ParityNone,
+        stop_bits: opt.stop_bits,
+        flow_control: opt.flow_control,
+    }).expect("failed to configure");
+
+    SerialDevice::set_timeout(&mut port, Duration::from_secs(opt.timeout)).expect("failed to set timeout");
+
+    let mut data: Box<dyn io::Read> = match opt.input {
+        Some(file) => Box::new(File::open(file).expect("failed to open file")),
+        None => Box::new(io::stdin()),
+    };
+
+    if opt.raw {
+        io::copy(&mut *data, &mut port).expect("failed to send data");
+    } else {
+        Xmodem::transmit_with_progress(data, port, progress_fn).expect("failed to send data");
+    };
 }
