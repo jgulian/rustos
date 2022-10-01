@@ -5,7 +5,6 @@ mod tests;
 
 use core::iter::IntoIterator;
 use core::ops::{Deref, DerefMut};
-use core::slice::{Iter, IterMut};
 
 /// A contiguous array type backed by a slice.
 ///

@@ -1,7 +1,17 @@
+use shim::io;
+use shim::path::{Path, PathBuf};
+
 use stack_vec::StackVec;
 use crate::console;
 
+use pi::atags::Atags;
+
+use fat32::traits::FileSystem;
+use fat32::traits::{Dir, Entry};
+
 use crate::console::{kprint, kprintln, CONSOLE};
+use crate::ALLOCATOR;
+use crate::FILESYSTEM;
 
 /// Error type for `Command` parse failures.
 #[derive(Debug)]
@@ -43,7 +53,7 @@ impl<'a> Command<'a> {
 }
 
 /// Starts a shell using `prefix` as the prefix for each line. This function
-/// returns if the `exit` command is called.
+/// never returns.
 pub fn shell(prefix: &str) -> ! {
     'shell_loop: loop {
         let mut command: [u8; 512] = [0; 512];
