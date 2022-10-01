@@ -1,4 +1,5 @@
 use stack_vec::StackVec;
+use crate::console;
 
 use crate::console::{kprint, kprintln, CONSOLE};
 
@@ -37,12 +38,69 @@ impl<'a> Command<'a> {
 
     /// Returns this command's path. This is equivalent to the first argument.
     fn path(&self) -> &str {
-        unimplemented!()
+        self.args[0]
     }
 }
 
 /// Starts a shell using `prefix` as the prefix for each line. This function
 /// returns if the `exit` command is called.
 pub fn shell(prefix: &str) -> ! {
-    unimplemented!()
+    'shell_loop: loop {
+        let mut command: [u8; 512] = [0; 512];
+        let mut container= [""; 64];
+        let mut i = 0;
+
+        kprint!("{}", prefix);
+
+        'command_loop: loop {
+            let byte = CONSOLE.lock().read_byte();
+            if byte == b'\n' || byte == b'\r' {
+                kprintln!("");
+                break 'command_loop;
+            } else if byte == 8 || byte == 127 {
+                if i > 0 {
+                    CONSOLE.lock().write_byte(8);
+                    CONSOLE.lock().write_byte(b' ');
+                    CONSOLE.lock().write_byte(8);
+                    i -= 1;
+                }
+            } else {
+                CONSOLE.lock().write_byte(byte);
+                command[i] = byte;
+                i += 1;
+                if i == 512 {
+                    kprintln!("");
+                    kprintln!("command too long");
+                    continue 'shell_loop;
+                }
+            }
+        }
+
+        let command_str = core::str::from_utf8(&command[0..i]).expect("");
+        match Command::parse(command_str, &mut container) {
+            Ok(command) => {
+                run_command(&command);
+            }
+            Err(err) => {
+                match err {
+                    Error::Empty => {}
+                    Error::TooManyArgs => {kprintln!("too many args");}
+                }
+            }
+        }
+    }
+}
+
+fn run_command(command: &Command) {
+    match command.path() {
+        "echo" => {
+            for i in 1..command.args.len() {
+                kprint!("{} ", command.args[i]);
+            }
+            kprintln!("");
+        }
+        _ => {
+            kprintln!("unknown command: {}", command.path());
+        }
+    }
 }

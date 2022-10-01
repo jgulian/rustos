@@ -138,6 +138,7 @@ impl MiniUart {
 
     /// Reads a byte. Blocks indefinitely until a byte is ready to be read.
     pub fn read_byte(&mut self) -> u8 {
+        while !self.has_byte() {}
         self.registers.MU_IO.read()
     }
 }
