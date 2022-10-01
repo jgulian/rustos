@@ -12,7 +12,7 @@ edition = "2018"
 
 [dependencies]
 cfg-if = "0.1"
-core_io = { version = "0.1.20190701", package = "core_io", optional = true }
+core_io = { version = "=0.1.20190701", package = "core_io", optional = true }
 
 [dev-dependencies]
 hashbrown = "0.6.3"
