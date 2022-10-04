@@ -10,11 +10,13 @@ type AllocatorImpl = bin::Allocator;
 mod tests;
 
 use core::alloc::{GlobalAlloc, Layout};
+use core::cmp::max;
 use core::fmt;
 
 use crate::console::kprintln;
 use crate::mutex::Mutex;
 use pi::atags::{Atag, Atags};
+use crate::allocator::util::{align_down, align_up};
 
 /// `LocalAlloc` is an analogous trait to the standard library's `GlobalAlloc`,
 /// but it takes `&mut self` in `alloc()` and `dealloc()`.
@@ -78,7 +80,20 @@ pub fn memory_map() -> Option<(usize, usize)> {
     let page_size = 1 << 12;
     let binary_end = unsafe { (&__text_end as *const u8) as usize };
 
-    unimplemented!("memory map")
+    for atag in Atags::get() {
+        match atag.mem() {
+            Some(mem) => {
+                let start_unaligned_address= max(mem.start as usize, binary_end);
+                let start_address = align_up(start_unaligned_address, page_size);
+                let end_address = align_down((mem.size + mem.start) as usize, page_size);
+                kprintln!("{}", end_address - start_address);
+                return Some((start_address, end_address))
+            },
+            None => continue,
+        }
+    }
+
+    None
 }
 
 impl fmt::Debug for Allocator {
