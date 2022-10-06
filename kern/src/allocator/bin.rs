@@ -7,67 +7,124 @@ use core::ptr;
 use crate::allocator::linked_list::LinkedList;
 use crate::allocator::util::*;
 use crate::allocator::LocalAlloc;
-use crate::kprintln;
 
-const BIN_COUNT: usize = 14;
+const BIN_COUNT: usize = 20;
+
+fn log_two(number: usize) -> Option<usize> {
+    return if number == 0 {
+        None
+    } else if number == 1 {
+        Some(0)
+    } else {
+        Some(log_two(number / 2)? + 1)
+    }
+}
+
+fn is_aligned(ptr: *mut usize, align: usize) -> bool {
+    align_up(ptr as usize, align) == (ptr as usize)
+}
 
 /// bin n (2^(n + 3) bytes)
 pub struct Allocator {
-    bins: [Bin; BIN_COUNT],
+    bins: [LinkedList; BIN_COUNT],
 }
 
 impl Allocator {
     /// Creates a new bin allocator that will allocate memory from the region
     /// starting at address `start` and ending at address `end`.
-    pub fn new(start: usize, end: usize) -> Allocator {
-        let page_size: usize = 1 << 12;
-        let number_of_pages = (end - start) / page_size;
-        kprintln!("thing {} {}", start, end);
-        kprintln!("memory size: {}", (end - start));
-        kprintln!("number of pages: {}", number_of_pages);
-        kprintln!("bin count {}", BIN_COUNT);
-
-        let mut bins: [Bin; BIN_COUNT] = [Bin::uninitialized(); BIN_COUNT];
-        let mut bin_end = end;
-        for i in (0..BIN_COUNT).rev() {
-            let bin_size = Allocator::bin_size(i);
-            let current_bin_end = align_down(bin_end, bin_size);
-            if current_bin_end < start + bin_size {
-                bins[i].initialize(0, 0, bin_size);
-                continue;
-            }
-
-            let bin_start = align_up((current_bin_end - start) / 2 + start, bin_size);
-            if current_bin_end < bin_start + bin_size {
-                bins[i].initialize(0, 0, bin_size);
-                continue;
-            }
-
-            kprintln!("HERE {} {} {}", bin_start, current_bin_end, bin_size);
-            bins[i].initialize(bin_start, current_bin_end, bin_size);
-            bin_end = bin_start;
-            kprintln!("BIN END {}", bin_end);
-        }
+    pub fn new(start: usize, mut end: usize) -> Allocator {
+        let mut bins = [LinkedList::new(); BIN_COUNT];
+        Allocator::allocate_bins(&mut bins, BIN_COUNT - 1, start, end);
 
         Allocator { bins }
     }
 
-    fn bin_size(size: usize) -> usize {
-        2 << (3 + size)
+    fn buddy_up(&mut self, ptr: *mut usize, bin: usize) {
+        let buddy = Allocator::buddy(ptr, bin);
+        if bin == BIN_COUNT - 1 || !self.bins[bin].remove(buddy) {
+            unsafe {
+                self.bins[bin].push(ptr);
+            }
+            return;
+        }
+
+        let aligned_buddy = if (ptr as usize) < (buddy as usize) {
+            ptr
+        } else {
+            buddy
+        };
+
+        self.buddy_up(aligned_buddy, bin + 1);
     }
 
-    fn size_to_bin(size: usize) -> Option<usize> {
-        for i in 0..BIN_COUNT {
-            if size < Allocator::bin_size(i) {
-                return Some(i);
+    fn buddy_down(&mut self, bin: usize, align: usize) -> Option<*mut usize> {
+        if bin >= BIN_COUNT {
+            return None;
+        }
+        for node in self.bins[bin].iter_mut() {
+            if is_aligned(node.value(), align) {
+                return Some(node.pop());
             }
         }
 
-        None
+        let buddy_above = self.buddy_down(bin + 1, align)?;
+        let other_buddy = Allocator::buddy(buddy_above, bin);
+
+        unsafe {
+            self.bins[bin].push(other_buddy);
+        }
+
+        Some(buddy_above)
     }
 
-    fn is_aligned(ptr: *mut usize, align: usize) -> bool {
-        align_up(ptr as usize, align) == (ptr as usize)
+    fn bin_size(size: usize) -> usize {
+        1 << (3 + size)
+    }
+
+    fn size_to_bin(size: usize) -> Option<usize> {
+        if size <= 8 {
+            return Some(0);
+        }
+        let log = log_two(size)?;
+        if size == 1 << log {
+            Some(log - 3)
+        } else {
+            Some(log - 2)
+        }
+    }
+
+    fn buddy(ptr: *mut usize, bin: usize) -> *mut usize {
+        let bin_size = Allocator::bin_size(bin);
+        let location = ptr as usize;
+        if is_aligned(ptr, bin_size * 2) {
+            (location + bin_size) as *mut usize
+        } else {
+            (location - bin_size) as *mut usize
+        }
+    }
+
+    fn allocate_bins(bins: &mut [LinkedList; BIN_COUNT], bin: usize, start: usize, end: usize) {
+        let smaller_bin = bin != 0;
+        let bin_size = Allocator::bin_size(bin);
+        let bin_start = align_up(start, bin_size);
+        let bin_end = align_down(end, bin_size);
+
+        if bin_end <= bin_start {
+            if smaller_bin {
+                Allocator::allocate_bins(bins, bin - 1, start, end);
+            }
+            return;
+        }
+
+        let bin_count = (bin_end - bin_start) / bin_size;
+        for i in 0..bin_count {
+            unsafe {
+                bins[bin].push((bin_start + bin_size * i) as *mut usize);
+            }
+        }
+
+        Allocator::allocate_bins(bins, bin - 1, start, bin_start);
+        Allocator::allocate_bins(bins, bin - 1, bin_end, end);
     }
 }
 
@@ -94,31 +151,8 @@ impl LocalAlloc for Allocator {
     /// or `layout` does not meet this allocator's
     /// size or alignment constraints.
     unsafe fn alloc(&mut self, layout: Layout) -> *mut u8 {
-        if layout.size() <= 0 || !is_power_of_two(layout.align()) {
-            return ptr::null_mut();
-        }
-
-        kprintln!("ALLOCATE {} {}", layout.size(), layout.align());
-
-        match Allocator::size_to_bin(layout.size()) {
-            None => {
-                kprintln!("HERE 3");
-            }
-            Some(bin) => {
-                kprintln!("ALLOCATING ON BIN {}", bin);
-                let mut i = bin;
-                while i < BIN_COUNT {
-                    let location = self.bins[i].next(layout.align());
-                    if location.is_some() {
-                        return location.unwrap() as *mut u8;
-                    }
-                    break;
-                    //i += 1;
-                }
-            }
-        }
-
-        ptr::null_mut()
+        let bin = Allocator::size_to_bin(layout.size()).unwrap_or(0);
+        self.buddy_down(bin, layout.align()).unwrap_or(ptr::null_mut()) as *mut u8
     }
 
     /// Deallocates the memory referenced by `ptr`.
@@ -135,16 +169,8 @@ impl LocalAlloc for Allocator {
     /// Parameters not meeting these conditions may result in undefined
     /// behavior.
     unsafe fn dealloc(&mut self, ptr: *mut u8, layout: Layout) {
-        kprintln!("DEALLOC {} {}", ptr as usize, layout.size());
-        let location = ptr as usize;
-        let mut i = BIN_COUNT - 1;
-        while location < self.bins[i].end {
-            i -= 1;
-        }
-        if i < 0 {
-            panic!("Attempted dealloc of unallocated pointer");
-        }
-        self.bins[i].push(ptr as *mut usize);
+        let bin = Allocator::size_to_bin(layout.size()).unwrap_or(0);
+        self.buddy_up(ptr as *mut usize, bin);
     }
 }
 
@@ -154,67 +180,3 @@ impl Debug for Allocator {
         f.write_fmt(format_args!("BinAlloc()"))
     }
 }
-
-/// Bin
-#[derive(Copy, Clone)]
-struct Bin {
-    linked_list: LinkedList,
-    start: usize,
-    end: usize,
-    bin_size: usize,
-}
-
-impl Bin {
-    fn uninitialized() -> Bin {
-        Bin { linked_list: LinkedList::new(), start: 0, end: 0, bin_size: 0 }
-    }
-
-    fn initialize(&mut self, start: usize, end: usize, bin_size: usize) {
-        self.start = start;
-        self.end = end;
-        self.bin_size = bin_size;
-    }
-
-    fn next(&mut self, align: usize) -> Option<*mut usize> {
-        if self.bin_size == 0 {
-            panic!("Attempted use of uninitialized bin");
-        }
-
-        for node in self.linked_list.iter_mut() {
-            if Allocator::is_aligned(node.value(), align) {
-                kprintln!("FOUND {}", node.value() as usize);
-                return Some(node.pop());
-            }
-        }
-
-        while self.start < self.end {
-            let ptr = self.start as *mut usize;
-            self.start += self.bin_size;
-
-            if Allocator::is_aligned(ptr, align) {
-                kprintln!("FOUND {}", self.start);
-                return Some(ptr);
-            }
-
-            unsafe {
-                kprintln!("PUSHED {}", self.start);
-                self.linked_list.push(self.start as *mut usize);
-            }
-        }
-        kprintln!("HERE 1 {} {}", self.start, self.end);
-
-        None
-    }
-
-    fn push(&mut self, ptr: *mut usize) {
-        if self.bin_size == 0 {
-            panic!("Attempted use of uninitialized bin");
-        }
-
-        unsafe {
-            kprintln!("PUSHED BACK");
-            self.linked_list.push(ptr);
-        }
-    }
-}
-

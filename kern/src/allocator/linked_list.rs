@@ -97,6 +97,18 @@ impl LinkedList {
         Some(value)
     }
 
+    /// Removes and returns the specified element, if it exists;
+    pub fn remove(&mut self, element: *mut usize) -> bool {
+        for node in self.iter_mut() {
+            if node.value == element {
+                node.pop();
+                return true;
+            }
+        }
+
+        false
+    }
+
     /// Returns the first item in the list without removing it, if any.
     pub fn peek(&self) -> Option<*mut usize> {
         match self.is_empty() {
