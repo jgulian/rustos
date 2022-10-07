@@ -87,7 +87,12 @@ impl CachedPartition {
     ///
     /// Returns an error if there is an error reading the sector from the disk.
     pub fn get_mut(&mut self, sector: u64) -> io::Result<&mut [u8]> {
-        unimplemented!("CachedPartition::get_mut()")
+        let physical_sector = self.virtual_to_physical(sector)
+            .ok_or(io::Error::from(io::Errorkind::Other))?;
+
+        let data = self.get(sector)?;
+        self.cache.get(physical_sector).expect("sector should be cached").dirty = true;
+        Ok(data);
     }
 
     /// Returns a reference to the cached sector `sector`. If the sector is not
@@ -97,7 +102,23 @@ impl CachedPartition {
     ///
     /// Returns an error if there is an error reading the sector from the disk.
     pub fn get(&mut self, sector: u64) -> io::Result<&[u8]> {
-        unimplemented!("CachedPartition::get()")
+        let physical_sector = self.virtual_to_physical(sector)
+            .ok_or(io::Error::from(io::Errorkind::Other))?;
+
+        let read_sector = if self.cache.contains_key(physical_sector) {
+            self.cache.get(physical_sector).unwrap()
+        } else {
+            let buffer: [u8; 512] = [0; 512];
+            self.device.read_sector(physical_sector, &mut buffer);
+            self.cache.insert(physical_sector, CacheEntry {
+                data: Vec::from(buffer),
+                dirty: false
+            });
+
+            self.cache.get(physical_sector).unwrap()
+        };
+
+        &read_sector.data.as_slice()
     }
 }
 
@@ -105,15 +126,20 @@ impl CachedPartition {
 // `write_sector` methods should only read/write from/to cached sectors.
 impl BlockDevice for CachedPartition {
     fn sector_size(&self) -> u64 {
-        unimplemented!()
+        self.device.sector_size()
     }
 
     fn read_sector(&mut self, sector: u64, buf: &mut [u8]) -> io::Result<usize> {
-        unimplemented!()
+        self.get(sector)
     }
 
     fn write_sector(&mut self, sector: u64, buf: &[u8]) -> io::Result<usize> {
-        unimplemented!()
+        let partition = self.get_mut(sector)?;
+        for i in 0..(buf.len()) {
+            partition[i] = buf[i];
+        }
+
+        Ok(buf.len())
     }
 }
 

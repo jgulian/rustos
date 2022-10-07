@@ -27,18 +27,18 @@ use core::fmt::Write;
 use console::kprintln;
 
 use allocator::Allocator;
-//use fs::FileSystem;
+use fs::FileSystem;
 
 #[cfg_attr(not(test), global_allocator)]
 pub static ALLOCATOR: Allocator = Allocator::uninitialized();
-//pub static FILESYSTEM: FileSystem = FileSystem::uninitialized();
+pub static FILESYSTEM: FileSystem = FileSystem::uninitialized();
 
 fn kmain() -> ! {
     unsafe {
         ALLOCATOR.initialize();
-    //    FILESYSTEM.initialize();
+        FILESYSTEM.initialize();
     }
-    //
+
     let s = String::from("amogus");
 
     kprintln!("Welcome to cs3210!");
