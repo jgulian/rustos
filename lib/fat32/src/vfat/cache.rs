@@ -87,12 +87,13 @@ impl CachedPartition {
     ///
     /// Returns an error if there is an error reading the sector from the disk.
     pub fn get_mut(&mut self, sector: u64) -> io::Result<&mut [u8]> {
-        let physical_sector = self.virtual_to_physical(sector)
-            .ok_or(io::Error::from(io::Errorkind::Other))?;
+        if !self.cache.contains_key(&sector) {
+            self.load_from_disk(sector)?;
+        }
 
-        let data = self.get(sector)?;
-        self.cache.get(physical_sector).expect("sector should be cached").dirty = true;
-        Ok(data);
+        let entry =self.cache.get_mut(&sector).expect("should be cached");
+        entry.dirty = true;
+        Ok(entry.data.as_mut_slice())
     }
 
     /// Returns a reference to the cached sector `sector`. If the sector is not
@@ -102,23 +103,28 @@ impl CachedPartition {
     ///
     /// Returns an error if there is an error reading the sector from the disk.
     pub fn get(&mut self, sector: u64) -> io::Result<&[u8]> {
+        if !self.cache.contains_key(&sector) {
+            self.load_from_disk(sector)?;
+        }
+
+        let entry =self.cache.get(&sector).expect("should be cached");
+        Ok(entry.data.as_slice())
+    }
+
+    fn load_from_disk(&mut self, sector: u64) -> io::Result<()> {
         let physical_sector = self.virtual_to_physical(sector)
-            .ok_or(io::Error::from(io::Errorkind::Other))?;
-
-        let read_sector = if self.cache.contains_key(physical_sector) {
-            self.cache.get(physical_sector).unwrap()
-        } else {
-            let buffer: [u8; 512] = [0; 512];
-            self.device.read_sector(physical_sector, &mut buffer);
-            self.cache.insert(physical_sector, CacheEntry {
-                data: Vec::from(buffer),
-                dirty: false
+            .ok_or(io::Error::from(io::ErrorKind::Other))?;
+        if !self.cache.contains_key(&physical_sector) {
+            let mut data: Vec<u8> = Vec::<u8>::new();
+            data.resize(self.partition.sector_size as usize, 0);
+            (*self.device).read_sector(physical_sector, data.as_mut_slice());
+            self.cache.insert(sector, CacheEntry{
+                data: data,
+                dirty: false,
             });
+        }
 
-            self.cache.get(physical_sector).unwrap()
-        };
-
-        &read_sector.data.as_slice()
+        Ok(())
     }
 }
 
@@ -130,7 +136,10 @@ impl BlockDevice for CachedPartition {
     }
 
     fn read_sector(&mut self, sector: u64, buf: &mut [u8]) -> io::Result<usize> {
-        self.get(sector)
+        let buffer = self.get(sector)?;
+        let length = buffer.len();
+        buf.copy_from_slice(buffer);
+        Ok(length)
     }
 
     fn write_sector(&mut self, sector: u64, buf: &[u8]) -> io::Result<usize> {

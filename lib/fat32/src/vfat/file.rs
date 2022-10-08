@@ -1,4 +1,6 @@
 use alloc::string::String;
+use alloc::vec::Vec;
+use core::cmp::min;
 
 use shim::io::{self, SeekFrom};
 
@@ -8,10 +10,44 @@ use crate::vfat::{Cluster, Metadata, VFatHandle};
 #[derive(Debug)]
 pub struct File<HANDLE: VFatHandle> {
     pub vfat: HANDLE,
-    // FIXME: Fill me in.
+    pub starting_sector: Cluster,
+    pub name: String,
+    pub metadata: Metadata,
+    pub file_size: u64,
 }
 
-// FIXME: Implement `traits::File` (and its supertraits) for `File`.
+impl<HANDLE: VFatHandle> traits::File for File<HANDLE> {
+    fn sync(&mut self) -> io::Result<()> {
+        unimplemented!("not required")
+    }
+
+    fn size(&self) -> u64 {
+        self.file_size
+    }
+}
+
+impl<HANDLE: VFatHandle> io::Write for File<HANDLE> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        unimplemented!("not required")
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        unimplemented!("not required")
+    }
+}
+
+
+impl<HANDLE: VFatHandle> io::Read for File<HANDLE> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        let mut data = Vec::<u8>::new();
+        self.vfat.lock(|file_system|
+            file_system.read_chain(self.starting_sector, &mut data))?;
+
+        buf.copy_from_slice(data.as_slice());
+
+        Ok(min(buf.len(), data.len()))
+    }
+}
 
 impl<HANDLE: VFatHandle> io::Seek for File<HANDLE> {
     /// Seek to offset `pos` in the file.

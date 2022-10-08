@@ -31,9 +31,9 @@ impl CHS {
 impl Debug for CHS {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("CHS")
-            .field("cylinder", self.cylinder)
-            .field("header", self.header)
-            .field("sector", self.sector)
+            .field("cylinder", &self.cylinder())
+            .field("header", &self.header())
+            .field("sector", &self.sector())
             .finish()
     }
 }
@@ -53,12 +53,12 @@ pub struct PartitionEntry {
 impl Debug for PartitionEntry {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("PartitionEntry")
-            .field("boot_indicator", self.boot_indicator)
-            .field("starting_chs", self.starting_chs)
-            .field("partition_type", self.partition_type)
-            .field("ending_chs", self.ending_chs)
-            .field("relative_sector", self.relative_sector)
-            .field("total_sectors", self.total_sectors)
+            .field("boot_indicator", &self.boot_indicator)
+            .field("starting_chs", &self.starting_chs)
+            .field("partition_type", &self.partition_type)
+            .field("ending_chs", &self.ending_chs)
+            .field("relative_sector", &self.relative_sector)
+            .field("total_sectors", &self.total_sectors)
             .finish()
     }
 }
@@ -96,7 +96,7 @@ impl MasterBootRecord {
     /// boot indicator. Returns `Io(err)` if the I/O error `err` occured while
     /// reading the MBR.
     pub fn from<T: BlockDevice>(mut device: T) -> Result<MasterBootRecord, Error> {
-        let buffer: [u8; 512] = [0; 512];
+        let mut buffer: [u8; 512] = [0; 512];
         device.read_sector(512, &mut buffer).map_err(|e| Error::Io(e))?;
         let master_boot_record: MasterBootRecord = unsafe {
             mem::transmute(buffer)
@@ -119,10 +119,10 @@ impl MasterBootRecord {
 impl Debug for MasterBootRecord {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("MasterBootRecord")
-            .field("bootstrap", self.bootstrap)
-            .field("disk_id", self.disk_id)
-            .field("partition_table", self.partition_table)
-            .field("valid_bootsector", self.valid_bootsector)
+//            .field("bootstrap", &self.bootstrap)
+            .field("disk_id", &self.disk_id)
+            .field("partition_table", &self.partition_table)
+            .field("valid_bootsector", &self.valid_bootsector)
             .finish()
     }
 }

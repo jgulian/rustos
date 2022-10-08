@@ -1,5 +1,7 @@
 use alloc::string::String;
 use alloc::vec::Vec;
+use core::marker::PhantomData;
+use core::mem::transmute;
 
 use shim::const_assert_size;
 use shim::ffi::OsStr;
@@ -7,20 +9,42 @@ use shim::io;
 use shim::newioerr;
 
 use crate::traits;
+use crate::traits::Dummy;
 use crate::util::VecExt;
-use crate::vfat::{Attributes, Date, Metadata, Time, Timestamp};
+use crate::vfat::{Attributes, Date, Error, Metadata, Time, Timestamp};
 use crate::vfat::{Cluster, Entry, File, VFatHandle};
+
+enum DirectoryAttribute {
+    ReadOnly = 0x01,
+    Hidden = 0x02,
+    System = 0x04,
+    VolumeId = 0x08,
+    Directory = 0x10,
+    Archive = 0x20,
+    LongFileName = 0b1111,
+}
 
 #[derive(Debug)]
 pub struct Dir<HANDLE: VFatHandle> {
     pub vfat: HANDLE,
-    // FIXME: Fill me in.
+    pub first_cluster: Cluster,
+    pub name: String,
+    pub metadata: Metadata,
 }
 
 #[repr(C, packed)]
 #[derive(Copy, Clone)]
 pub struct VFatRegularDirEntry {
-    // FIXME: Fill me in.
+    name: [u8; 11],
+    attributes: u8,
+    __nt_reserved: u8,
+    created_time_tenth: u8,
+    created_time: Timestamp,
+    last_access: Date,
+    first_cluster_high: u16,
+    last_modification: Timestamp,
+    first_cluster_low: u16,
+    file_size: u32,
 }
 
 const_assert_size!(VFatRegularDirEntry, 32);
@@ -28,7 +52,14 @@ const_assert_size!(VFatRegularDirEntry, 32);
 #[repr(C, packed)]
 #[derive(Copy, Clone)]
 pub struct VFatLfnDirEntry {
-    // FIXME: Fill me in.
+    order: u8,
+    name_one: [u8; 10],
+    attributes: u8,
+    dir_type: u8,
+    checksum: u8,
+    name_two: [u8; 12],
+    first_cluster_low: u16,
+    name_three: [u8; 4],
 }
 
 const_assert_size!(VFatLfnDirEntry, 32);
@@ -36,7 +67,9 @@ const_assert_size!(VFatLfnDirEntry, 32);
 #[repr(C, packed)]
 #[derive(Copy, Clone)]
 pub struct VFatUnknownDirEntry {
-    // FIXME: Fill me in.
+    __reserved_one: [u8; 11],
+    attributes: u8,
+    __reserved_two: [u8; 20],
 }
 
 const_assert_size!(VFatUnknownDirEntry, 32);
@@ -59,10 +92,123 @@ impl<HANDLE: VFatHandle> Dir<HANDLE> {
     /// If `name` contains invalid UTF-8 characters, an error of `InvalidInput`
     /// is returned.
     pub fn find<P: AsRef<OsStr>>(&self, name: P) -> io::Result<Entry<HANDLE>> {
-        unimplemented!("Dir::find()")
+        use traits::{Dir, Entry};
+        let name = name.as_ref().to_str()
+            .ok_or(io::Error::from(io::ErrorKind::InvalidInput))?;
+
+        for entry in self.entries()? {
+            if str::eq_ignore_ascii_case(entry.name(), name) {
+                return Ok(entry);
+            }
+        }
+
+        Err(io::Error::from(io::ErrorKind::NotFound))
     }
 }
 
 impl<HANDLE: VFatHandle> traits::Dir for Dir<HANDLE> {
-    // FIXME: Implement `trait::Dir` for `Dir`.
+    type Entry = Entry<HANDLE>;
+    type Iter = DirIter<HANDLE>;
+
+    fn entries(&self) -> io::Result<Self::Iter> {
+        let mut data: Vec<u8> = Vec::new();
+        self.vfat.lock(|file_system|
+            file_system.read_chain(self.first_cluster, &mut data)
+        )?;
+
+        Ok(DirIter {
+            vfat: self.vfat.clone(),
+            data: unsafe {data.cast()},
+            i: 0,
+            done: false,
+        })
+    }
+}
+
+pub struct DirIter<HANDLE: VFatHandle> {
+    vfat: HANDLE,
+    data: Vec<VFatDirEntry>,
+    i: usize,
+    done: bool,
+}
+
+impl<HANDLE: VFatHandle> Iterator for DirIter<HANDLE> {
+    type Item = Entry<HANDLE>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut long_file_names = Vec::<VFatLfnDirEntry>::new();
+
+        loop {
+            if self.done {
+                return None;
+            }
+
+            let entry: &VFatDirEntry = &self.data[self.i];
+            self.i += 1;
+
+            let (regular, long_file_name) = unsafe {
+                if entry.unknown.attributes == DirectoryAttribute::LongFileName as u8 {
+                    (None, Some(entry.long_filename))
+                } else {
+                    (Some(entry.regular), None)
+                }
+            };
+
+            if long_file_name.is_some() {
+                long_file_names.push(long_file_name.unwrap());
+                continue;
+            }
+
+            let regular_dir = regular.unwrap();
+            let mut name = String::new();
+
+            if long_file_names.is_empty() {
+                for c in regular_dir.name.iter() {
+                    name.push(*c as char);
+                }
+            } else {
+                while !long_file_names.is_empty() {
+                    let long_file_name: VFatLfnDirEntry = long_file_names.pop().expect("lfn should have item");
+                    for c in long_file_name.name_one.iter() {
+                        name.push(*c as char);
+                    }
+                    for c in long_file_name.name_two.iter() {
+                        name.push(*c as char);
+                    }
+                    for c in long_file_name.name_three.iter() {
+                        name.push(*c as char);
+                    }
+                }
+            }
+
+            let starting_sector = ((regular_dir.first_cluster_high as u32) << 16) |
+                (regular_dir.first_cluster_low as u32);
+
+            let metadata = Metadata {
+                attributes: regular_dir.attributes,
+                created: regular_dir.created_time,
+                last_access: Timestamp { date: regular_dir.last_access, time: Default::default() },
+                last_modification: regular_dir.last_modification,
+            };
+
+            let entry = if regular_dir.attributes & (DirectoryAttribute::Directory as u8) > 0 {
+                Entry::Dir(Dir {
+                    vfat: self.vfat.clone(),
+                    first_cluster: Cluster::from(starting_sector),
+                    name,
+                    metadata
+                })
+            } else {
+                Entry::File(File {
+                    vfat: self.vfat.clone(),
+                    starting_sector: Cluster::from(starting_sector),
+                    name,
+                    metadata,
+                    file_size: regular_dir.file_size as u64,
+                })
+            };
+
+            return Some(entry);
+        }
+    }
 }

@@ -13,8 +13,8 @@ edition = "2018"
 [dependencies]
 shim = { path = "../shim", features = ["alloc"] }
 hashbrown = "0.6.3"
-ahash = "=0.2.18"
-const-random = "=0.1.6"
+#ahash = "=0.2.18"
+#const-random = "=0.1.6"
 
 [dev-dependencies]
 rand = "0.4"
