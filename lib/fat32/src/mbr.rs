@@ -71,7 +71,7 @@ pub struct MasterBootRecord {
     pub bootstrap: [u8; 436],
     pub disk_id: [u8; 10],
     pub partition_table: [PartitionEntry; 4],
-    pub valid_bootsector: u16,
+    pub valid_bootsector: [u8; 2],
 }
 
 const_assert_size!(MasterBootRecord, 512);
@@ -97,18 +97,19 @@ impl MasterBootRecord {
     /// reading the MBR.
     pub fn from<T: BlockDevice>(mut device: T) -> Result<MasterBootRecord, Error> {
         let mut buffer: [u8; 512] = [0; 512];
-        device.read_sector(512, &mut buffer).map_err(|e| Error::Io(e))?;
+        device.read_sector(0, &mut buffer).map_err(|e| Error::Io(e))?;
         let master_boot_record: MasterBootRecord = unsafe {
             mem::transmute(buffer)
         };
 
-        if master_boot_record.valid_bootsector != 0x55AA {
+        if master_boot_record.valid_bootsector[0] != 0x55 ||
+            master_boot_record.valid_bootsector[1] != 0xAA {
             return Err(Error::BadSignature);
         }
 
-        for partition in master_boot_record.partition_table.iter() {
+        for (i, partition) in master_boot_record.partition_table.iter().enumerate() {
             if partition.boot_indicator != 0 && partition.boot_indicator != 0x80 {
-                return Err(Error::UnknownBootIndicator(partition.boot_indicator));
+                return Err(Error::UnknownBootIndicator(i as u8));
             }
         }
 

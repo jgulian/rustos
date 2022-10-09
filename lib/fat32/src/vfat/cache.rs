@@ -111,15 +111,20 @@ impl CachedPartition {
         Ok(entry.data.as_slice())
     }
 
-    fn load_from_disk(&mut self, sector: u64) -> io::Result<()> {
-        let physical_sector = self.virtual_to_physical(sector)
+    fn load_from_disk(&mut self, virtual_sector: u64) -> io::Result<()> {
+        let physical_sector = self.virtual_to_physical(virtual_sector)
             .ok_or(io::Error::from(io::ErrorKind::Other))?;
-        if !self.cache.contains_key(&physical_sector) {
+        if !self.cache.contains_key(&virtual_sector) {
             let mut data: Vec<u8> = Vec::<u8>::new();
             data.resize(self.partition.sector_size as usize, 0);
-            (*self.device).read_sector(physical_sector, data.as_mut_slice());
-            self.cache.insert(sector, CacheEntry{
-                data: data,
+
+            for i in 0..(self.partition.sector_size / self.device.sector_size()) {
+                let slice = &mut data.as_mut_slice()[(self.device.sector_size() * i) as usize..];
+                (*self.device).read_sector(physical_sector + i, slice);
+            }
+
+            self.cache.insert(virtual_sector, CacheEntry{
+                data,
                 dirty: false,
             });
         }
@@ -132,7 +137,7 @@ impl CachedPartition {
 // `write_sector` methods should only read/write from/to cached sectors.
 impl BlockDevice for CachedPartition {
     fn sector_size(&self) -> u64 {
-        self.device.sector_size()
+        self.partition.sector_size
     }
 
     fn read_sector(&mut self, sector: u64, buf: &mut [u8]) -> io::Result<usize> {

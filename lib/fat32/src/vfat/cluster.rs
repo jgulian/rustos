@@ -1,3 +1,6 @@
+use core::fmt;
+use core::fmt::Formatter;
+
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Copy, Clone, Hash)]
 pub struct Cluster(u32);
 
@@ -17,8 +20,13 @@ impl Cluster {
     }
 
     pub fn sector_start(&self, data_start_sector: u64, sectors_per_cluster: u8) -> u64 {
-        data_start_sector + self.0 as u64 * sectors_per_cluster as u64
+        data_start_sector + (self.0 as u64 - 2) * sectors_per_cluster as u64
+    }
+
+    pub fn offset(&self) -> u32 {
+        self.0 * 4
     }
 }
+
 
 // TODO: Implement any useful helper methods on `Cluster`.

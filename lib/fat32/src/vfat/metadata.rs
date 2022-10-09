@@ -11,7 +11,7 @@ pub struct Date(u16);
 
 impl Date {
     fn year(&self) -> usize {
-        (self.0 as usize >> 9) & 0b111_1111_usize
+        ((self.0 as usize >> 9) & 0b111_1111_usize) + 1980
     }
 
     fn month(&self) -> u8 {
@@ -50,13 +50,13 @@ pub struct Attributes(u8);
 /// A structure containing a date and time.
 #[derive(Default, Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Timestamp {
-    pub date: Date,
     pub time: Time,
+    pub date: Date,
 }
 
 impl From<Date> for Timestamp {
     fn from(date: Date) -> Self {
-        Timestamp{date: date, time: Time(0)
+        Timestamp{date, time: Time(0)
         }
     }
 }

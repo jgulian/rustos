@@ -1,10 +1,11 @@
 pub mod sd;
 
 use alloc::rc::Rc;
+use alloc::vec::Vec;
 use core::fmt::{self, Debug};
 use shim::io;
 use shim::ioerr;
-use shim::path::Path;
+use shim::path::{Component, Path};
 
 pub use fat32::traits;
 use fat32::vfat::{Dir, Entry, File, VFat, VFatHandle};
@@ -57,9 +58,19 @@ impl FileSystem {
     ///
     /// Panics if the underlying disk or file sytem failed to initialize.
     pub unsafe fn initialize(&self) {
-        unimplemented!("FileSystem::initialize()")
+        let sd = sd::Sd::new().expect("filesystem failed to initialize");
+        let vfat = VFat::<PiVFatHandle>::from(sd).expect("failed to initialize vfat");
+        self.0.lock().replace(vfat);
     }
 }
 
 // FIXME: Implement `fat32::traits::FileSystem` for `&FileSystem`
-impl fat32::traits::FileSystem for &FileSystem {}
+impl fat32::traits::FileSystem for &FileSystem {
+    type File = File<PiVFatHandle>;
+    type Dir = Dir<PiVFatHandle>;
+    type Entry = Entry<PiVFatHandle>;
+
+    fn open<P: AsRef<Path>>(self, path: P) -> io::Result<Self::Entry> {
+        self.0.lock().as_ref().unwrap().open(path)
+    }
+}

@@ -1,5 +1,6 @@
 extern crate rand;
 
+use alloc::string::ToString;
 use std::fmt::{self, Debug};
 use std::io;
 use std::io::prelude::*;

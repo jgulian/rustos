@@ -34,7 +34,7 @@ pub struct BiosParameterBlock {
     pub label_string: [u8; 11],
     pub system_identifier: [u8; 8],
     pub boot_code: [u8; 420],
-    pub bp_signature: u16,
+    pub bp_signature: [u8; 2],
 }
 
 const_assert_size!(BiosParameterBlock, 512);
@@ -48,13 +48,13 @@ impl BiosParameterBlock {
     /// If the EBPB signature is invalid, returns an error of `BadSignature`.
     pub fn from<T: BlockDevice>(mut device: T, sector: u64) -> Result<BiosParameterBlock, Error> {
         let mut buffer: [u8; 512] = [0; 512];
-        device.read_sector(512, &mut buffer).map_err(|e| Error::Io(e))?;
+        device.read_sector(sector, &mut buffer).map_err(|e| Error::Io(e))?;
         let bios_parameter_block: BiosParameterBlock = unsafe {
             mem::transmute(buffer)
         };
 
-        if bios_parameter_block.__reserved_one[0] != 0xEB ||
-            bios_parameter_block.__reserved_one[2] != 0x90 {
+        if bios_parameter_block.bp_signature[0] != 0x55 ||
+            bios_parameter_block.bp_signature[1] != 0xAA {
             return Err(Error::BadSignature);
         }
 

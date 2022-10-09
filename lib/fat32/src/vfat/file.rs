@@ -1,19 +1,21 @@
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::cmp::min;
+use core::iter::Chain;
 
 use shim::io::{self, SeekFrom};
 
 use crate::traits;
 use crate::vfat::{Cluster, Metadata, VFatHandle};
+use crate::vfat::vfat::ChainOffset;
 
 #[derive(Debug)]
 pub struct File<HANDLE: VFatHandle> {
     pub vfat: HANDLE,
-    pub starting_sector: Cluster,
     pub name: String,
     pub metadata: Metadata,
-    pub file_size: u64,
+    pub file_size: u32,
+    pub(crate) offset: ChainOffset,
 }
 
 impl<HANDLE: VFatHandle> traits::File for File<HANDLE> {
@@ -22,7 +24,7 @@ impl<HANDLE: VFatHandle> traits::File for File<HANDLE> {
     }
 
     fn size(&self) -> u64 {
-        self.file_size
+        self.file_size as u64
     }
 }
 
@@ -39,13 +41,24 @@ impl<HANDLE: VFatHandle> io::Write for File<HANDLE> {
 
 impl<HANDLE: VFatHandle> io::Read for File<HANDLE> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        let mut data = Vec::<u8>::new();
-        self.vfat.lock(|file_system|
-            file_system.read_chain(self.starting_sector, &mut data))?;
+        if self.offset.exhausted {
+            return Ok(0);
+        }
 
-        buf.copy_from_slice(data.as_slice());
+        let (buffer_to_read, exhausted) = if self.offset.total_bytes + buf.len() > self.file_size as usize {
+            (&mut buf[0..(self.file_size as usize - self.offset.total_bytes)], true)
+        } else {
+            (buf, false)
+        };
 
-        Ok(min(buf.len(), data.len()))
+
+        let (amount_read, new_offset) = self.vfat.lock(|file_system| {
+            file_system.read_chain_offset(buffer_to_read, self.offset.clone())
+        })?;
+
+        self.offset = new_offset;
+        self.offset.exhausted |= exhausted;
+        Ok(amount_read)
     }
 }
 

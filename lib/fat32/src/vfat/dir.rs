@@ -13,6 +13,7 @@ use crate::traits::Dummy;
 use crate::util::VecExt;
 use crate::vfat::{Attributes, Date, Error, Metadata, Time, Timestamp};
 use crate::vfat::{Cluster, Entry, File, VFatHandle};
+use crate::vfat::vfat::ChainOffset;
 
 enum DirectoryAttribute {
     ReadOnly = 0x01,
@@ -35,7 +36,8 @@ pub struct Dir<HANDLE: VFatHandle> {
 #[repr(C, packed)]
 #[derive(Copy, Clone)]
 pub struct VFatRegularDirEntry {
-    name: [u8; 11],
+    name: [u8; 8],
+    extension: [u8; 3],
     attributes: u8,
     __nt_reserved: u8,
     created_time_tenth: u8,
@@ -67,7 +69,8 @@ const_assert_size!(VFatLfnDirEntry, 32);
 #[repr(C, packed)]
 #[derive(Copy, Clone)]
 pub struct VFatUnknownDirEntry {
-    __reserved_one: [u8; 11],
+    named: u8,
+    __reserved_one: [u8; 10],
     attributes: u8,
     __reserved_two: [u8; 20],
 }
@@ -118,7 +121,7 @@ impl<HANDLE: VFatHandle> traits::Dir for Dir<HANDLE> {
 
         Ok(DirIter {
             vfat: self.vfat.clone(),
-            data: unsafe {data.cast()},
+            data: unsafe { data.cast() },
             i: 0,
             done: false,
         })
@@ -139,11 +142,22 @@ impl<HANDLE: VFatHandle> Iterator for DirIter<HANDLE> {
         let mut long_file_names = Vec::<VFatLfnDirEntry>::new();
 
         loop {
-            if self.done {
+            if self.done || self.i == self.data.len() {
                 return None;
             }
 
             let entry: &VFatDirEntry = &self.data[self.i];
+            if unsafe { entry.unknown.named } == 0 {
+                self.done = true;
+                return None;
+            }
+
+            if unsafe { entry.unknown.named } == 0xe5 {
+                self.i += 1;
+                long_file_names.clear();
+                continue;
+            }
+
             self.i += 1;
 
             let (regular, long_file_name) = unsafe {
@@ -162,26 +176,36 @@ impl<HANDLE: VFatHandle> Iterator for DirIter<HANDLE> {
             let regular_dir = regular.unwrap();
             let mut name = String::new();
 
-            if long_file_names.is_empty() {
+            let name = if long_file_names.is_empty() {
+                let mut result = String::new();
+                let mut found_dot = false;
                 for c in regular_dir.name.iter() {
-                    name.push(*c as char);
+                    if *c == b' ' || *c == 0 {
+                        break;
+                    }
+                    result.push(*c as char);
                 }
+                let mut has_extension = false;
+                for c in regular_dir.extension.iter() {
+                    if *c == b' ' || *c == 0 {
+                        break;
+                    }
+                    if !has_extension {
+                        result.push('.');
+                        has_extension = true;
+                    }
+                    result.push(*c as char)
+                }
+                result
             } else {
-                while !long_file_names.is_empty() {
-                    let long_file_name: VFatLfnDirEntry = long_file_names.pop().expect("lfn should have item");
-                    for c in long_file_name.name_one.iter() {
-                        name.push(*c as char);
-                    }
-                    for c in long_file_name.name_two.iter() {
-                        name.push(*c as char);
-                    }
-                    for c in long_file_name.name_three.iter() {
-                        name.push(*c as char);
-                    }
-                }
+                parse_name(&mut long_file_names)
+            };
+
+            if name.len() == 0 {
+                panic!("entry must have name");
             }
 
-            let starting_sector = ((regular_dir.first_cluster_high as u32) << 16) |
+            let starting_cluster = ((regular_dir.first_cluster_high as u32) << 16) |
                 (regular_dir.first_cluster_low as u32);
 
             let metadata = Metadata {
@@ -194,21 +218,43 @@ impl<HANDLE: VFatHandle> Iterator for DirIter<HANDLE> {
             let entry = if regular_dir.attributes & (DirectoryAttribute::Directory as u8) > 0 {
                 Entry::Dir(Dir {
                     vfat: self.vfat.clone(),
-                    first_cluster: Cluster::from(starting_sector),
+                    first_cluster: Cluster::from(starting_cluster),
                     name,
-                    metadata
+                    metadata,
                 })
             } else {
                 Entry::File(File {
                     vfat: self.vfat.clone(),
-                    starting_sector: Cluster::from(starting_sector),
                     name,
                     metadata,
-                    file_size: regular_dir.file_size as u64,
+                    file_size: regular_dir.file_size,
+                    offset: ChainOffset::new(Cluster::from(starting_cluster)),
                 })
             };
 
             return Some(entry);
         }
     }
+}
+
+fn parse_name(long_file_names: &mut Vec<VFatLfnDirEntry>) -> String {
+    long_file_names.sort_by(|a, b| (a.order & 0b11111).cmp(&(b.order & 0b11111)));
+
+    let mut bytes = Vec::<u8>::new();
+    for long_file_name in long_file_names.iter() {
+        bytes.extend_from_slice(&long_file_name.name_one);
+        bytes.extend_from_slice(&long_file_name.name_two);
+        bytes.extend_from_slice(&long_file_name.name_three);
+    }
+
+    let mut chars = Vec::<u16>::new();
+    for byte_pair in bytes.chunks(2) {
+        let char = (byte_pair[1] as u16) << 8 | byte_pair[0] as u16;
+        if char == 0 || char == 0xFFFF {
+            break;
+        }
+        chars.push(char);
+    }
+
+    String::from_utf16_lossy(chars.as_slice())
 }

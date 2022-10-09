@@ -1,10 +1,13 @@
-use core::fmt::Debug;
+use alloc::string::ToString;
+use core::fmt::{Debug, Formatter};
 use core::marker::PhantomData;
 use core::mem::size_of;
 
 use alloc::vec::Vec;
 use core::cmp::min;
-use core::mem;
+use core::iter::Chain;
+use core::{fmt, mem};
+use core::ptr::read;
 
 use shim::io;
 use shim::ioerr;
@@ -56,12 +59,13 @@ impl<HANDLE: VFatHandle> VFat<HANDLE> {
         }
 
         let partition_entry: &PartitionEntry = &master_boot_record.partition_table[i];
+
         let bios_parameter_block = BiosParameterBlock::from(&mut device, partition_entry.relative_sector as u64)?;
 
         let partition = Partition {
             start: partition_entry.relative_sector as u64,
             num_sectors: partition_entry.total_sectors as u64,
-            sector_size: bios_parameter_block.total_logical_sectors as u64,
+            sector_size: bios_parameter_block.bytes_per_sector as u64,
         };
 
         let sectors_per_fat = if bios_parameter_block.sectors_per_fat_one != 0 {
@@ -70,7 +74,8 @@ impl<HANDLE: VFatHandle> VFat<HANDLE> {
             bios_parameter_block.sectors_per_fat_two
         };
 
-        let data_start_sector = bios_parameter_block.reserved_sectors as u64 + (bios_parameter_block.number_of_fats as u64 * sectors_per_fat as u64);
+        let data_start_sector = bios_parameter_block.reserved_sectors as u64 +
+            (bios_parameter_block.number_of_fats as u64 * sectors_per_fat as u64);
 
         Ok(HANDLE::new(VFat {
             phantom: Default::default(),
@@ -85,28 +90,53 @@ impl<HANDLE: VFatHandle> VFat<HANDLE> {
     }
 
     pub fn read_chain(&mut self, start: Cluster, buf: &mut Vec<u8>) -> io::Result<usize> {
-        let initial_size = buf.len();
-        let mut cluster = start;
+        let mut chain_offset = ChainOffset::new(start);
+        let bytes_per_cluster = self.bytes_per_sector as usize * self.sectors_per_cluster as usize;
+        let mut total_amount_read = 0;
+        buf.resize(0, 0);
+        let mut i : usize = 0;
 
-        loop {
-            let read_into = buf.len();
-            buf.resize(buf.len() + self.bytes_per_sector as usize, 0);
-            self.read_cluster(cluster, 0, &mut buf.as_mut_slice()[read_into..]);
+        while !chain_offset.exhausted {
+            buf.resize(buf.len() + bytes_per_cluster, 0);
+            let slice = &mut buf.as_mut_slice()[(bytes_per_cluster * i)..(bytes_per_cluster * (i + 1))];
+            let (amount_read, new_offset) = self.read_chain_offset(slice, chain_offset)?;
 
-            match self.fat_entry(cluster)?.status() {
-                Status::Eoc(status) => {
-                    break;
-                },
-                Status::Data(next_cluster) => {
-                    cluster = next_cluster;
+            chain_offset = new_offset;
+            total_amount_read += amount_read;
+            i += 1;
+        }
+
+        Ok(total_amount_read)
+    }
+
+    pub fn read_chain_offset(&mut self, buf: &mut [u8], start_offset: ChainOffset) -> io::Result<(usize, ChainOffset)> {
+        let mut amount_read = 0;
+        let bytes_per_cluster = self.bytes_per_sector as usize * self.sectors_per_cluster as usize;
+        let mut offset = start_offset.clone();
+
+        while !offset.exhausted && amount_read != buf.len() {
+            let sector = &mut buf[amount_read..];
+            let n = self.read_cluster(offset.current_cluster, offset.bytes_within_cluster, sector)?;
+            amount_read += n;
+            offset.bytes_within_cluster = (n + offset.bytes_within_cluster) % bytes_per_cluster;
+
+            if offset.bytes_within_cluster == 0 {
+                match self.fat_entry(offset.current_cluster)?.status() {
+                    Status::Eoc(status) => {
+                        offset.exhausted = true;
+                    }
+                    Status::Data(next_cluster) => {
+                        offset.current_cluster = next_cluster;
+                    }
+                    _ => {
+                        return Err(io::Error::from(io::ErrorKind::Other));
+                    }
                 }
-                _ => {
-                    panic!("invalid cluster");
-                },
             }
         }
 
-        Ok(buf.len() - initial_size)
+        offset.total_bytes += amount_read;
+        Ok((amount_read, offset))
     }
 
     pub fn read_cluster(&mut self, cluster: Cluster, offset: usize, buf: &mut [u8]) -> io::Result<usize> {
@@ -114,28 +144,31 @@ impl<HANDLE: VFatHandle> VFat<HANDLE> {
         let mut sector_id = cluster.sector_start(self.data_start_sector, self.sectors_per_cluster);
         let last_sector = sector_id + self.sectors_per_cluster as u64;
 
-        sector_id += offset as u64 / self.fat_start_sector;
+        sector_id += offset as u64 / self.bytes_per_sector as u64;
         let mut sector_offset = offset % self.bytes_per_sector as usize;
 
         while amount_read < buf.len() && sector_id < last_sector {
             let buffer = self.device.get(sector_id)?;
-            for i in 0..min(self.bytes_per_sector as usize - sector_offset, buf.len() - amount_read) {
+
+            let amount_to_copy = min(self.bytes_per_sector as usize - sector_offset, buf.len() - amount_read);
+            for i in 0..amount_to_copy {
                 buf[amount_read + i] = buffer[sector_offset + i];
             }
 
             sector_offset = 0;
             sector_id += 1;
-            amount_read += self.bytes_per_sector as usize - sector_offset;
+            amount_read += amount_to_copy;
         }
 
         Ok(amount_read)
     }
 
     pub fn fat_entry(&mut self, cluster: Cluster) -> io::Result<&FatEntry> {
-        let sector_number = cluster.fat_sector_number(self.fat_start_sector, self.bytes_per_sector);
-        let entry_offset = cluster.fat_entry_offset(self.bytes_per_sector) as usize;
-        let sector = self.device.get(sector_number)?;
-        Ok(unsafe {mem::transmute::<&u8, &FatEntry>(&sector[entry_offset])})
+        let sector = self.fat_start_sector + (cluster.offset() / self.bytes_per_sector as u32) as u64;
+        let data = self.device.get(sector)?;
+        let offset = (cluster.offset() % self.bytes_per_sector as u32) as usize;
+        let entry = &data[offset];
+        Ok(unsafe { mem::transmute::<&u8, &FatEntry>(entry) })
     }
 
     pub fn root_cluster(&self) -> Cluster {
@@ -179,5 +212,39 @@ impl<'a, HANDLE: VFatHandle> FileSystem for &'a HANDLE {
         }
 
         Ok(path_stack.pop().ok_or(io::Error::from(io::ErrorKind::InvalidInput))?)
+    }
+}
+
+#[derive(Copy, Clone)]
+pub struct ChainOffset {
+    pub total_bytes: usize,
+    pub bytes_within_cluster: usize,
+    pub current_cluster: Cluster,
+    pub exhausted: bool,
+}
+
+impl ChainOffset {
+    pub(crate) fn new(start: Cluster) -> Self {
+        ChainOffset {
+            total_bytes: 0,
+            bytes_within_cluster: 0,
+            current_cluster: start,
+            exhausted: false,
+        }
+    }
+
+    fn bytes_read(&self) -> usize {
+        self.total_bytes
+    }
+}
+
+impl fmt::Debug for ChainOffset {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        f.debug_struct("ChainOffset")
+            .field("total_bytes", &self.total_bytes)
+            .field("bytes_within_cluster", &self.bytes_within_cluster)
+            .field("current_cluster", &self.current_cluster)
+            .field("exhausted", &self.exhausted)
+            .finish()
     }
 }
