@@ -3,6 +3,8 @@ use shim::io;
 use shim::ioerr;
 
 use fat32::traits::BlockDevice;
+use crate::console::kprint;
+use crate::kprintln;
 
 extern "C" {
     /// A global representing the last SD controller error that occured.
@@ -74,12 +76,12 @@ impl BlockDevice for Sd {
         }
 
         let did_err = unsafe {
-            let ptr: *mut u8 = &mut buf[0];
-            if (ptr as usize) % 4 == 0 {
+            let ptr = buf.as_mut_ptr();
+            if (ptr as usize) % 4 != 0 {
                 return Err(io::Error::from(io::ErrorKind::InvalidInput));
             }
 
-            sd_readsector(n as i32, ptr) != 0
+            sd_readsector(n as i32, ptr) == 0
         };
 
         if did_err {

@@ -1,8 +1,9 @@
 ROOT := $(shell git rev-parse --show-toplevel)
 
 KERN := boot
-TARGET := target/aarch64-unknown-none/release/${KERN}
+TARGET := ~/target/boot/aarch64-unknown-none/release/${KERN}
 OBJCPY := cargo objcopy -- --strip-all -O binary
+BUILD := ~/build/boot
 
 .PHONY: all build qemu objdump nm check clean install test
 
@@ -10,32 +11,32 @@ all: build
 
 build:
 	@echo "+ Building build/$(KERN).elf [xbuild/$@]"
-	@cargo xbuild --release
-	@mkdir -p build
-	@cp -f $(TARGET) build/$(KERN).elf
+	@cargo xbuild --release --target-dir ~/target/boot/
+	@mkdir -p $(BUILD)
+	@cp -f $(TARGET) $(BUILD)/$(KERN).elf
 
-	@echo "+ Building build/$(KERN).bin [objcopy]"
-	@$(OBJCPY) $(TARGET) build/$(KERN).bin
+	@echo "+ Building $(BUILD)/$(KERN).bin [objcopy]"
+	@$(OBJCPY) $(TARGET) $(BUILD)/$(KERN).bin
 
 check:
 	@cargo xcheck
 
 qemu: build
-	./qemu.sh build/$(KERN).elf
+	./qemu.sh $(BUILD)/$(KERN).elf
 
 objdump: build
-	cargo objdump -- -disassemble -no-show-raw-insn -print-imm-hex build/$(KERN).elf
+	cargo objdump -- -disassemble -no-show-raw-insn -print-imm-hex $(BUILD)/$(KERN).elf
 
 nm: build
-	cargo nm build/$(KERN).elf
+	cargo nm $(BUILD)/$(KERN).elf
 
 clean:
 	cargo clean
-	rm -rf build
+	rm -rf $(BUILD)
 
 install: build
-	@echo "+ Installing build/$(KERN).elf [install-kernel.py]"
-	@$(ROOT)/bin/install-kernel.py build/$(KERN).elf
+	@echo "+ Installing $(BUILD)/$(KERN).elf [install-kernel.py]"
+	@$(ROOT)/bin/install-kernel.py $(BUILD)/$(KERN).elf
 
 test:
 	cargo test --target=$(shell $(ROOT)/bin/get-host-target.sh)

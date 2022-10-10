@@ -30,6 +30,7 @@ def load_target_dir():
         print("    waiting", end="", flush=True)
 
         while not os.path.isdir(dst):
+            print(os.path.isdir(dst))
             print(".", end="", flush=True)
             time.sleep(1)
         print()
@@ -106,7 +107,10 @@ def copy_to(src, name, dst):
                 os.unlink(bak)
             shutil.move(dst, bak)
         print("[!] %s is updated" % dst)
-        shutil.copy2(src, dst)
+
+        with open(src, 'rb') as source:
+            with open(dst, 'wb+') as dest:
+                dest.write(source.read())
     else:
         print("[!] %s is up-to-date" % dst)
 

@@ -104,7 +104,6 @@ impl Xmodem<()> {
                 match receiver.read_packet(&mut packet) {
                     Err(ref e) if e.kind() == io::ErrorKind::Interrupted => continue,
                     Err(e) => {
-                        println!("BAD 1");
                         return Err(e); },
                     Ok(0) => break 'next_packet,
                     Ok(n) => {
@@ -118,7 +117,6 @@ impl Xmodem<()> {
             return ioerr!(BrokenPipe, "bad receive");
         }
 
-        println!("GOOD 1");
         Ok(received)
     }
 }
@@ -249,8 +247,6 @@ impl<T: io::Read + io::Write> Xmodem<T> {
             self.started = true;
         }
 
-        println!("Here 1");
-
         let packet_head = self.read_byte(true)?;
         if packet_head == EOT {
             self.write_byte(NAK)?;
@@ -261,8 +257,6 @@ impl<T: io::Read + io::Write> Xmodem<T> {
             return Err(io::Error::from(io::ErrorKind::InvalidData));
         }
 
-        println!("Here 2");
-
         (self.progress)(Progress::Started);
 
         let packet_num = self.read_byte(false)?;
@@ -272,21 +266,21 @@ impl<T: io::Read + io::Write> Xmodem<T> {
             return Err(io::Error::from(io::ErrorKind::InvalidData));
         }
 
-        println!("Here 3");
-
         let read = self.inner.read_max(buf)?;
         if read != 128 {
             self.write_byte(CAN)?;
             return Err(io::Error::from(io::ErrorKind::UnexpectedEof));
         }
 
-        println!("Here 4");
-
         let checksum = self.read_byte(false)?;
         if checksum == get_checksum(buf) {
             self.write_byte(ACK)?;
             (self.progress)(Progress::Packet(packet_num));
-            self.packet += 1;
+            self.packet = if self.packet != 255 {
+                self.packet + 1
+            } else {
+                0
+            };
             Ok(128)
         } else {
             self.write_byte(NAK)?;
@@ -354,7 +348,11 @@ impl<T: io::Read + io::Write> Xmodem<T> {
         self.expect_byte(ACK, "Invalid end of packet")?;
 
         (self.progress)(Progress::Packet(self.packet));
-        self.packet += 1;
+        self.packet = if self.packet != 255 {
+            self.packet + 1
+        } else {
+            0
+        };
         Ok(128)
     }
 

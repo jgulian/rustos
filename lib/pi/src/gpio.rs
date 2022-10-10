@@ -102,7 +102,7 @@ impl Gpio<Uninitialized> {
     pub fn into_alt(self, function: Function) -> Gpio<Alt> {
         let reg: usize = (self.pin / 10) as usize;
         let shift: usize = (3 * (self.pin % 10)) as usize;
-        self.registers.FSEL[reg].write((function as u32) << shift);
+        self.registers.FSEL[reg].or_mask((function as u32) << shift);
         self.transition()
     }
 
