@@ -38,6 +38,7 @@ use process::GlobalScheduler;
 use traps::irq::Irq;
 use vm::VMManager;
 use pi::uart::MiniUart;
+use crate::shell::Shell;
 
 #[cfg_attr(not(test), global_allocator)]
 pub static ALLOCATOR: Allocator = Allocator::uninitialized();
@@ -53,5 +54,12 @@ fn kmain() -> ! {
     }
 
     kprintln!("Welcome to cs3210!");
-    shell::shell("> ");
+
+    unsafe {
+        asm!("brk 2");
+    }
+
+    loop {
+        Shell::new(">").run();
+    }
 }

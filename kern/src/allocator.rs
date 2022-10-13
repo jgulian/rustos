@@ -86,7 +86,6 @@ pub fn memory_map() -> Option<(usize, usize)> {
                 let start_unaligned_address= max(mem.start as usize, binary_end);
                 let start_address = align_up(start_unaligned_address, page_size);
                 let end_address = align_down((mem.size + mem.start) as usize, page_size);
-                kprintln!("{}", end_address - start_address);
                 return Some((start_address, end_address))
             },
             None => continue,

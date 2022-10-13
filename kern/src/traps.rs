@@ -3,9 +3,13 @@ mod syndrome;
 mod syscall;
 
 pub mod irq;
+
+use core::fmt;
+use core::fmt::Formatter;
 pub use self::frame::TrapFrame;
 
 use pi::interrupt::{Controller, Interrupt};
+use crate::{kprintln, Shell};
 
 use self::syndrome::Syndrome;
 use self::syscall::handle_syscall;
@@ -35,11 +39,21 @@ pub struct Info {
     kind: Kind,
 }
 
+impl fmt::Display for Info {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        f.debug_struct("Info")
+            .field("source", &self.source)
+            .field("kind", &self.kind)
+            .finish()
+    }
+}
+
 /// This function is called when an exception occurs. The `info` parameter
 /// specifies the source and kind of exception that has occurred. The `esr` is
 /// the value of the exception syndrome register. Finally, `tf` is a pointer to
 /// the trap frame for the exception.
 #[no_mangle]
 pub extern "C" fn handle_exception(info: Info, esr: u32, tf: &mut TrapFrame) {
-    unimplemented!("handle_exception");
+    kprintln!("handle_exception: {} {}", info, esr);
+    Shell::new("$").run();
 }
