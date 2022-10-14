@@ -4,6 +4,7 @@ mod syscall;
 
 pub mod irq;
 
+use core::convert::TryInto;
 use core::fmt;
 use core::fmt::Formatter;
 pub use self::frame::TrapFrame;
@@ -55,5 +56,23 @@ impl fmt::Display for Info {
 #[no_mangle]
 pub extern "C" fn handle_exception(info: Info, esr: u32, tf: &mut TrapFrame) {
     kprintln!("handle_exception: {} {}", info, esr);
+
+    let syndrome = Syndrome::from(esr);
+    kprintln!("syndrome: {}", syndrome);
+
     Shell::new("$").run();
+
+    kprintln!("Here {}", tf);
+    match info.kind {
+        Kind::Synchronous => {
+            match syndrome {
+                Syndrome::Brk(_) => {
+                    kprintln!("incrementing {}, {}", tf.elr, tf.elr + 4);
+                    tf.elr += 4;
+                }
+                _ => {}
+            }
+        }
+        _ => {}
+    }
 }

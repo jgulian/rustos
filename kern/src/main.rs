@@ -56,8 +56,10 @@ fn kmain() -> ! {
     kprintln!("Welcome to cs3210!");
 
     unsafe {
-        asm!("brk 2");
+        asm!("brk 4");
     }
+
+    kprintln!("Back here");
 
     loop {
         Shell::new(">").run();

@@ -1,3 +1,5 @@
+use core::fmt;
+use core::fmt::Formatter;
 use aarch64::ESR_EL1;
 use crate::traps::syndrome::Fault::{AccessFlag, AddressSize, Alignment, Permission, TlbConflict, Translation};
 
@@ -69,12 +71,12 @@ impl From<u32> for Syndrome {
             0b01_1000 => MsrMrsSystem,
             0b10_0000..=0b10_0001 => InstructionAbort {
                 kind: Fault::from(instruction_syndrome),
-                level: (instruction_syndrome as u8) & 0b11
+                level: (instruction_syndrome as u8) & 0b11,
             },
             0b10_0010 => PCAlignmentFault,
             0b10_0100..=0b10_0101 => DataAbort {
                 kind: Fault::from(instruction_syndrome),
-                level: (instruction_syndrome as u8) & 0b11
+                level: (instruction_syndrome as u8) & 0b11,
             },
             0b10_0110 => SpAlignmentFault,
             0b10_1000..=0b10_1100 => TrappedFpu,
@@ -84,6 +86,55 @@ impl From<u32> for Syndrome {
             0b11_0100..=0b11_0101 => Watchpoint,
             0b11_1100 => Brk(esr as u16),
             _ => Other(esr),
+        }
+    }
+}
+
+impl fmt::Display for Syndrome {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Syndrome::Unknown => f.write_str("Unknown"),
+            Syndrome::WfiWfe => f.write_str("WfiWfe"),
+            Syndrome::SimdFp => f.write_str("SimdFp"),
+            Syndrome::IllegalExecutionState => f.write_str("IllegalExecutionState"),
+            Syndrome::Svc(data) =>
+                f.debug_struct("Svc")
+                    .field("data", data)
+                    .finish(),
+            Syndrome::Hvc(data) =>
+                f.debug_struct("Hvc")
+                    .field("data", data)
+                    .finish(),
+            Syndrome::Smc(data) =>
+                f.debug_struct("Smc")
+                    .field("data", data)
+                    .finish(),
+            Syndrome::MsrMrsSystem => f.write_str("MsrMrsSystem"),
+            Syndrome::InstructionAbort { kind, level } =>
+                f.debug_struct("InstructionAbort")
+                    .field("kind", kind)
+                    .field("level", level)
+                    .finish(),
+            Syndrome::PCAlignmentFault => f.write_str("PCAlignmentFault"),
+            Syndrome::DataAbort { kind, level } =>
+                f.debug_struct("DataAbort")
+                    .field("kind", kind)
+                    .field("level", level)
+                    .finish(),
+            Syndrome::SpAlignmentFault => f.write_str("SpAlignmentFault"),
+            Syndrome::TrappedFpu => f.write_str("TrappedFpu"),
+            Syndrome::SError => f.write_str("SError"),
+            Syndrome::Breakpoint => f.write_str("Breakpoint"),
+            Syndrome::Step => f.write_str("Step"),
+            Syndrome::Watchpoint => f.write_str("Watchpoint"),
+            Syndrome::Brk(data) =>
+                f.debug_struct("Brk")
+                    .field("data", data)
+                    .finish(),
+            Syndrome::Other(data) =>
+                f.debug_struct("Other")
+                    .field("data", data)
+                    .finish(),
         }
     }
 }
