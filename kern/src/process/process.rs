@@ -1,4 +1,5 @@
 use alloc::boxed::Box;
+use core::mem;
 use shim::io;
 use shim::path::Path;
 
@@ -105,6 +106,22 @@ impl Process {
     ///
     /// Returns `false` in all other cases.
     pub fn is_ready(&mut self) -> bool {
-        unimplemented!("Process::is_ready()")
+        //TODO: clean up, also go through code base and replace a lot of match statements with these
+        // lol
+        if let State::Waiting(p) = &mut self.state {
+            let mut poll = mem::replace(p, Box::new(|p| false));
+            if poll(self) {
+                self.state = State::Ready;
+            } else {
+                if let State::Waiting(pr) = &mut self.state {
+                    mem::replace(pr, poll);
+                }
+            }
+        }
+
+        match self.state {
+            State::Ready => true,
+            _ => false,
+        }
     }
 }

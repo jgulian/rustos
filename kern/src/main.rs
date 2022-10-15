@@ -42,7 +42,9 @@ use traps::irq::Irq;
 use vm::VMManager;
 use pi::uart::MiniUart;
 use crate::param::TICK;
+use crate::process::Process;
 use crate::shell::Shell;
+use crate::traps::TrapFrame;
 
 #[cfg_attr(not(test), global_allocator)]
 pub static ALLOCATOR: Allocator = Allocator::uninitialized();
@@ -51,18 +53,12 @@ pub static SCHEDULER: GlobalScheduler = GlobalScheduler::uninitialized();
 pub static VMM: VMManager = VMManager::uninitialized();
 pub static IRQ: Irq = Irq::uninitialized();
 
-
-
 fn kmain() -> ! {
     unsafe {
         ALLOCATOR.initialize();
         FILESYSTEM.initialize();
         IRQ.initialize();
-
-        IRQ.register(Interrupt::Timer1, Box::new(|tf| {
-            kprintln!("tick tick boom");
-            tick_in(TICK);
-        }))
+        SCHEDULER.initialize();
     }
 
     let mut controller = Controller::new();
