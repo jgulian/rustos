@@ -25,6 +25,7 @@ pub mod process;
 pub mod traps;
 pub mod vm;
 
+use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::alloc::{GlobalAlloc, Layout};
@@ -34,10 +35,13 @@ use console::kprintln;
 
 use allocator::Allocator;
 use fs::FileSystem;
+use pi::interrupt::{Controller, Interrupt};
+use pi::timer::tick_in;
 use process::GlobalScheduler;
 use traps::irq::Irq;
 use vm::VMManager;
 use pi::uart::MiniUart;
+use crate::param::TICK;
 use crate::shell::Shell;
 
 #[cfg_attr(not(test), global_allocator)]
@@ -47,21 +51,28 @@ pub static SCHEDULER: GlobalScheduler = GlobalScheduler::uninitialized();
 pub static VMM: VMManager = VMManager::uninitialized();
 pub static IRQ: Irq = Irq::uninitialized();
 
+
+
 fn kmain() -> ! {
     unsafe {
         ALLOCATOR.initialize();
         FILESYSTEM.initialize();
+        IRQ.initialize();
+
+        IRQ.register(Interrupt::Timer1, Box::new(|tf| {
+            kprintln!("tick tick boom");
+            tick_in(TICK);
+        }))
+    }
+
+    let mut controller = Controller::new();
+    for int in Interrupt::iter() {
+        controller.disable(*int);
     }
 
     kprintln!("Welcome to cs3210!");
 
     unsafe {
-        asm!("brk 4");
-    }
-
-    kprintln!("Back here");
-
-    loop {
-        Shell::new(">").run();
+        SCHEDULER.start();
     }
 }

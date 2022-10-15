@@ -10,7 +10,7 @@ use core::fmt::Formatter;
 pub use self::frame::TrapFrame;
 
 use pi::interrupt::{Controller, Interrupt};
-use crate::{kprintln, Shell};
+use crate::{IRQ, kprintln, Shell};
 
 use self::syndrome::Syndrome;
 use self::syscall::handle_syscall;
@@ -55,24 +55,33 @@ impl fmt::Display for Info {
 /// the trap frame for the exception.
 #[no_mangle]
 pub extern "C" fn handle_exception(info: Info, esr: u32, tf: &mut TrapFrame) {
-    kprintln!("handle_exception: {} {}", info, esr);
+    kprintln!("handle_exception: {} {} {}", info, esr, unsafe {aarch64::current_el()});
 
     let syndrome = Syndrome::from(esr);
     kprintln!("syndrome: {}", syndrome);
 
-    Shell::new("$").run();
+    //Shell::new("$").run();
 
-    kprintln!("Here {}", tf);
     match info.kind {
         Kind::Synchronous => {
             match syndrome {
                 Syndrome::Brk(_) => {
-                    kprintln!("incrementing {}, {}", tf.elr, tf.elr + 4);
                     tf.elr += 4;
                 }
                 _ => {}
             }
         }
+        Kind::Irq => {
+            let controller = Controller::new();
+            for int in Interrupt::iter() {
+                if controller.is_pending(*int) {
+                    IRQ.invoke(*int, tf);
+                    kprintln!("returned from invoke")
+                }
+            }
+        }
         _ => {}
     }
+
+    kprintln!("here")
 }

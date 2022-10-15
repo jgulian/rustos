@@ -1,5 +1,3 @@
-// TODO: make push and pop macros do two elements
-
 .macro PUSH16 a, b
     stp  \b, \a, [SP, #-16]!
 .endm

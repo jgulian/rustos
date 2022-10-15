@@ -53,6 +53,11 @@ impl Interrupt {
             _ => panic!("Unknown interrupt: {}", i),
         }
     }
+
+    pub fn register(&self) -> (usize, u32) {
+        let v = (*self as usize);
+        (v / 32, 1 << (v % 32))
+    }
 }
 
 
@@ -76,7 +81,13 @@ impl From<usize> for Interrupt {
 #[repr(C)]
 #[allow(non_snake_case)]
 struct Registers {
-    // FIXME: Fill me in.
+    PENDING_BASIC: Volatile<u32>,
+    PENDING_IRQ: [Volatile<u32>; 2],
+    FIQ_CONTROL: Volatile<u32>,
+    ENABLE_IRQ: [Volatile<u32>; 2],
+    ENABLE_BASIC: Volatile<u32>,
+    DISABLE_IRQ: [Volatile<u32>; 2],
+    DISABLE_BASIC: Volatile<u32>,
 }
 
 /// An interrupt controller. Used to enable and disable interrupts as well as to
@@ -95,16 +106,19 @@ impl Controller {
 
     /// Enables the interrupt `int`.
     pub fn enable(&mut self, int: Interrupt) {
-        unimplemented!()
+        let (reg, mask) = int.register();
+        self.registers.ENABLE_IRQ[reg].or_mask(mask);
     }
 
     /// Disables the interrupt `int`.
     pub fn disable(&mut self, int: Interrupt) {
-        unimplemented!()
+        let (reg, mask) = int.register();
+        self.registers.DISABLE_IRQ[reg].or_mask(mask);
     }
 
     /// Returns `true` if `int` is pending. Otherwise, returns `false`.
     pub fn is_pending(&self, int: Interrupt) -> bool {
-        unimplemented!()
+        let (reg, mask) = int.register();
+        (self.registers.PENDING_IRQ[reg].read() & mask) > 0
     }
 }

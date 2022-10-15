@@ -1,6 +1,7 @@
 use core::fmt;
 use core::fmt::Formatter;
 use aarch64::ESR_EL1;
+use crate::kprintln;
 use crate::traps::syndrome::Fault::{AccessFlag, AddressSize, Alignment, Permission, TlbConflict, Translation};
 
 #[derive(Debug, PartialEq, Copy, Clone)]
@@ -59,6 +60,8 @@ impl From<u32> for Syndrome {
         let exception_class = (esr >> 26) as u16;
         let is_32_bit_exception = esr & (1 << 25) > 0;
         let instruction_syndrome = esr & ((1 << 25) - 1);
+
+        kprintln!("thing {}", exception_class);
 
         match exception_class {
             0b00_0000 => Unknown,

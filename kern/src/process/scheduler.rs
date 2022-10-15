@@ -2,13 +2,28 @@ use alloc::boxed::Box;
 use alloc::collections::vec_deque::VecDeque;
 use core::fmt;
 
-use aarch64::*;
+use aarch64;
+use pi::interrupt::{Controller, Interrupt};
+use pi::timer::{tick_in, Timer};
 
 use crate::mutex::Mutex;
 use crate::param::{PAGE_MASK, PAGE_SIZE, TICK, USER_IMG_BASE};
 use crate::process::{Id, Process, State};
 use crate::traps::TrapFrame;
-use crate::VMM;
+use crate::{kprintln, shell, VMM};
+use crate::console::kprint;
+
+extern "C" {
+    fn _start();
+}
+
+extern fn run_shell() {
+    unsafe { asm!("brk 1" :::: "volatile"); }
+    unsafe { asm!("brk 2" :::: "volatile"); }
+    shell::Shell::new("user0> ").run();
+    unsafe { asm!("brk 3" :::: "volatile"); }
+    loop { shell::Shell::new("user1> ").run(); }
+}
 
 /// Process scheduler for the entire machine.
 #[derive(Debug)]
@@ -23,8 +38,8 @@ impl GlobalScheduler {
     /// Enter a critical region and execute the provided closure with the
     /// internal scheduler.
     pub fn critical<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce(&mut Scheduler) -> R,
+        where
+            F: FnOnce(&mut Scheduler) -> R,
     {
         let mut guard = self.0.lock();
         f(guard.as_mut().expect("scheduler uninitialized"))
@@ -66,7 +81,40 @@ impl GlobalScheduler {
     /// Starts executing processes in user space using timer interrupt based
     /// preemptive scheduling. This method should not return under normal conditions.
     pub fn start(&self) -> ! {
-        unimplemented!("GlobalScheduler::start()")
+        Controller::new().enable(Interrupt::Timer1);
+        tick_in(TICK);
+
+        let process = Process::new().expect("unable to create process");
+
+        let top_of_stack = process.stack.top().as_usize();
+        let mut trap_frame: TrapFrame = Default::default();
+        for x in trap_frame.xs.iter_mut() {
+            *x = 0;
+        }
+        for q in trap_frame.qs.iter_mut() {
+            *q = 0_f64;
+        }
+
+        trap_frame.sp = _start as *const () as u64;
+        trap_frame.tpidr = 0;
+        trap_frame.elr = run_shell as *const () as u64;
+        trap_frame.spsr = 0;
+
+        kprintln!("{}", trap_frame);
+
+        unsafe {
+            asm!("mov x0, $0
+                  mov sp, x0"
+                :: "r"(&trap_frame as *const TrapFrame as u64)
+                :: "volatile");
+            asm!("bl context_restore");
+            asm!("mov x28, 0");
+            asm!("mov x29, 0");
+        }
+
+        aarch64::eret();
+
+        loop {}
     }
 
     /// Initializes the scheduler and add userspace processes to the Scheduler
@@ -145,7 +193,7 @@ impl Scheduler {
     }
 }
 
-pub extern "C" fn  test_user_process() -> ! {
+pub extern "C" fn test_user_process() -> ! {
     loop {
         let ms = 10000;
         let error: u64;
