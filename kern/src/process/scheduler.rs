@@ -10,7 +10,7 @@ use crate::mutex::Mutex;
 use crate::param::{PAGE_MASK, PAGE_SIZE, TICK, USER_IMG_BASE};
 use crate::process::{Id, Process, State};
 use crate::traps::TrapFrame;
-use crate::{IRQ, kprintln, SCHEDULER, shell, VMM};
+use crate::{IRQ, kprintln, SCHEDULER, shell, Shell, VMM};
 use crate::console::kprint;
 
 extern "C" {
@@ -18,8 +18,18 @@ extern "C" {
 }
 
 extern fn run_shell() {
-    shell::Shell::new("user0> ").run();
-    loop { shell::Shell::new("user1> ").run(); }
+    let mut prot_one = [0; 200];
+    let mut root = Shell::new("root> ");
+    let mut user = Shell::new("user>");
+    let mut prot_two = [0; 200];
+
+    root.run();
+
+    loop {
+        user.run();
+        prot_one[0] = prot_two[0];
+        prot_two[0] += 1;
+    }
 }
 
 /// Process scheduler for the entire machine.
@@ -54,7 +64,6 @@ impl GlobalScheduler {
     /// restoring the next process's trap frame into `tf`. For more details, see
     /// the documentation on `Scheduler::schedule_out()` and `Scheduler::switch_to()`.
     pub fn switch(&self, new_state: State, tf: &mut TrapFrame) -> Id {
-        //kprintln!("here1");
         self.critical(|scheduler| scheduler.schedule_out(new_state, tf));
         //kprintln!("here2");
         self.switch_to(tf)
@@ -66,7 +75,6 @@ impl GlobalScheduler {
             if let Some(id) = rtn {
                 return id;
             }
-            kprintln!("looping");
             aarch64::wfe();
         }
     }
@@ -89,7 +97,8 @@ impl GlobalScheduler {
         tick_in(TICK);
         Controller::new().enable(Interrupt::Timer1);
 
-        let process = Process::new().expect("unable to create process");
+        let mut process = Process::new().expect("unable to create process");
+        process.state = State::Running;
 
         let top_of_stack = process.stack.top().as_usize();
         let mut trap_frame: TrapFrame = Default::default();
@@ -100,7 +109,7 @@ impl GlobalScheduler {
             *q = 0_f64;
         }
 
-        trap_frame.sp = _start as *const () as u64;
+        trap_frame.sp = top_of_stack as u64;
         trap_frame.tpidr = 0;
         trap_frame.elr = run_shell as *const () as u64;
         trap_frame.spsr = 0;
@@ -117,6 +126,10 @@ impl GlobalScheduler {
             asm!("bl context_restore");
             asm!("mov x28, 0");
             asm!("mov x29, 0");
+            asm!("mov x0, $0
+                  mov sp, x0"
+                :: "r"(_start as *const () as u64)
+                :: "volatile");
         }
 
         aarch64::eret();
