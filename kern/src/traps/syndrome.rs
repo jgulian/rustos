@@ -61,7 +61,7 @@ impl From<u32> for Syndrome {
         let is_32_bit_exception = esr & (1 << 25) > 0;
         let instruction_syndrome = esr & ((1 << 25) - 1);
 
-        kprintln!("thing {}", exception_class);
+        //kprintln!("thing {}", exception_class);
 
         match exception_class {
             0b00_0000 => Unknown,

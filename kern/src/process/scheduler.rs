@@ -19,7 +19,6 @@ extern "C" {
 
 extern fn run_shell() {
     shell::Shell::new("user0> ").run();
-    unsafe { asm!("brk 3" :::: "volatile"); }
     loop { shell::Shell::new("user1> ").run(); }
 }
 
@@ -55,9 +54,9 @@ impl GlobalScheduler {
     /// restoring the next process's trap frame into `tf`. For more details, see
     /// the documentation on `Scheduler::schedule_out()` and `Scheduler::switch_to()`.
     pub fn switch(&self, new_state: State, tf: &mut TrapFrame) -> Id {
-        kprintln!("here1");
+        //kprintln!("here1");
         self.critical(|scheduler| scheduler.schedule_out(new_state, tf));
-        kprintln!("here2");
+        //kprintln!("here2");
         self.switch_to(tf)
     }
 
@@ -83,7 +82,7 @@ impl GlobalScheduler {
     /// preemptive scheduling. This method should not return under normal conditions.
     pub fn start(&self) -> ! {
         IRQ.register(Interrupt::Timer1, Box::new(|tf| {
-            kprintln!("tick tick boom");
+            //kprintln!("tick tick boom");
             tick_in(TICK);
             SCHEDULER.switch(State::Ready, tf);
         }));
@@ -217,10 +216,10 @@ impl Scheduler {
     /// If there is no process to switch to, returns `None`. Otherwise, returns
     /// `Some` of the next process`s process ID.
     fn switch_to(&mut self, tf: &mut TrapFrame) -> Option<Id> {
-        kprintln!("amogus");
+        //kprintln!("amogus");
         let mut j = self.processes.len();
         for (i, process) in self.processes.iter_mut().enumerate() {
-            kprintln!("proc {} is ready {}", i, process.is_ready());
+            //kprintln!("proc {} is ready {}", i, process.is_ready());
             if process.is_ready() {
                 j = i;
                 break;
@@ -233,7 +232,7 @@ impl Scheduler {
         (*tf) = *process.context;
         self.processes.push_front(process);
 
-        kprintln!("here amogus");
+        //kprintln!("here amogus");
 
         Some(id)
     }

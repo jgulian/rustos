@@ -55,10 +55,10 @@ impl fmt::Display for Info {
 /// the trap frame for the exception.
 #[no_mangle]
 pub extern "C" fn handle_exception(info: Info, esr: u32, tf: &mut TrapFrame) {
-    kprintln!("handle_exception: {} {} {}", info, esr, unsafe {aarch64::current_el()});
+    //kprintln!("handle_exception: {} {} {}", info, esr, unsafe {aarch64::current_el()});
 
     let syndrome = Syndrome::from(esr);
-    kprintln!("syndrome: {}", syndrome);
+    //kprintln!("syndrome: {}", syndrome);
 
     //Shell::new("$").run();
 
@@ -76,12 +76,12 @@ pub extern "C" fn handle_exception(info: Info, esr: u32, tf: &mut TrapFrame) {
             for int in Interrupt::iter() {
                 if controller.is_pending(*int) {
                     IRQ.invoke(*int, tf);
-                    kprintln!("returned from invoke")
+                    //kprintln!("returned from invoke")
                 }
             }
         }
         _ => {}
     }
 
-    kprintln!("here")
+    //kprintln!("here")
 }
