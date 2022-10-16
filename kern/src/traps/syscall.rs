@@ -2,7 +2,7 @@ use alloc::boxed::Box;
 use alloc::string::ToString;
 use core::time::Duration;
 
-use crate::console::CONSOLE;
+use crate::console::{CONSOLE, kprint};
 use crate::process::State;
 use crate::traps::TrapFrame;
 use crate::{kprintln, SCHEDULER};
@@ -26,14 +26,14 @@ pub fn sys_sleep(ms: u32, tf: &mut TrapFrame) {
     let started = timer::current_time();
     let sleep_until = started + Duration::from_millis(ms as u64);
 
-    let waiting = State::Waiting(Box::new(move |tf| {
+    let waiting = State::Waiting(Box::new(move |process| {
         let current_time = timer::current_time();
         let passed = sleep_until < current_time;
         if passed {
-            unsafe {
-                asm!("mov $0, x0
-                  mov $1, x7" :: "r"((current_time - started).as_millis()), "r"(0));
-            }
+            let millis: u64 = (current_time - started).as_millis() as u64;
+            kprintln!("{}", millis);
+            process.context.xs[0] = millis;
+            process.context.xs[8] = 0;
         }
         passed
     }));

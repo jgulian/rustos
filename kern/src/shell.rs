@@ -264,16 +264,16 @@ impl Shell {
             Ok(t) => t,
         };
 
-        let mut error: u64 = 0;
-        let mut result: u64 = 0;
+        let mut error: u64;
+        let mut result: u64;
         unsafe {
             asm!("mov x0, $0" :: "r"(ms));
             aarch64::svc!(0);
             asm!("mov $0, x0
-                  mov $1, x7" : "=r"(result), "=r"(error));
+                  mov $1, x1" : "=r"(result), "=r"(error));
         }
 
-        kprintln!("Slept for {} milliseconds", result);
+        kprintln!("Slept for {} milliseconds {}", result, error);
     }
 }
 

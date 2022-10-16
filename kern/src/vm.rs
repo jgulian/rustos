@@ -26,7 +26,12 @@ impl VMManager {
     /// The caller should assure that the method is invoked only once during the kernel
     /// initialization.
     pub fn initialize(&self) {
-        unimplemented!();
+        let value = self.0.lock();
+        if (*value).is_some() {
+            panic!("VMManager initialize called twice");
+        }
+
+        self.setup();
     }
 
     /// Set up the virtual memory manager.

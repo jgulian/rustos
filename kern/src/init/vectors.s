@@ -54,6 +54,9 @@ context_save:
     mrs x0, SPSR_EL1
     mrs x1, ELR_EL1
     PUSH16 x0, x1
+    mrs x0, TTBR1_EL1
+    mrs x1, TTBR0_EL1
+    PUSH16 x0, x1
 
     mov x0, x29
     mrs x1, ESR_EL1
@@ -71,9 +74,17 @@ context_save:
 .global context_restore
 context_restore:
     POP16 x0, x1
+    msr TTBR0_EL1, x0
+    msr TTBR1_EL1, x1
+
+    dsb     ishst
+    tlbi    vmalle1
+    dsb     ish
+    isb
+
+    POP16 x0, x1
     msr ELR_EL1, x0
     msr SPSR_EL1, x1
-    mov x25, x0
     POP16 x0, x1
     msr SP_EL0, x0
     msr TPIDR_EL0, x1

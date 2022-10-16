@@ -5,6 +5,16 @@ use core::ops::{Add, AddAssign, BitAnd, BitOr, Sub, SubAssign};
 #[derive(Copy, Clone, PartialEq)]
 pub struct VirtualAddr(usize);
 
+impl VirtualAddr {
+    pub fn level2_index(&self) -> u64 {
+        ((self.0 & ((1 << 42) - (1 << 29))) >> 29) as u64
+    }
+
+    pub fn level3_index(&self) -> u64 {
+        ((self.0 & ((1 << 29) - (1 << 16))) >> 29) as u64
+    }
+}
+
 /// A physical address.
 #[derive(Copy, Clone, PartialEq)]
 pub struct PhysicalAddr(usize);
