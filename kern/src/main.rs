@@ -59,6 +59,7 @@ fn kmain() -> ! {
         FILESYSTEM.initialize();
         IRQ.initialize();
         SCHEDULER.initialize();
+        VMM.initialize();
     }
 
     let mut controller = Controller::new();

@@ -245,7 +245,7 @@ impl Scheduler {
         process.state = State::Running;
         let id = process.context.tpidr;
         (*tf) = *process.context;
-        kprintln!("Switching back {}", *tf);
+        //kprintln!("Switching back {}", *tf);
         self.processes.push_front(process);
 
         //kprintln!("here amogus");
