@@ -143,6 +143,9 @@ impl Shell {
             "exit" => {
                 self.exit();
             }
+            "sleep" => {
+                self.sleep(command);
+            }
             _ => {
                 kprintln!("unknown command: {}", command.path());
             }
@@ -245,6 +248,32 @@ impl Shell {
 
     fn exit(&mut self) {
         self.open = false;
+    }
+
+    fn sleep(&self, command: &Command) {
+        if command.args.len() < 2 {
+            kprintln!("not enough args for cat");
+            return;
+        }
+
+        let ms = match command.args[1].to_string().parse::<u32>() {
+            Err(_) => {
+                kprintln!("unable to parse ");
+                return;
+            }
+            Ok(t) => t,
+        };
+
+        let mut error: u64 = 0;
+        let mut result: u64 = 0;
+        unsafe {
+            asm!("mov x0, $0" :: "r"(ms));
+            aarch64::svc!(0);
+            asm!("mov $0, x0
+                  mov $1, x7" : "=r"(result), "=r"(error));
+        }
+
+        kprintln!("Slept for {} milliseconds", result);
     }
 }
 

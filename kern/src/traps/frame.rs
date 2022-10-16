@@ -8,7 +8,7 @@ pub struct TrapFrame {
     pub spsr: u64,
     pub sp: u64,
     pub tpidr: u64,
-    pub qs: [f64; 32],
+    pub qs: [u128; 32],
     pub xs: [u64; 31],
     pub xzr: u64,
 }

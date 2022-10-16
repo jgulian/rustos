@@ -15,6 +15,7 @@ use crate::console::kprint;
 
 extern "C" {
     fn _start();
+    fn context_restore();
 }
 
 extern fn run_shell() {
@@ -64,6 +65,7 @@ impl GlobalScheduler {
     /// restoring the next process's trap frame into `tf`. For more details, see
     /// the documentation on `Scheduler::schedule_out()` and `Scheduler::switch_to()`.
     pub fn switch(&self, new_state: State, tf: &mut TrapFrame) -> Id {
+        //kprintln!("here1");
         self.critical(|scheduler| scheduler.schedule_out(new_state, tf));
         //kprintln!("here2");
         self.switch_to(tf)
@@ -106,7 +108,7 @@ impl GlobalScheduler {
             *x = 0;
         }
         for q in trap_frame.qs.iter_mut() {
-            *q = 0_f64;
+            *q = 0;
         }
 
         trap_frame.sp = top_of_stack as u64;
@@ -123,7 +125,7 @@ impl GlobalScheduler {
                   mov sp, x0"
                 :: "r"(&trap_frame as *const TrapFrame as u64)
                 :: "volatile");
-            asm!("bl context_restore");
+            context_restore();
             asm!("mov x28, 0");
             asm!("mov x29, 0");
             asm!("mov x0, $0

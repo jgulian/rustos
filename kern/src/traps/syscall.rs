@@ -1,11 +1,18 @@
 use alloc::boxed::Box;
+use alloc::string::ToString;
 use core::time::Duration;
 
 use crate::console::CONSOLE;
 use crate::process::State;
 use crate::traps::TrapFrame;
-use crate::SCHEDULER;
+use crate::{kprintln, SCHEDULER};
 use kernel_api::*;
+use pi::timer;
+use pi::timer::Timer;
+
+enum SystemCall {
+    SLEEP = 0,
+}
 
 /// Sleep for `ms` milliseconds.
 ///
@@ -15,7 +22,23 @@ use kernel_api::*;
 /// parameter: the approximate true elapsed time from when `sleep` was called to
 /// when `sleep` returned.
 pub fn sys_sleep(ms: u32, tf: &mut TrapFrame) {
-    unimplemented!("sys_sleep()");
+    let tpidr = tf.tpidr;
+    let started = timer::current_time();
+    let sleep_until = started + Duration::from_millis(ms as u64);
+
+    let waiting = State::Waiting(Box::new(move |tf| {
+        let current_time = timer::current_time();
+        let passed = sleep_until < current_time;
+        if passed {
+            unsafe {
+                asm!("mov $0, x0
+                  mov $1, x7" :: "r"((current_time - started).as_millis()), "r"(0));
+            }
+        }
+        passed
+    }));
+
+    SCHEDULER.switch(waiting, tf);
 }
 
 /// Returns current time.
@@ -57,6 +80,11 @@ pub fn sys_getpid(tf: &mut TrapFrame) {
 }
 
 pub fn handle_syscall(num: u16, tf: &mut TrapFrame) {
-    use crate::console::kprintln;
-    unimplemented!("handle_syscall()")
+    match num {
+        0 => {
+            let time: u32 = tf.xs[0] as u32;
+            sys_sleep(time, tf);
+        }
+        _ => {}
+    }
 }
