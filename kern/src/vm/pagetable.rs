@@ -3,7 +3,7 @@ use core::ops::{Deref, DerefMut, Sub};
 use core::slice::Iter;
 
 use alloc::boxed::Box;
-use alloc::fmt;
+use alloc::{fmt, format};
 use core::alloc::{GlobalAlloc, Layout};
 use core::fmt::Formatter;
 use aarch64::EntryPerm::{KERN_RW, USER_RW};
@@ -85,6 +85,20 @@ impl From<u64> for L3Entry {
 }
 
 impl fmt::Display for L3Entry {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        f.debug_struct("L3Entry")
+            .field("addr", &self.0.get_value(RawL3Entry::ADDR))
+            .field("af", &self.0.get_value(RawL3Entry::AF))
+            .field("sh", &self.0.get_value(RawL3Entry::SH))
+            .field("ap", &self.0.get_value(RawL3Entry::AP))
+            .field("attr", &self.0.get_value(RawL3Entry::ATTR))
+            .field("type", &self.0.get_value(RawL3Entry::TYPE))
+            .field("valid", &self.0.get_value(RawL3Entry::VALID))
+            .finish()
+    }
+}
+
+impl fmt::Debug for L3Entry {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         f.debug_struct("L3Entry")
             .field("addr", &self.0.get_value(RawL3Entry::ADDR))
@@ -316,12 +330,14 @@ impl UserPageTable {
         let mut entry = RawL3Entry::new(0);
         entry.set_value(address >> PAGE_ALIGN, RawL3Entry::ADDR);
         entry.set_value(EntrySh::ISh as u64, RawL3Entry::SH);
-        entry.set_value(USER_RW as u64, RawL3Entry::AP);
+        entry.set_value(USER_RW, RawL3Entry::AP);
         entry.set_value(EntryAttr::Mem, RawL3Entry::ATTR);
         entry.set_value(EntryType::Table, RawL3Entry::TYPE);
         entry.set_value(EntryValid::Valid, RawL3Entry::VALID);
         entry.set_value(0b1_u64, RawL3Entry::AF);
-        self.0.set_entry(VirtualAddr::from(address), entry);
+        self.0.set_entry(va, entry);
+
+        kprintln!("any pagers");
 
         return unsafe {core::slice::from_raw_parts_mut(page, PAGE_SIZE)};
     }
@@ -359,23 +375,39 @@ impl DerefMut for UserPageTable {
 impl Drop for UserPageTable {
     fn drop(&mut self) {
         for entry in self.into_iter() {
-            if !entry.is_valid() {
-                break;
-            }
+            if entry.is_valid() {
+                let address = entry.0.get_masked(RawL3Entry::ADDR) << PAGE_ALIGN;
 
-            let address = entry.0.get_masked(RawL3Entry::ADDR) << PAGE_ALIGN;
-
-            unsafe {
-                ALLOCATOR.dealloc(address as *mut u8, Page::layout())
+                unsafe {
+                    ALLOCATOR.dealloc(address as *mut u8, Page::layout())
+                }
             }
         }
     }
 }
 
+impl fmt::Display for UserPageTable {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        for l3_entry in self.into_iter() {
+            if l3_entry.is_valid() {
+                f.write_fmt(format_args!("{}\n", l3_entry))?;
+            }
+        }
+        f.write_str("aptos");
+        Ok(())
+    }
+}
+
 impl fmt::Debug for UserPageTable {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        f.debug_struct("UserPageTable")
-            .finish()
+        for l3_entry in self.into_iter() {
+            if l3_entry.is_valid() {
+                f.write_fmt(format_args!("{}\n", l3_entry))?;
+            }
+            f.write_fmt(format_args!("{}\n", l3_entry))?;
+        }
+        f.write_str("aptos");
+        Ok(())
     }
 }
 

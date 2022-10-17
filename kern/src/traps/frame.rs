@@ -18,6 +18,8 @@ pub struct TrapFrame {
 impl fmt::Display for TrapFrame {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         f.debug_struct("TrapFrame")
+            .field("ttbr0", &self.ttbr0)
+            .field("ttbr1", &self.ttbr1)
             .field("xzr", &self.xzr)
             .field("xs", &self.xs)
             .field("qs", &self.qs)

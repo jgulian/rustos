@@ -73,9 +73,9 @@ fn kmain() -> ! {
 
     kprintln!("Welcome to cs3210!");
     SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
-    SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
-    SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
-    SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
+    //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
+    //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
+    //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
 
     unsafe {
         SCHEDULER.start();

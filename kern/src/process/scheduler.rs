@@ -144,14 +144,7 @@ impl GlobalScheduler {
     pub fn test_phase_3(&self, proc: &mut Process){
         use crate::vm::{VirtualAddr, PagePerm};
 
-        let mut page = proc.vmap.alloc(
-            VirtualAddr::from(USER_IMG_BASE as u64), PagePerm::RWX);
 
-        let text = unsafe {
-            core::slice::from_raw_parts(test_user_process as *const u8, 24)
-        };
-
-        page[0..24].copy_from_slice(text);
     }
 }
 
@@ -192,13 +185,6 @@ impl Scheduler {
         self.processes.push_back(process);
 
         Some(new_pid)
-    }
-
-    fn add_function(&mut self, func: fn ()) {
-        // I also need to add some of the pages for the kernel memory
-        // This shouldn't be too hard. Just make sure they're RX.
-        // Alternatively, I could copy kernel code into user space
-        // which might be better.
     }
 
     /// Finds the currently running process, sets the current process's state

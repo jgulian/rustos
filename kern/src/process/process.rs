@@ -13,7 +13,7 @@ use crate::traps::TrapFrame;
 use crate::vm::*;
 use kernel_api::{OsError, OsResult};
 use fat32::traits::FileSystem;
-use crate::FILESYSTEM;
+use crate::{FILESYSTEM, kprintln};
 
 /// Type alias for the type of a process ID.
 pub type Id = u64;
@@ -80,9 +80,28 @@ impl Process {
         let mut process = Process::new()?;
         process.vmap.alloc(Process::get_stack_base(), PagePerm::RW);
         let user_image = process.vmap.alloc(Process::get_image_base(), PagePerm::RWX);
+
+
         let mut file = FILESYSTEM.open(pn)?.into_file().ok_or(OsError::IoError)?;
         file.read(user_image)?;
+        kprintln!("{}", process.vmap);
         Ok(process)
+    }
+
+    pub fn load_from_kernel(function: fn ()) -> OsResult<Process> {
+        let mut process = Process::new()?;
+
+        let mut page = process.vmap.alloc(
+            VirtualAddr::from(USER_IMG_BASE as u64), PagePerm::RWX);
+
+        let text = unsafe {
+            core::slice::from_raw_parts(function as *const u8, 24)
+        };
+
+        unimplemented!("need to fix text");
+
+        page[0..24].copy_from_slice(text);
+        Err(OsError::NoMemory)
     }
 
     /// Returns the highest `VirtualAddr` that is supported by this system.

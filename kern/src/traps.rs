@@ -57,6 +57,9 @@ impl fmt::Display for Info {
 pub extern "C" fn handle_exception(info: Info, esr: u32, tf: &mut TrapFrame) {
     let syndrome = Syndrome::from(esr);
 
+    kprintln!("handle_exception {}", info);
+    kprintln!("{}", syndrome);
+
     match info.kind {
         Kind::Synchronous => {
             match syndrome {
