@@ -10,7 +10,7 @@ for d in ${PROGS[@]}; do
 done
 
 dd if=/dev/zero of=$IMG bs=1MB count=128
-echo -e "n\np\n1\n\n\nt\nc\nw\n" | fdisk $IMG
+echo -e "n\np\n1\n\n\nt\nc\nw\n" | fdisk $IMG > /dev/null
 
 LO=$(sudo losetup --show -f -P $IMG)
 LOP1=${LO}p1
@@ -20,10 +20,10 @@ if [ ! -e $LOP1 ]; then
     sudo losetup -d $LO
 fi
 
-sudo mkfs.vfat -F32 $LOP1
+sudo mkfs.vfat -F32 $IMG
 
 mkdir -p $MNT
-sudo mount $LOP1 $MNT
+sudo mount $IMG $MNT
 
 trap "sudo umount $MNT; rmdir $MNT; sudo losetup -d $LO" EXIT
 

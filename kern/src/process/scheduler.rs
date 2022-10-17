@@ -56,7 +56,10 @@ impl GlobalScheduler {
 
     /// Adds a process to the scheduler's queue and returns that process's ID.
     /// For more details, see the documentation on `Scheduler::add()`.
-    pub fn add(&self, process: Process) -> Option<Id> {
+    pub fn add(&self, mut process: Process) -> Option<Id> {
+        process.context.ttbr0 = VMM.get_baddr().as_u64();
+        process.context.ttbr1 = process.vmap.get_baddr().as_u64();
+        process.context.elr = USER_IMG_BASE as u64;
         self.critical(move |scheduler| scheduler.add(process))
     }
 
@@ -65,7 +68,7 @@ impl GlobalScheduler {
     /// restoring the next process's trap frame into `tf`. For more details, see
     /// the documentation on `Scheduler::schedule_out()` and `Scheduler::switch_to()`.
     pub fn switch(&self, new_state: State, tf: &mut TrapFrame) -> Id {
-        //kprintln!("here1");
+        kprintln!("switching");
         self.critical(|scheduler| scheduler.schedule_out(new_state, tf));
         //kprintln!("here2");
         self.switch_to(tf)
@@ -100,40 +103,30 @@ impl GlobalScheduler {
         Controller::new().enable(Interrupt::Timer1);
 
         let mut process = Process::new().expect("unable to create process");
+        SCHEDULER.test_phase_3(&mut process);
         process.state = State::Running;
 
-        let top_of_stack = process.stack.top().as_usize();
         let mut trap_frame: TrapFrame = Default::default();
-        for x in trap_frame.xs.iter_mut() {
-            *x = 0;
-        }
-        for q in trap_frame.qs.iter_mut() {
-            *q = 0;
-        }
-
-        trap_frame.sp = top_of_stack as u64;
-        trap_frame.tpidr = 0;
-        trap_frame.elr = run_shell as *const () as u64;
-        trap_frame.spsr = 0;
-
-        self.add(process);
+        self.switch_to(&mut trap_frame);
 
         kprintln!("{}", trap_frame);
 
         unsafe {
             asm!("mov x0, $0
                   mov sp, x0"
-                :: "r"(&trap_frame as *const TrapFrame as u64)
+                :: "r"((&mut trap_frame) as *const TrapFrame as u64)
                 :: "volatile");
             context_restore();
             asm!("mov x28, 0");
             asm!("mov x29, 0");
-            asm!("mov x0, $0
-                  mov sp, x0"
-                :: "r"(_start as *const () as u64)
-                :: "volatile");
+            //TODO: it doesn't like this line
+            //asm!("mov x0, $0
+            //      mov sp, x0"
+            //    :: "r"(_start as *const () as u64)
+            //    :: "volatile");
         }
 
+        kprintln!("after context_restore");
         aarch64::eret();
 
         loop {}
@@ -148,18 +141,18 @@ impl GlobalScheduler {
     //
     // * A method to load a extern function to the user process's page table.
     //
-    // pub fn test_phase_3(&self, proc: &mut Process){
-    //     use crate::vm::{VirtualAddr, PagePerm};
-    //
-    //     let mut page = proc.vmap.alloc(
-    //         VirtualAddr::from(USER_IMG_BASE as u64), PagePerm::RWX);
-    //
-    //     let text = unsafe {
-    //         core::slice::from_raw_parts(test_user_process as *const u8, 24)
-    //     };
-    //
-    //     page[0..24].copy_from_slice(text);
-    // }
+    pub fn test_phase_3(&self, proc: &mut Process){
+        use crate::vm::{VirtualAddr, PagePerm};
+
+        let mut page = proc.vmap.alloc(
+            VirtualAddr::from(USER_IMG_BASE as u64), PagePerm::RWX);
+
+        let text = unsafe {
+            core::slice::from_raw_parts(test_user_process as *const u8, 24)
+        };
+
+        page[0..24].copy_from_slice(text);
+    }
 }
 
 #[derive(Debug)]
@@ -199,6 +192,13 @@ impl Scheduler {
         self.processes.push_back(process);
 
         Some(new_pid)
+    }
+
+    fn add_function(&mut self, func: fn ()) {
+        // I also need to add some of the pages for the kernel memory
+        // This shouldn't be too hard. Just make sure they're RX.
+        // Alternatively, I could copy kernel code into user space
+        // which might be better.
     }
 
     /// Finds the currently running process, sets the current process's state

@@ -4,12 +4,16 @@ use shim::io;
 use shim::path::Path;
 
 use aarch64;
+use aarch64::EntryPerm::USER_RW;
+use aarch64::SPSR_EL1;
 
 use crate::param::*;
 use crate::process::{Stack, State};
 use crate::traps::TrapFrame;
 use crate::vm::*;
 use kernel_api::{OsError, OsResult};
+use fat32::traits::FileSystem;
+use crate::FILESYSTEM;
 
 /// Type alias for the type of a process ID.
 pub type Id = u64;
@@ -57,7 +61,11 @@ impl Process {
 
         let mut p = Process::do_load(pn)?;
 
-        //FIXME: Set trapframe for the process.
+        p.context.sp = Process::get_stack_top().as_u64();
+        p.context.elr = Process::get_image_base().as_u64();
+        p.context.ttbr0 = VMM.get_baddr().as_u64();
+        p.context.ttbr1 = p.vmap.get_baddr().as_u64();
+        p.context.spsr = SPSR_EL1::F | SPSR_EL1::A | SPSR_EL1::D;
 
         Ok(p)
     }
@@ -66,30 +74,38 @@ impl Process {
     /// Allocates one page for stack with read/write permission, and N pages with read/write/execute
     /// permission to load file's contents.
     fn do_load<P: AsRef<Path>>(pn: P) -> OsResult<Process> {
-        unimplemented!();
+        use fat32::traits::Entry;
+        use io::Read;
+
+        let mut process = Process::new()?;
+        process.vmap.alloc(Process::get_stack_base(), PagePerm::RW);
+        let user_image = process.vmap.alloc(Process::get_image_base(), PagePerm::RWX);
+        let mut file = FILESYSTEM.open(pn)?.into_file().ok_or(OsError::IoError)?;
+        file.read(user_image)?;
+        Ok(process)
     }
 
     /// Returns the highest `VirtualAddr` that is supported by this system.
     pub fn get_max_va() -> VirtualAddr {
-        unimplemented!();
+        VirtualAddr::from(u64::max_value())
     }
 
     /// Returns the `VirtualAddr` represents the base address of the user
     /// memory space.
     pub fn get_image_base() -> VirtualAddr {
-        unimplemented!();
+        VirtualAddr::from(USER_IMG_BASE)
     }
 
     /// Returns the `VirtualAddr` represents the base address of the user
     /// process's stack.
     pub fn get_stack_base() -> VirtualAddr {
-        unimplemented!();
+        VirtualAddr::from(u64::max_value() & PAGE_MASK as u64)
     }
 
     /// Returns the `VirtualAddr` represents the top of the user process's
     /// stack.
     pub fn get_stack_top() -> VirtualAddr {
-        unimplemented!();
+        VirtualAddr::from(u64::max_value())
     }
 
     /// Returns `true` if this process is ready to be scheduled.

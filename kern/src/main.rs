@@ -30,7 +30,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::alloc::{GlobalAlloc, Layout};
 use core::fmt::Write;
-use shim::path::Path;
+use shim::path::{Path, PathBuf};
 use console::kprintln;
 
 use allocator::Allocator;
@@ -53,6 +53,10 @@ pub static SCHEDULER: GlobalScheduler = GlobalScheduler::uninitialized();
 pub static VMM: VMManager = VMManager::uninitialized();
 pub static IRQ: Irq = Irq::uninitialized();
 
+fn run_shell() {
+    Shell::new(">").run();
+}
+
 fn kmain() -> ! {
     unsafe {
         ALLOCATOR.initialize();
@@ -68,6 +72,10 @@ fn kmain() -> ! {
     }
 
     kprintln!("Welcome to cs3210!");
+    SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
+    SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
+    SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
+    SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
 
     unsafe {
         SCHEDULER.start();
