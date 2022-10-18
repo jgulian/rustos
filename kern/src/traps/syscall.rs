@@ -53,7 +53,10 @@ pub fn sys_time(tf: &mut TrapFrame) {
 ///
 /// This system call does not take paramer and does not return any value.
 pub fn sys_exit(tf: &mut TrapFrame) {
+    kprintln!("Any killers?");
     SCHEDULER.kill(tf).expect("failed to kill process");
+    kprintln!("AMOGUS");
+    SCHEDULER.switch_to(tf);
 }
 
 /// Write to console.
@@ -62,7 +65,7 @@ pub fn sys_exit(tf: &mut TrapFrame) {
 ///
 /// It only returns the usual status value.
 pub fn sys_write(b: u8, tf: &mut TrapFrame) {
-    kprint!("{}", b);
+    kprint!("{}", b as char);
 }
 
 /// Returns current process's ID.
@@ -76,7 +79,6 @@ pub fn sys_getpid(tf: &mut TrapFrame) {
 }
 
 pub fn handle_syscall(num: u16, tf: &mut TrapFrame) {
-    kprintln!("any syscallers");
     match num as usize {
         NR_SLEEP => {
             let time: u32 = tf.xs[0] as u32;

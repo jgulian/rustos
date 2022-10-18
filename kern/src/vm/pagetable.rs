@@ -374,15 +374,17 @@ impl DerefMut for UserPageTable {
 // FIXME: Implement `Drop` for `UserPageTable`.
 impl Drop for UserPageTable {
     fn drop(&mut self) {
+        kprintln!("any droppers");
         for entry in self.into_iter() {
             if entry.is_valid() {
-                let address = entry.0.get_masked(RawL3Entry::ADDR) << PAGE_ALIGN;
+                let address = entry.0.get_value(RawL3Entry::ADDR) << PAGE_ALIGN;
 
                 unsafe {
                     ALLOCATOR.dealloc(address as *mut u8, Page::layout())
                 }
             }
         }
+        kprintln!("dropped");
     }
 }
 
