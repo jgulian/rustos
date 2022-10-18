@@ -245,11 +245,9 @@ impl KernPageTable {
         let page_end = allocator::util::align_down(end, PAGE_ALIGN);
         let page_count = (page_end - page_start) / PAGE_SIZE;
 
-        kprintln!("From {} to {}", page_start, page_end);
 
         for i in 0..page_count {
             let address = page_start + PAGE_SIZE * i;
-            //kprintln!("runs {}", address);
             let mut entry = RawL3Entry::new(0);
             entry.set_value(address as u64 >> PAGE_ALIGN, RawL3Entry::ADDR);
             entry.set_value(EntrySh::ISh as u64, RawL3Entry::SH);
@@ -264,8 +262,6 @@ impl KernPageTable {
         let device_start = allocator::util::align_down(IO_BASE, PAGE_ALIGN);
         let device_end = allocator::util::align_up(IO_BASE_END, PAGE_ALIGN);
         let device_page_count = (device_end - device_start) / PAGE_SIZE;
-
-        kprintln!("From {} to {}", device_start, page_end);
 
         for i in 0..device_page_count {
             let address = device_start + PAGE_SIZE * i;
@@ -337,8 +333,6 @@ impl UserPageTable {
         entry.set_value(0b1_u64, RawL3Entry::AF);
         self.0.set_entry(va, entry);
 
-        kprintln!("any pagers");
-
         return unsafe {core::slice::from_raw_parts_mut(page, PAGE_SIZE)};
     }
 }
@@ -374,7 +368,6 @@ impl DerefMut for UserPageTable {
 // FIXME: Implement `Drop` for `UserPageTable`.
 impl Drop for UserPageTable {
     fn drop(&mut self) {
-        kprintln!("any droppers");
         for entry in self.into_iter() {
             if entry.is_valid() {
                 let address = entry.0.get_value(RawL3Entry::ADDR) << PAGE_ALIGN;
@@ -384,7 +377,6 @@ impl Drop for UserPageTable {
                 }
             }
         }
-        kprintln!("dropped");
     }
 }
 
@@ -395,7 +387,6 @@ impl fmt::Display for UserPageTable {
                 f.write_fmt(format_args!("{}\n", l3_entry))?;
             }
         }
-        f.write_str("aptos");
         Ok(())
     }
 }
@@ -408,7 +399,6 @@ impl fmt::Debug for UserPageTable {
             }
             f.write_fmt(format_args!("{}\n", l3_entry))?;
         }
-        f.write_str("aptos");
         Ok(())
     }
 }

@@ -84,7 +84,7 @@ impl Process {
 
         let mut file = FILESYSTEM.open(pn)?.into_file().ok_or(OsError::IoError)?;
         file.read(user_image)?;
-        kprintln!("{}", process.vmap);
+
         Ok(process)
     }
 

@@ -34,9 +34,7 @@ impl VMManager {
             //kprintln!("l3_entry: {}", l3_entry);
         }
 
-        kprintln!("Here 1");
         self.setup();
-        kprintln!("Here 2");
     }
 
     /// Set up the virtual memory manager.
@@ -47,11 +45,8 @@ impl VMManager {
     ///
     /// Panics if the current system does not support 64KB memory translation granule size.
     pub fn setup(&self) {
-        kprintln!("Any Lockers");
         let kern_page_table = self.0.lock();
-        kprintln!("Lockers");
         let baddr = kern_page_table.as_ref().unwrap().get_baddr().as_u64();
-        kprintln!("Lockers 2");
 
         unsafe {
             assert!(ID_AA64MMFR0_EL1.get_value(ID_AA64MMFR0_EL1::TGran64) == 0);
@@ -85,17 +80,13 @@ impl VMManager {
 
             TTBR0_EL1.set(baddr);
             TTBR1_EL1.set(baddr);
-            kprintln!("Lockers 3");
 
             asm!("dsb ish");
             isb();
-            kprintln!("Lockers 4");
 
             SCTLR_EL1.set(SCTLR_EL1.get() | SCTLR_EL1::I | SCTLR_EL1::C | SCTLR_EL1::M);
             asm!("dsb sy");
             isb();
-
-            kprintln!("Any blockers?");
         }
     }
 

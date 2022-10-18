@@ -53,9 +53,7 @@ pub fn sys_time(tf: &mut TrapFrame) {
 ///
 /// This system call does not take paramer and does not return any value.
 pub fn sys_exit(tf: &mut TrapFrame) {
-    kprintln!("Any killers?");
     SCHEDULER.kill(tf).expect("failed to kill process");
-    kprintln!("AMOGUS");
     SCHEDULER.switch_to(tf);
 }
 
