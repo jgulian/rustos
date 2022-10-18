@@ -11,9 +11,12 @@ pub use self::frame::TrapFrame;
 
 use pi::interrupt::{Controller, Interrupt};
 use crate::{IRQ, kprintln, Shell};
+use pi::local_interrupt::{LocalController, LocalInterrupt};
 
 use self::syndrome::Syndrome;
 use self::syscall::handle_syscall;
+use crate::percore;
+use crate::traps::irq::IrqHandlerRegistry;
 
 #[repr(u16)]
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]

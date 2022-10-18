@@ -14,14 +14,19 @@
 mod init;
 
 extern crate alloc;
+#[macro_use]
+extern crate log;
 
 pub mod allocator;
 pub mod console;
 pub mod fs;
+pub mod logger;
 pub mod mutex;
-pub mod shell;
+pub mod net;
 pub mod param;
+pub mod percore;
 pub mod process;
+pub mod shell;
 pub mod traps;
 pub mod vm;
 
@@ -37,8 +42,10 @@ use allocator::Allocator;
 use fs::FileSystem;
 use pi::interrupt::{Controller, Interrupt};
 use pi::timer::tick_in;
+use net::uspi::Usb;
+use net::GlobalEthernetDriver;
 use process::GlobalScheduler;
-use traps::irq::Irq;
+use traps::irq::{Fiq, GlobalIrq};
 use vm::VMManager;
 use pi::uart::MiniUart;
 use crate::param::TICK;
@@ -51,24 +58,20 @@ pub static ALLOCATOR: Allocator = Allocator::uninitialized();
 pub static FILESYSTEM: FileSystem = FileSystem::uninitialized();
 pub static SCHEDULER: GlobalScheduler = GlobalScheduler::uninitialized();
 pub static VMM: VMManager = VMManager::uninitialized();
-pub static IRQ: Irq = Irq::uninitialized();
-
-fn run_shell() {
-    Shell::new(">").run();
-}
+pub static USB: Usb = Usb::uninitialized();
+pub static GLOABAL_IRQ: GlobalIrq = GlobalIrq::new();
+pub static FIQ: Fiq = Fiq::new();
+pub static ETHERNET: GlobalEthernetDriver = GlobalEthernetDriver::uninitialized();
 
 fn kmain() -> ! {
+    crate::logger::init_logger();
+
     unsafe {
         ALLOCATOR.initialize();
         FILESYSTEM.initialize();
         IRQ.initialize();
         SCHEDULER.initialize();
         VMM.initialize();
-    }
-
-    let mut controller = Controller::new();
-    for int in Interrupt::iter() {
-        controller.disable(*int);
     }
 
     kprintln!("Welcome to cs3210!");

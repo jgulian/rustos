@@ -13,7 +13,6 @@ use core::alloc::{GlobalAlloc, Layout};
 use core::cmp::max;
 use core::fmt;
 
-use crate::console::kprintln;
 use crate::mutex::Mutex;
 use pi::atags::{Atag, Atags};
 use crate::allocator::util::{align_down, align_up};
@@ -46,6 +45,7 @@ impl Allocator {
     /// Panics if the system's memory map could not be retrieved.
     pub unsafe fn initialize(&self) {
         let (start, end) = memory_map().expect("failed to find memory map");
+        info!("heap beg: {:x}, end: {:x}", start, end);
         *self.0.lock() = Some(AllocatorImpl::new(start, end));
     }
 }
