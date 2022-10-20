@@ -1,7 +1,6 @@
 use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 use alloc::vec;
-use kernel_api::syscall::exit;
 use shim::{io, ioerr};
 use shim::path::{Path, PathBuf};
 
@@ -256,24 +255,7 @@ impl Shell {
             return;
         }
 
-        let ms = match command.args[1].to_string().parse::<u32>() {
-            Err(_) => {
-                kprintln!("unable to parse ");
-                return;
-            }
-            Ok(t) => t,
-        };
-
-        let mut error: u64;
-        let mut result: u64;
-        unsafe {
-            asm!("mov x0, $0" :: "r"(ms));
-            aarch64::svc!(0);
-            asm!("mov $0, x0
-                  mov $1, x1" : "=r"(result), "=r"(error));
-        }
-
-        kprintln!("Slept for {} milliseconds {}", result, error);
+        unimplemented!("actually different");
     }
 }
 

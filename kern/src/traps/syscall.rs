@@ -5,12 +5,10 @@ use core::time::Duration;
 use crate::console::{CONSOLE, kprint};
 use smoltcp::wire::{IpAddress, IpEndpoint};
 
-use crate::console::{kprint, CONSOLE};
 use crate::param::USER_IMG_BASE;
 use crate::process::State;
 use crate::traps::TrapFrame;
-use crate::{kprintln, SCHEDULER};
-use crate::{ETHERNET, SCHEDULER};
+use crate::{kprintln, SCHEDULER, ETHERNET};
 
 use kernel_api::*;
 use pi::timer;

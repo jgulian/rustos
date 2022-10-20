@@ -35,6 +35,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::alloc::{GlobalAlloc, Layout};
 use core::fmt::Write;
+use aarch64::SCR_EL3::IRQ;
 use shim::path::{Path, PathBuf};
 use console::kprintln;
 
@@ -63,24 +64,21 @@ pub static GLOABAL_IRQ: GlobalIrq = GlobalIrq::new();
 pub static FIQ: Fiq = Fiq::new();
 pub static ETHERNET: GlobalEthernetDriver = GlobalEthernetDriver::uninitialized();
 
-fn kmain() -> ! {
+unsafe fn kmain() -> ! {
     crate::logger::init_logger();
 
-    unsafe {
-        ALLOCATOR.initialize();
-        FILESYSTEM.initialize();
-        IRQ.initialize();
-        SCHEDULER.initialize();
-        VMM.initialize();
-    }
+    ALLOCATOR.initialize();
+    FILESYSTEM.initialize();
+    SCHEDULER.initialize();
+    VMM.initialize();
+
+    init::initialize_app_cores();
+    VMM.setup();
 
     kprintln!("Welcome to cs3210!");
     SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
     SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
-    //SCHEDULER.add(Process::load(PathBuf::from("/sleep")).expect("should exist"));
     SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
-    //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
-    //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
 
     unsafe {
         SCHEDULER.start();

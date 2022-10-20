@@ -1,6 +1,7 @@
 use aarch64::*;
 
 use core::mem::zeroed;
+use core::ops::Add;
 use core::ptr::write_volatile;
 
 mod oom;
@@ -116,8 +117,16 @@ unsafe fn kinit() -> ! {
 /// Kernel entrypoint for core 1, 2, and 3
 #[no_mangle]
 pub unsafe extern "C" fn start2() -> ! {
-    // Lab 5 1.A
-    unimplemented!("start2")
+    let core_index = MPIDR_EL1.get() & 0b11;
+    let stack_address = KERN_STACK_BASE - KERN_STACK_SIZE * core_index as usize;
+
+    asm!("mov sp, $0"
+         :: "r"(stack_address)
+         :: "volatile");
+
+    asm!("b kinit2");
+
+    loop {}
 }
 
 unsafe fn kinit2() -> ! {
@@ -127,13 +136,27 @@ unsafe fn kinit2() -> ! {
 }
 
 unsafe fn kmain2() -> ! {
-    // Lab 5 1.A
-    unimplemented!("kmain2")
+    let core_index = MPIDR_EL1.get() & 0b11;
+    let address = SPINNING_BASE.add(core_index as usize);
+    address.write_volatile(0);
+
+    info!("amogus {}", core_index);
+
+    loop {}
 }
 
 /// Wakes up each app core by writing the address of `init::start2`
 /// to their spinning base and send event with `sev()`.
 pub unsafe fn initialize_app_cores() {
-    // Lab 5 1.A
-    unimplemented!("initialize_app_cores")
+    for i in 1..4 {
+        let address = SPINNING_BASE.add(i);
+        address.write_volatile((start2 as *const fn() -> !) as usize);
+    }
+
+    aarch64::sev();
+
+    for i in 1..4 {
+        let address = SPINNING_BASE.add(i);
+        while address.read() != 0 {}
+    }
 }

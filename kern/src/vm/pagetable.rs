@@ -146,7 +146,7 @@ impl PageTable {
     fn new(perm: u64) -> Box<PageTable> {
         let mut page_table = Box::new(PageTable{
             l2: L2PageTable::new(),
-            l3: [L3PageTable::new(), L3PageTable::new()],
+            l3: [L3PageTable::new(), L3PageTable::new(), L3PageTable::new()],
         });
 
         for i in 0..2 {

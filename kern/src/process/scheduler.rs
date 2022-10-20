@@ -92,7 +92,7 @@ impl GlobalScheduler {
             if let Some(id) = rtn {
                 trace!(
                     "[core-{}] switch_to {:?}, pc: {:x}, lr: {:x}, x29: {:x}, x28: {:x}, x27: {:x}",
-                    affinity(),
+                    aarch64::affinity(),
                     id,
                     tf.elr,
                     tf.xs[30],
@@ -118,15 +118,15 @@ impl GlobalScheduler {
     /// preemptive scheduling. This method should not return under normal
     /// conditions.
     pub fn start(&self) -> ! {
-        IRQ.register(Interrupt::Timer1, Box::new(|tf| {
-            tick_in(TICK);
-            SCHEDULER.switch(State::Ready, tf);
-        }));
+        unimplemented!("actually different");
+        //local_irq().register(Interrupt::Timer1, Box::new(|tf| {
+        //    tick_in(TICK);
+        //    SCHEDULER.switch(State::Ready, tf);
+        //}));
         tick_in(TICK);
         Controller::new().enable(Interrupt::Timer1);
 
         let mut process = Process::new().expect("unable to create process");
-        SCHEDULER.test_phase_3(&mut process);
         process.state = State::Running;
 
         let mut trap_frame: TrapFrame = Default::default();
@@ -147,7 +147,9 @@ impl GlobalScheduler {
             //    :: "volatile");
         }
 
-        aarch64::eret();
+        unsafe {
+            aarch64::eret();
+        }
 
         loop {}
     }

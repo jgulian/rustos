@@ -34,11 +34,11 @@ impl VMManager {
     /// The caller should assure that the method is invoked only once during the kernel
     /// initialization.
     pub fn initialize(&self) {
-        if self.0.lock().replace(KernPageTable::new()).is_some() {
+        if self.kern_pt.lock().replace(KernPageTable::new()).is_some() {
             panic!("VMManager initialize called twice");
         }
 
-        self.setup();
+        self.wait();
     }
 
     /// Set up the virtual memory manager for the current core.
@@ -105,12 +105,12 @@ impl VMManager {
 
         info!("MMU is ready for core-{}/@sp={:016x}", affinity(), SP.get());
 
-        // Lab 5 1.B
+        //  Lab 5 1.B
         unimplemented!("wait for other cores")
     }
 
     /// Returns the base address of the kernel page table as `PhysicalAddr`.
     pub fn get_baddr(&self) -> PhysicalAddr {
-        self.0.lock().as_ref().unwrap().get_baddr()
+        self.kern_pt.lock().as_ref().unwrap().get_baddr()
     }
 }
