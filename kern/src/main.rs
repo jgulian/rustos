@@ -69,18 +69,18 @@ unsafe fn kmain() -> ! {
 
     ALLOCATOR.initialize();
     FILESYSTEM.initialize();
-    SCHEDULER.initialize();
     VMM.initialize();
+    SCHEDULER.initialize();
 
     init::initialize_app_cores();
-    VMM.setup();
+    VMM.wait();
+
+    loop {}
 
     kprintln!("Welcome to cs3210!");
-    SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
-    SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
-    SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
+    //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
+    //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
+    //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
 
-    unsafe {
-        SCHEDULER.start();
-    }
+    //SCHEDULER.start();
 }

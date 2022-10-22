@@ -7,7 +7,7 @@ use core::ptr::write_volatile;
 mod oom;
 mod panic;
 
-use crate::kmain;
+use crate::{kmain, kprintln};
 use crate::param::*;
 use crate::VMM;
 
@@ -124,9 +124,7 @@ pub unsafe extern "C" fn start2() -> ! {
          :: "r"(stack_address)
          :: "volatile");
 
-    asm!("b kinit2");
-
-    loop {}
+    kinit2();
 }
 
 unsafe fn kinit2() -> ! {
@@ -139,8 +137,7 @@ unsafe fn kmain2() -> ! {
     let core_index = MPIDR_EL1.get() & 0b11;
     let address = SPINNING_BASE.add(core_index as usize);
     address.write_volatile(0);
-
-    info!("amogus {}", core_index);
+    VMM.wait();
 
     loop {}
 }
@@ -150,7 +147,7 @@ unsafe fn kmain2() -> ! {
 pub unsafe fn initialize_app_cores() {
     for i in 1..4 {
         let address = SPINNING_BASE.add(i);
-        address.write_volatile((start2 as *const fn() -> !) as usize);
+        address.write_volatile(start2 as usize);
     }
 
     aarch64::sev();

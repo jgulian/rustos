@@ -2,6 +2,7 @@ use core::cell::UnsafeCell;
 use core::fmt;
 use core::ops::{Deref, DerefMut, Drop};
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use crate::percore::is_mmu_ready;
 
 #[repr(align(32))]
 pub struct Mutex<T> {
@@ -11,13 +12,15 @@ pub struct Mutex<T> {
 }
 
 unsafe impl<T: Send> Send for Mutex<T> {}
+
 unsafe impl<T: Send> Sync for Mutex<T> {}
 
 pub struct MutexGuard<'a, T: 'a> {
     lock: &'a Mutex<T>,
 }
 
-impl<'a, T> !Send for MutexGuard<'a, T> {}
+impl<'a, T> ! Send for MutexGuard<'a, T> {}
+
 unsafe impl<'a, T: Sync> Sync for MutexGuard<'a, T> {}
 
 impl<T> Mutex<T> {
@@ -34,10 +37,23 @@ impl<T> Mutex<T> {
     // Once MMU/cache is enabled, do the right thing here. For now, we don't
     // need any real synchronization.
     pub fn try_lock(&self) -> Option<MutexGuard<T>> {
-        let this = 0;
-        if !self.lock.load(Ordering::Relaxed) || self.owner.load(Ordering::Relaxed) == this {
-            self.lock.store(true, Ordering::Relaxed);
-            self.owner.store(this, Ordering::Relaxed);
+        let me = aarch64::affinity();
+
+        if me != 0 {
+            return None;
+        }
+
+        let (load_ordering, store_ordering) = if is_mmu_ready() {
+            (Ordering::Acquire, Ordering::Release)
+        } else {
+            assert_eq!(me, 0);
+            (Ordering::Relaxed, Ordering::Relaxed)
+        };
+
+
+        if !self.lock.load(load_ordering) || self.owner.load(load_ordering) == me {
+            self.lock.store(true, store_ordering);
+            self.owner.store(me, store_ordering);
             Some(MutexGuard { lock: &self })
         } else {
             None

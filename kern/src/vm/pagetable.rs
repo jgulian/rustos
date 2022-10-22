@@ -179,7 +179,7 @@ impl PageTable {
 
         let l2_index = va.level2_index();
         let l3_index = va.level3_index();
-        if 2 <= l2_index {
+        if 3 <= l2_index {
             panic!("l2 index out of bounds");
         }
 
@@ -239,11 +239,12 @@ impl KernPageTable {
     /// more details.
     pub fn new() -> KernPageTable {
         let mut page_table = PageTable::new(KERN_RW);
-        let (start, end) = allocator::memory_map().unwrap_or((0, 0));
-        let page_start = 0;
-        let page_end = allocator::util::align_down(end, PAGE_ALIGN);
-        let page_count = (page_end - page_start) / PAGE_SIZE;
 
+        // TODO: memory_map is messed up figure out why
+        // let (start, end) = allocator::memory_map().unwrap_or((0, 0));
+        let page_start = 0;
+        let page_end = allocator::util::align_down(100000000, PAGE_ALIGN);
+        let page_count = (page_end - page_start) / PAGE_SIZE;
 
         for i in 0..page_count {
             let address = page_start + PAGE_SIZE * i;
@@ -275,9 +276,7 @@ impl KernPageTable {
             page_table.set_entry(VirtualAddr::from(address), entry);
         }
 
-        KernPageTable{
-            0: page_table
-        }
+        KernPageTable(page_table)
     }
 }
 

@@ -6,6 +6,7 @@ pub use self::pagetable::*;
 
 use aarch64::*;
 use core::sync::atomic::{AtomicUsize, Ordering};
+use crate::kprintln;
 
 use crate::mutex::Mutex;
 use crate::param::{KERNEL_MASK_BITS, USER_MASK_BITS};
@@ -34,11 +35,13 @@ impl VMManager {
     /// The caller should assure that the method is invoked only once during the kernel
     /// initialization.
     pub fn initialize(&self) {
-        if self.kern_pt.lock().replace(KernPageTable::new()).is_some() {
+        let mut kernel_page_table = KernPageTable::new();
+        let baddr = kernel_page_table.get_baddr();
+
+        if self.kern_pt.lock().replace(kernel_page_table).is_some() {
             panic!("VMManager initialize called twice");
         }
-
-        self.wait();
+        self.kern_pt_addr.store(baddr.as_usize(), Ordering::Relaxed);
     }
 
     /// Set up the virtual memory manager for the current core.
@@ -48,7 +51,7 @@ impl VMManager {
     /// # Panics
     ///
     /// Panics if the current system does not support 64KB memory translation granule size.
-    pub unsafe fn setup(&self) {
+    unsafe fn setup(&self) {
         assert!(ID_AA64MMFR0_EL1.get_value(ID_AA64MMFR0_EL1::TGran64) == 0);
 
         let ips = ID_AA64MMFR0_EL1.get_value(ID_AA64MMFR0_EL1::PARange);
@@ -103,10 +106,15 @@ impl VMManager {
             self.setup();
         }
 
-        info!("MMU is ready for core-{}/@sp={:016x}", affinity(), SP.get());
+        //info!("MMU is ready for core-{}/@sp={:016x}", affinity(), SP.get());
 
-        //  Lab 5 1.B
-        unimplemented!("wait for other cores")
+        self.ready_core_cnt.fetch_add(1, Ordering::Relaxed);
+        while self.ready_core_cnt.load(Ordering::Relaxed) < pi::common::NCORES {
+            kprintln!("here");
+//            info!("num cores ready: {}", self.ready_core_cnt.load(Ordering::Relaxed));
+        }
+
+        info!("ready");
     }
 
     /// Returns the base address of the kernel page table as `PhysicalAddr`.
