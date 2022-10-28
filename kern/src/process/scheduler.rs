@@ -131,12 +131,6 @@ impl GlobalScheduler {
         self.initialize_global_timer_interrupt();
         self.initialize_local_timer_interrupt();
 
-        info!("enable: {}", aarch64::CNTP_CTL_EL0::ENABLE);
-        info!("is enabled? {}", unsafe {aarch64::CNTP_CTL_EL0.get()});
-
-        let among = local_tick_in(core_index as usize, Duration::from_secs(1));
-        info!("tick in {} {}", core_index, among);
-
         //unimplemented!("actually different");
         //local_irq().register(Interrupt::Timer1, Box::new(|tf| {
         //    tick_in(TICK);
@@ -200,19 +194,14 @@ impl GlobalScheduler {
         let core = aarch64::affinity();
         let mut controller = LocalController::new(core);
         controller.enable_local_timer();
-        unsafe {
-            //asm!("dsb SY" ::: "memory" : "volatile");
-            info!("init val {:x} {:x}", read_volatile((0x4000_0040 + 4 * core) as *mut u32), read_volatile((0x4000_0060 + 4 * core) as *mut u32) );
-        };
-
 
         local_irq().register(LocalInterrupt::cntpnsqirq, Box::new(|tf| {
             let core = aarch64::affinity();
             LocalController::new(core);
-            info!("here");
-
-            loop {}
+            local_tick_in(core, Duration::from_secs(1));
+            info!("pns");
         }));
+        local_tick_in(core, Duration::from_secs(1));
     }
 
     /// Initializes the scheduler and add userspace processes to the Scheduler.

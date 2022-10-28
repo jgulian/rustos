@@ -97,16 +97,10 @@ impl LocalController {
 
     pub fn enable_local_timer(&mut self) {
         unsafe {
-            let value = (aarch64::CNTP_CTL_EL0.get() | aarch64::CNTP_CTL_EL0::ENABLE)
-                & (!aarch64::CNTP_CTL_EL0::IMASK);
-            aarch64::CNTP_CTL_EL0.set(aarch64::CNTP_CTL_EL0::ENABLE);
-            self.registers.core_timer[self.core].write(0b1);
-            self.registers.core_irq_source[self.core].write(0b1);
-            self.registers.local_timer_control.write(0b11 << 28 | 20_000_000);
-            self.registers.local_timer_write.write(0b11 << 30);
-            self.registers.core_timer_prescaler.write(0x8000_0000);
-
-            //asm!("cpsie i");
+            aarch64::CNTP_CTL_EL0.set(aarch64::CNTP_CTL_EL0.get() |
+                aarch64::CNTP_CTL_EL0::ENABLE | aarch64::CNTP_CTL_EL0::IMASK);
+            self.registers.core_timer[self.core].write(0b10);
+            self.registers.core_irq_source[self.core].write(0b10);
         }
     }
 
@@ -114,17 +108,15 @@ impl LocalController {
         self.registers.core_irq_source[self.core].read() & (1 << (int as u32)) > 0
     }
 
-    pub fn tick_in(&mut self, t: Duration) -> u64 {
+    pub fn tick_in(&mut self, t: Duration) {
+        let additional_time = (t.as_nanos() * unsafe {aarch64::CNTFRQ_EL0.get() as u128} / 1_000_000_000u128) as u64;
         unsafe {
-            write_volatile((0x4000_0040 + 4 * self.core) as *mut u32, 1 << 1);;
-            aarch64::CNTP_TVAL_EL0.set(aarch64::CNTPCT_EL0.get() + 19200000);
-            aarch64::CNTP_CTL_EL0.set(1);
+            aarch64::CNTP_TVAL_EL0.set(additional_time);
+            aarch64::CNTP_CTL_EL0.set(aarch64::CNTP_CTL_EL0.get() & (!aarch64::CNTP_CTL_EL0::IMASK));
         }
-
-        19200000 as u64
     }
 }
 
-pub fn local_tick_in(core: usize, t: Duration) -> u64 {
+pub fn local_tick_in(core: usize, t: Duration) {
     LocalController::new(core).tick_in(t)
 }

@@ -93,12 +93,6 @@ pub extern "C" fn handle_exception(info: Info, esr: u32, tf: &mut TrapFrame) {
             let local_controller = LocalController::new(core);
             for local_int in LocalInterrupt::iter() {
                 if local_controller.is_pending(local_int) {
-                    //if local_int != LocalInterrupt::cntpsirq {
-                    //    return;
-                    //}
-
-                    info!("received thing {}", core);
-                    info!("there {}", local_int as u32);
                     local_irq().invoke(local_int, tf);
                 }
             }
