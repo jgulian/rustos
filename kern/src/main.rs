@@ -72,15 +72,22 @@ unsafe fn kmain() -> ! {
     VMM.initialize();
     SCHEDULER.initialize();
 
+    info!("if you're leaving baby");
     init::initialize_app_cores();
+    info!("let me down slowly");
     VMM.wait();
 
-    loop {}
+    info!("good");
+
+    SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
+    //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
+    //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
+
+    info!("bad");
+
+    SCHEDULER.start();
 
     kprintln!("Welcome to cs3210!");
-    //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
-    //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
-    //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
 
     //SCHEDULER.start();
 }

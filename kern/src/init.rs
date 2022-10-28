@@ -3,12 +3,15 @@ use aarch64::*;
 use core::mem::zeroed;
 use core::ops::Add;
 use core::ptr::write_volatile;
+use core::time::Duration;
+use pi::local_interrupt::local_tick_in;
 
 mod oom;
 mod panic;
 
-use crate::{kmain, kprintln};
+use crate::{kmain, kprintln, SCHEDULER};
 use crate::param::*;
+use crate::percore::local_irq;
 use crate::VMM;
 
 global_asm!(include_str!("init/vectors.s"));
@@ -28,6 +31,7 @@ pub unsafe extern "C" fn _start() -> ! {
         SP.set(KERN_STACK_BASE);
         kinit()
     }
+    loop {}
     unreachable!()
 }
 
@@ -139,7 +143,7 @@ unsafe fn kmain2() -> ! {
     address.write_volatile(0);
     VMM.wait();
 
-    loop {}
+    SCHEDULER.start();
 }
 
 /// Wakes up each app core by writing the address of `init::start2`
@@ -150,10 +154,16 @@ pub unsafe fn initialize_app_cores() {
         address.write_volatile(start2 as usize);
     }
 
+    info!("amogus 0");
     aarch64::sev();
+    info!("amogus 1");
 
     for i in 1..4 {
         let address = SPINNING_BASE.add(i);
-        while address.read() != 0 {}
+        while address.read() != 0 {
+            info!("funny {}", i);
+        }
     }
+
+    info!("amogus 2");
 }

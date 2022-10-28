@@ -149,7 +149,7 @@ impl PageTable {
             l3: [L3PageTable::new(), L3PageTable::new(), L3PageTable::new()],
         });
 
-        for i in 0..2 {
+        for i in 0..3 {
             let mut page_entry = RawL2Entry::new(0);
             page_entry.set_value(page_table.l3[i].as_ptr().as_u64() >> PAGE_ALIGN, RawL2Entry::ADDR);
             page_entry.set_value(1, RawL2Entry::AF);

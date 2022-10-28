@@ -5,12 +5,14 @@ use alloc::vec::Vec;
 use core::ffi::c_void;
 use core::fmt;
 use core::mem;
+use core::ptr::read_volatile;
 use core::time::Duration;
 
 use aarch64;
 use pi::interrupt::{Controller, Interrupt};
 use pi::timer::{tick_in, Timer};
 use smoltcp::time::Instant;
+use pi::local_interrupt::{local_tick_in, LocalController, LocalInterrupt, Registers};
 
 use crate::mutex::Mutex;
 use crate::net::uspi::TKernelTimerHandle;
@@ -66,9 +68,11 @@ impl GlobalScheduler {
     /// Adds a process to the scheduler's queue and returns that process's ID.
     /// For more details, see the documentation on `Scheduler::add()`.
     pub fn add(&self, mut process: Process) -> Option<Id> {
+        info!("adding process");
         process.context.ttbr0 = VMM.get_baddr().as_u64();
         process.context.ttbr1 = process.vmap.get_baddr().as_u64();
         process.context.elr = USER_IMG_BASE as u64;
+        info!("adding registers set");
         self.critical(move |scheduler| scheduler.add(process))
     }
 
@@ -118,20 +122,38 @@ impl GlobalScheduler {
     /// preemptive scheduling. This method should not return under normal
     /// conditions.
     pub fn start(&self) -> ! {
-        unimplemented!("actually different");
+        let core_index = aarch64::affinity();
+
+        if core_index != 0 {
+            loop {}
+        }
+
+        self.initialize_global_timer_interrupt();
+        self.initialize_local_timer_interrupt();
+
+        info!("enable: {}", aarch64::CNTP_CTL_EL0::ENABLE);
+        info!("is enabled? {}", unsafe {aarch64::CNTP_CTL_EL0.get()});
+
+        let among = local_tick_in(core_index as usize, Duration::from_secs(1));
+        info!("tick in {} {}", core_index, among);
+
+        //unimplemented!("actually different");
         //local_irq().register(Interrupt::Timer1, Box::new(|tf| {
         //    tick_in(TICK);
         //    SCHEDULER.switch(State::Ready, tf);
         //}));
-        tick_in(TICK);
-        Controller::new().enable(Interrupt::Timer1);
+        //tick_in(TICK);
+        //Controller::new().enable(Interrupt::Timer1);
 
+        info!("here 0");
         let mut process = Process::new().expect("unable to create process");
         process.state = State::Running;
 
+        info!("here 1");
         let mut trap_frame: TrapFrame = Default::default();
         self.switch_to(&mut trap_frame);
 
+        info!("here 2");
         unsafe {
             asm!("mov x0, $0
                   mov sp, x0"
@@ -141,12 +163,13 @@ impl GlobalScheduler {
             asm!("mov x28, 0");
             asm!("mov x29, 0");
             //TODO: it doesn't like this line
-            //asm!("mov x0, $0
-            //      mov sp, x0"
-            //    :: "r"(_start as *const () as u64)
-            //    :: "volatile");
+            asm!("mov x0, $0
+                  mov sp, x0"
+                :: "r"(_start as *const () as u64)
+                :: "volatile");
         }
 
+        info!("eret");
         unsafe {
             aarch64::eret();
         }
@@ -163,15 +186,33 @@ impl GlobalScheduler {
     /// Registers a timer handler with `Usb::start_kernel_timer` which will
     /// invoke `poll_ethernet` after 1 second.
     pub fn initialize_global_timer_interrupt(&self) {
-        unimplemented!("initialize_global_timer_interrupt()")
+        if aarch64::affinity() != 0 {
+            return;
+        }
+
+
     }
 
     /// Initializes the per-core local timer interrupt with `pi::local_interrupt`.
     /// The timer should be configured in a way that `CntpnsIrq` interrupt fires
     /// every `TICK` duration, which is defined in `param.rs`.
     pub fn initialize_local_timer_interrupt(&self) {
-        // Lab 5 2.C
-        unimplemented!("initialize_local_timer_interrupt()")
+        let core = aarch64::affinity();
+        let mut controller = LocalController::new(core);
+        controller.enable_local_timer();
+        unsafe {
+            //asm!("dsb SY" ::: "memory" : "volatile");
+            info!("init val {:x} {:x}", read_volatile((0x4000_0040 + 4 * core) as *mut u32), read_volatile((0x4000_0060 + 4 * core) as *mut u32) );
+        };
+
+
+        local_irq().register(LocalInterrupt::cntpnsqirq, Box::new(|tf| {
+            let core = aarch64::affinity();
+            LocalController::new(core);
+            info!("here");
+
+            loop {}
+        }));
     }
 
     /// Initializes the scheduler and add userspace processes to the Scheduler.

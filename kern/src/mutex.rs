@@ -39,10 +39,6 @@ impl<T> Mutex<T> {
     pub fn try_lock(&self) -> Option<MutexGuard<T>> {
         let me = aarch64::affinity();
 
-        if me != 0 {
-            return None;
-        }
-
         let (load_ordering, store_ordering) = if is_mmu_ready() {
             (Ordering::Acquire, Ordering::Release)
         } else {

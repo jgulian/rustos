@@ -4,7 +4,7 @@ use core::ops::Index;
 use pi::interrupt::Interrupt;
 use pi::local_interrupt::LocalInterrupt;
 
-use crate::mutex::Mutex;
+use crate::mutex::{Mutex, MutexGuard};
 use crate::traps::TrapFrame;
 
 // Programmer Guide Chapter 10
@@ -85,8 +85,8 @@ impl Index<LocalInterrupt> for LocalIrq {
     type Output = IrqHandlerMutex;
 
     fn index(&self, int: LocalInterrupt) -> &IrqHandlerMutex {
-        // Lab 5 1.C
-        unimplemented!("LocalInterrupt Index")
+        use LocalInterrupt::*;
+        &self.0[int as usize]
     }
 }
 
@@ -94,8 +94,7 @@ impl Index<()> for Fiq {
     type Output = IrqHandlerMutex;
 
     fn index(&self, _: ()) -> &IrqHandlerMutex {
-        // Lab 5 2.B
-        unimplemented!("FIQ Index")
+        &self.0
     }
 }
 
@@ -114,12 +113,17 @@ where
     /// Register an irq handler for an interrupt.
     /// The caller should assure that `initialize()` has been called before calling this function.
     fn register(&self, int: I, handler: IrqHandler) {
-        unimplemented!("actually different")
+        self.index(int).lock().replace(handler);
     }
 
     /// Executes an irq handler for the givven interrupt.
     /// The caller should assure that `initialize()` has been called before calling this function.
     fn invoke(&self, int: I, tf: &mut TrapFrame) {
-        unimplemented!("actually different")
+        match self.index(int).lock().as_mut() {
+            Some(handler) => {
+                (**handler)(tf);
+            }
+            _ => {}
+        }
     }
 }

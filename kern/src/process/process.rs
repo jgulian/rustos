@@ -65,13 +65,19 @@ impl Process {
     pub fn load<P: AsRef<Path>>(pn: P) -> OsResult<Process> {
         use crate::VMM;
 
+        info!("process loading");
+
         let mut p = Process::do_load(pn)?;
+
+        info!("process loaded");
 
         p.context.sp = Process::get_stack_top().as_u64();
         p.context.elr = Process::get_image_base().as_u64();
         p.context.ttbr0 = VMM.get_baddr().as_u64();
         p.context.ttbr1 = p.vmap.get_baddr().as_u64();
         p.context.spsr = SPSR_EL1::F | SPSR_EL1::A | SPSR_EL1::D;
+
+        info!("process registers inputted");
 
         Ok(p)
     }
@@ -83,13 +89,17 @@ impl Process {
         use fat32::traits::Entry;
         use io::Read;
 
+        info!("making me sick");
         let mut process = Process::new()?;
         process.vmap.alloc(Process::get_stack_base(), PagePerm::RW);
         let user_image = process.vmap.alloc(Process::get_image_base(), PagePerm::RWX);
 
+        info!("but we'll heal");
 
         let mut file = FILESYSTEM.open(pn)?.into_file().ok_or(OsError::IoError)?;
         file.read(user_image)?;
+
+        info!("the sun will rise");
 
         Ok(process)
     }

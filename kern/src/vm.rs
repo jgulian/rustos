@@ -110,8 +110,7 @@ impl VMManager {
 
         self.ready_core_cnt.fetch_add(1, Ordering::Relaxed);
         while self.ready_core_cnt.load(Ordering::Relaxed) < pi::common::NCORES {
-            kprintln!("here");
-//            info!("num cores ready: {}", self.ready_core_cnt.load(Ordering::Relaxed));
+            //info!("{} num cores ready: {}", aarch64::affinity(), self.ready_core_cnt.load(Ordering::Relaxed));
         }
 
         info!("ready");

@@ -10,7 +10,7 @@ use core::fmt::Formatter;
 pub use self::frame::TrapFrame;
 
 use pi::interrupt::{Controller, Interrupt};
-use crate::{IRQ, kprintln, Shell};
+use crate::{GLOABAL_IRQ, IRQ, kprintln, Shell};
 use pi::local_interrupt::{LocalController, LocalInterrupt};
 
 use self::syndrome::Syndrome;
@@ -61,7 +61,9 @@ impl fmt::Display for Info {
 pub extern "C" fn handle_exception(info: Info, esr: u32, tf: &mut TrapFrame) {
     let syndrome = Syndrome::from(esr);
 
-    //kprintln!("handle_exception {}", info);
+    let core = aarch64::affinity();
+
+    //kprintln!("handle_exception {}: {}", core, info);
     //kprintln!("{}", syndrome);
 
     match info.kind {
@@ -71,17 +73,33 @@ pub extern "C" fn handle_exception(info: Info, esr: u32, tf: &mut TrapFrame) {
                     tf.elr += 4;
                 },
                 Syndrome::Svc(s) => {
+                    return;
                     handle_syscall(s, tf);
                 }
                 _ => {}
             }
         }
         Kind::Irq => {
-            let controller = Controller::new();
-            for int in Interrupt::iter() {
-                if controller.is_pending(int) {
-                    unimplemented!("actually different")
-                    //local_irq().invoke(int, tf);
+            let core = aarch64::affinity();
+            if core == 0 {
+                let global_controller = Controller::new();
+                for global_interrupt in Interrupt::iter() {
+                    if global_controller.is_pending(global_interrupt) {
+                        GLOABAL_IRQ.invoke(global_interrupt, tf);
+                    }
+                }
+            }
+
+            let local_controller = LocalController::new(core);
+            for local_int in LocalInterrupt::iter() {
+                if local_controller.is_pending(local_int) {
+                    //if local_int != LocalInterrupt::cntpsirq {
+                    //    return;
+                    //}
+
+                    info!("received thing {}", core);
+                    info!("there {}", local_int as u32);
+                    local_irq().invoke(local_int, tf);
                 }
             }
         }

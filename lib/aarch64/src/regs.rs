@@ -267,3 +267,5 @@ defreg!(CNTP_CVAL_EL0);
 
 // (ref: D7.5.12 Counter-timer Physical Timer TimerValue Register)
 defreg!(CNTP_TVAL_EL0, [TVAL[31 - 00],]);
+
+defreg!(CNTPCT_EL0);
