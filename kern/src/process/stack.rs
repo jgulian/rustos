@@ -27,7 +27,9 @@ impl Stack {
     /// fails for some other reason, returns `None`.
     pub fn new() -> Option<Stack> {
         let raw_ptr = unsafe {
+            info!("alloc issue 1");
             let raw_ptr: *mut u8 = ALLOCATOR.alloc(Stack::layout());
+            info!("alloc issue 2");
             assert!(!raw_ptr.is_null());
             raw_ptr.write_bytes(0, Self::SIZE);
             raw_ptr

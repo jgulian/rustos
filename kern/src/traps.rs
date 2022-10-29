@@ -7,6 +7,7 @@ pub mod irq;
 use core::convert::TryInto;
 use core::fmt;
 use core::fmt::Formatter;
+use aarch64::enable_fiq_interrupt;
 pub use self::frame::TrapFrame;
 
 use pi::interrupt::{Controller, Interrupt};
@@ -68,6 +69,7 @@ pub extern "C" fn handle_exception(info: Info, esr: u32, tf: &mut TrapFrame) {
 
     match info.kind {
         Kind::Synchronous => {
+            enable_fiq_interrupt();
             match syndrome {
                 Syndrome::Brk(_) => {
                     tf.elr += 4;
@@ -80,6 +82,7 @@ pub extern "C" fn handle_exception(info: Info, esr: u32, tf: &mut TrapFrame) {
             }
         }
         Kind::Irq => {
+            enable_fiq_interrupt();
             let core = aarch64::affinity();
             if core == 0 {
                 let global_controller = Controller::new();
@@ -97,6 +100,9 @@ pub extern "C" fn handle_exception(info: Info, esr: u32, tf: &mut TrapFrame) {
                 }
             }
         }
+        Kind::Fiq => {
+
+        },
         _ => {}
     }
 }

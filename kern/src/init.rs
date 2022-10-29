@@ -143,6 +143,8 @@ unsafe fn kmain2() -> ! {
     address.write_volatile(0);
     VMM.wait();
 
+    loop {}
+
     SCHEDULER.start();
 }
 

@@ -14,13 +14,14 @@ use smoltcp::wire::EthernetAddress;
 use crate::mutex::Mutex;
 use crate::net::Frame;
 use crate::traps::irq::IrqHandlerRegistry;
-use crate::ALLOCATOR;
+use crate::{ALLOCATOR, FIQ, GLOABAL_IRQ, TrapFrame};
 
 const DEBUG_USPI: bool = false;
+
 pub macro uspi_trace {
-    () => (if DEBUG_USPI { trace!("\n") } ),
-    ($fmt:expr) => (if DEBUG_USPI { trace!(concat!($fmt, "\n")) }),
-    ($fmt:expr, $($arg:tt)*) => (if DEBUG_USPI { trace!(concat!($fmt, "\n"), $($arg)*) })
+() => (if DEBUG_USPI { trace!("\n") } ),
+($fmt:expr) => (if DEBUG_USPI { trace!(concat!($fmt, "\n")) }),
+($fmt:expr, $($arg:tt)*) => (if DEBUG_USPI { trace!(concat!($fmt, "\n"), $($arg)*) })
 }
 
 pub type TKernelTimerHandle = u64;
@@ -68,7 +69,7 @@ mod inner {
         fn TimerGet() -> TKernelTimerHandle;
     }
 
-    impl !Sync for USPi {}
+    impl ! Sync for USPi {}
 
     impl USPi {
         /// The caller should assure that this function is called only once
@@ -143,6 +144,7 @@ mod inner {
 }
 
 pub use inner::USPi;
+use pi::timer;
 
 unsafe fn layout(size: usize) -> Layout {
     Layout::from_size_align_unchecked(size + core::mem::size_of::<usize>(), 16)
@@ -150,38 +152,42 @@ unsafe fn layout(size: usize) -> Layout {
 
 #[no_mangle]
 fn malloc(size: u32) -> *mut c_void {
-    // Lab 5 2.B
-    unimplemented!("malloc")
+    let total_size = size as usize + core::mem::size_of::<Layout>();
+    let layout = unsafe { Layout::from_size_align_unchecked(total_size, 8) };
+    unsafe {
+        let ptr = ALLOCATOR.alloc(layout) as *mut Layout;
+        ptr.write(layout);
+        ptr.add(1) as *mut c_void
+    }
 }
 
 #[no_mangle]
 fn free(ptr: *mut c_void) {
-    // Lab 5 2.B
-    unimplemented!("free")
+    unsafe {
+        let layout_ptr = (ptr as *mut Layout).sub(1);
+        let layout = layout_ptr.read();
+        ALLOCATOR.dealloc(layout_ptr as *mut u8, layout);
+    }
 }
 
 #[no_mangle]
 pub fn TimerSimpleMsDelay(nMilliSeconds: u32) {
-    // Lab 5 2.B
-    unimplemented!("TimerSimpleMsDelay")
+    spin_sleep(Duration::from_millis(nMilliSeconds as u64))
 }
 
 #[no_mangle]
 pub fn TimerSimpleusDelay(nMicroSeconds: u32) {
-    // Lab 5 2.B
-    unimplemented!("TimerSimpleusDelay")
+    spin_sleep(Duration::from_nanos(nMicroSeconds as u64))
 }
 
 #[no_mangle]
 pub fn MsDelay(nMilliSeconds: u32) {
-    // Lab 5 2.B
-    unimplemented!("MsDelay")
+    spin_sleep(Duration::from_millis(nMilliSeconds as u64))
 }
 
 #[no_mangle]
 pub fn usDelay(nMicroSeconds: u32) {
-    // Lab 5 2.B
-    unimplemented!("usDelay")
+    spin_sleep(Duration::from_nanos(nMicroSeconds as u64))
 }
 
 /// Registers `pHandler` to the kernel's IRQ handler registry.
@@ -192,15 +198,27 @@ pub fn usDelay(nMicroSeconds: u32) {
 /// registry. Otherwise, register the handler to the global IRQ interrupt handler.
 #[no_mangle]
 pub unsafe fn ConnectInterrupt(nIRQ: u32, pHandler: TInterruptHandler, pParam: *mut c_void) {
-    // Lab 5 2.B
-    unimplemented!("ConnectInterrupt")
+    let int = Interrupt::from(nIRQ as usize);
+    let handler = Box::new(|tf: &mut TrapFrame| {
+        match pHandler {
+            Some(h) => h(pParam),
+            None => {}
+        }
+    });
+
+    unimplemented!("actually not done");
+
+    if int == Interrupt::Usb {
+        //FIQ.register((), handler);
+    } else {
+        //GLOABAL_IRQ.register(int, handler);
+    }
 }
 
 /// Writes a log message from USPi using `uspi_trace!` macro.
 #[no_mangle]
 pub unsafe fn DoLogWrite(_pSource: *const u8, _Severity: u32, pMessage: *const u8) {
-    // Lab 5 2.B
-    unimplemented!("DoLogWrite")
+    //uspi_trace!(String::new(pMessage as str));
 }
 
 #[no_mangle]
@@ -210,8 +228,7 @@ pub fn DebugHexdump(_pBuffer: *const c_void, _nBufLen: u32, _pSource: *const u8)
 
 #[no_mangle]
 pub unsafe fn uspi_assertion_failed(pExpr: *const u8, pFile: *const u8, nLine: u32) {
-    // Lab 5 2.B
-    unimplemented!("uspi_assertion_failed")
+    //uspi_trace!(format_args!("line {}: {} != {}", nLine, String::from(pExpr as str), String::from(pFile as str)));
 }
 
 pub struct Usb(pub Mutex<Option<USPi>>);

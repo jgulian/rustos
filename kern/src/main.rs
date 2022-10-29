@@ -65,7 +65,7 @@ pub static FIQ: Fiq = Fiq::new();
 pub static ETHERNET: GlobalEthernetDriver = GlobalEthernetDriver::uninitialized();
 
 unsafe fn kmain() -> ! {
-    crate::logger::init_logger();
+    logger::init_logger();
 
     ALLOCATOR.initialize();
     FILESYSTEM.initialize();
@@ -79,6 +79,7 @@ unsafe fn kmain() -> ! {
 
     info!("good");
 
+    SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
     SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
     //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
     //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));

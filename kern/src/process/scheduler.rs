@@ -107,7 +107,7 @@ impl GlobalScheduler {
                 return id;
             }
 
-            aarch64::wfi();
+            aarch64::wfe();
         }
     }
 
@@ -123,10 +123,6 @@ impl GlobalScheduler {
     /// conditions.
     pub fn start(&self) -> ! {
         let core_index = aarch64::affinity();
-
-        if core_index != 0 {
-            loop {}
-        }
 
         self.initialize_global_timer_interrupt();
         self.initialize_local_timer_interrupt();
@@ -147,7 +143,6 @@ impl GlobalScheduler {
         let mut trap_frame: TrapFrame = Default::default();
         self.switch_to(&mut trap_frame);
 
-        info!("here 2");
         unsafe {
             asm!("mov x0, $0
                   mov sp, x0"
@@ -199,7 +194,7 @@ impl GlobalScheduler {
             let core = aarch64::affinity();
             LocalController::new(core);
             local_tick_in(core, Duration::from_secs(1));
-            info!("pns");
+            info!("pns {}", core);
         }));
         local_tick_in(core, Duration::from_secs(1));
     }
@@ -272,6 +267,8 @@ impl Scheduler {
                 *process.context = *tf;
                 let p = self.processes.remove(i).unwrap();
                 self.processes.push_back(p);
+
+                aarch64::sev();
 
                 return true;
             }

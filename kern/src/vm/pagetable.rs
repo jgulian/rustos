@@ -312,14 +312,18 @@ impl UserPageTable {
             panic!("invalid virtual address");
         }
 
+        info!("jere 1");
         va = va.sub(VirtualAddr::from(USER_IMG_BASE));
 
         if self.0.is_valid(va) {
             panic!("entry has already been allocated");
         }
+        info!("jere 2");
 
         let page = unsafe { ALLOCATOR.alloc(Page::layout()) };
         let address = page as u64;
+
+        info!("jere 3");
 
         let mut entry = RawL3Entry::new(0);
         entry.set_value(address >> PAGE_ALIGN, RawL3Entry::ADDR);
@@ -330,6 +334,8 @@ impl UserPageTable {
         entry.set_value(EntryValid::Valid, RawL3Entry::VALID);
         entry.set_value(0b1_u64, RawL3Entry::AF);
         self.0.set_entry(va, entry);
+
+        info!("jere 4");
 
         return unsafe {core::slice::from_raw_parts_mut(page, PAGE_SIZE)};
     }

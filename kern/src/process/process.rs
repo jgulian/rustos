@@ -43,7 +43,9 @@ impl Process {
     /// If enough memory could not be allocated to start the process, returns
     /// `None`. Otherwise returns `Some` of the new `Process`.
     pub fn new() -> OsResult<Process> {
+        info!("dere 1");
         let stack = Stack::new().ok_or(OsError::NoMemory)?;
+        info!("dere 2");
         Ok(Process{
             context: Box::new(Default::default()),
             stack,
@@ -91,7 +93,9 @@ impl Process {
 
         info!("making me sick");
         let mut process = Process::new()?;
+        info!("here 1");
         process.vmap.alloc(Process::get_stack_base(), PagePerm::RW);
+        info!("here 2");
         let user_image = process.vmap.alloc(Process::get_image_base(), PagePerm::RWX);
 
         info!("but we'll heal");

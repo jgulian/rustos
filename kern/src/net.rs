@@ -14,6 +14,7 @@ use smoltcp::phy::{self, Device, DeviceCapabilities};
 use smoltcp::socket::{SocketHandle, SocketRef, TcpSocketBuffer};
 use smoltcp::time::Instant;
 use smoltcp::wire::{IpAddress, IpCidr};
+use pi::interrupt::Interrupt::Usb;
 
 use crate::mutex::Mutex;
 use crate::param::MTU;
@@ -137,8 +138,8 @@ impl phy::TxToken for TxToken {
 
 /// Creates and returns a new ethernet interface using `UsbEthernet` struct.
 pub fn create_interface() -> EthernetInterface<UsbEthernet> {
-    // Lab 5 2.B
-    unimplemented!("create_interface")
+    EthernetInterfaceBuilder::new(UsbEthernet)
+        .finalize()
 }
 
 const PORT_MAP_SIZE: usize = 65536 / 64;

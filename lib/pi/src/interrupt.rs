@@ -96,7 +96,6 @@ impl Controller {
 
     /// Enables the interrupt as FIQ interrupt
     pub fn enable_fiq(&mut self, int: Interrupt) {
-        // Lab 5 2.B
-        unimplemented!("enable_fiq")
+        self.registers.FIQ_CONTROL.or_mask(0b1 << 7 | int as u32);
     }
 }
