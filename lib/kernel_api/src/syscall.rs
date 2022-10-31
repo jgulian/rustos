@@ -87,7 +87,10 @@ pub fn write(b: u8) {
 }
 
 pub fn write_str(msg: &str) {
-    unimplemented!("write_str()")
+    let pad = [0; 64];
+    for c in msg.bytes() {
+        write(c);
+    }
 }
 
 pub fn getpid() -> u64 {
@@ -105,10 +108,6 @@ pub fn getpid() -> u64 {
     }
 
     pid
-}
-
-pub fn getpid() -> u64 {
-    unimplemented!("getpid()")
 }
 
 pub fn sock_create() -> SocketDescriptor {

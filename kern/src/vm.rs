@@ -112,8 +112,6 @@ impl VMManager {
         while self.ready_core_cnt.load(Ordering::Relaxed) < pi::common::NCORES {
             //info!("{} num cores ready: {}", aarch64::affinity(), self.ready_core_cnt.load(Ordering::Relaxed));
         }
-
-        info!("ready");
     }
 
     /// Returns the base address of the kernel page table as `PhysicalAddr`.

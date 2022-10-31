@@ -57,7 +57,7 @@ pub fn sys_time(tf: &mut TrapFrame) {
 ///
 /// This system call does not take paramer and does not return any value.
 pub fn sys_exit(tf: &mut TrapFrame) {
-    SCHEDULER.kill(tf).expect("failed to kill process");
+    let a = SCHEDULER.kill(tf).expect("failed to kill process");
     SCHEDULER.switch_to(tf);
 }
 

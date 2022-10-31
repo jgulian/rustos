@@ -3,6 +3,7 @@ use core::fmt;
 use core::ops::{Deref, DerefMut, Drop};
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use crate::percore::is_mmu_ready;
+use crate::vm::Page;
 
 #[repr(align(32))]
 pub struct Mutex<T> {
@@ -39,17 +40,16 @@ impl<T> Mutex<T> {
     pub fn try_lock(&self) -> Option<MutexGuard<T>> {
         let me = aarch64::affinity();
 
-        let (load_ordering, store_ordering) = if is_mmu_ready() {
-            (Ordering::Acquire, Ordering::Release)
+        let ordering = if is_mmu_ready() {
+            Ordering::SeqCst
+        } else if me == 0 {
+            Ordering::Relaxed
         } else {
-            assert_eq!(me, 0);
-            (Ordering::Relaxed, Ordering::Relaxed)
+            return None;
         };
 
-
-        if !self.lock.load(load_ordering) || self.owner.load(load_ordering) == me {
-            self.lock.store(true, store_ordering);
-            self.owner.store(me, store_ordering);
+        //TODO: Review
+        if !self.lock.compare_and_swap(false, true, ordering) {
             Some(MutexGuard { lock: &self })
         } else {
             None
@@ -70,7 +70,13 @@ impl<T> Mutex<T> {
     }
 
     fn unlock(&self) {
-        self.lock.store(false, Ordering::Relaxed);
+        let ordering = if is_mmu_ready() {
+            Ordering::SeqCst
+        } else {
+            Ordering::Relaxed
+        };
+        self.owner.store(usize::max_value(), ordering);
+        self.lock.store(false, ordering);
     }
 }
 

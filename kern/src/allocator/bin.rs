@@ -59,7 +59,6 @@ impl Allocator {
     }
 
     fn buddy_down(&mut self, bin: usize, align: usize) -> Option<*mut usize> {
-        info!("b {} {:x} {:x}", bin, aarch64::SP.get(), KERN_STACK_BASE - KERN_STACK_SIZE);
         if bin >= BIN_COUNT {
             return None;
         }
@@ -153,12 +152,8 @@ impl LocalAlloc for Allocator {
     /// or `layout` does not meet this allocator's
     /// size or alignment constraints.
     unsafe fn alloc(&mut self, layout: Layout) -> *mut u8 {
-        info!("buddy 0");
         let bin = Allocator::size_to_bin(layout.size()).unwrap_or(0);
-        info!("buddy 1");
-        let a = self.buddy_down(bin, layout.align()).unwrap_or(ptr::null_mut()) as *mut u8;
-        info!("buddy 2");
-        a
+        self.buddy_down(bin, layout.align()).unwrap_or(ptr::null_mut()) as *mut u8
     }
 
     /// Deallocates the memory referenced by `ptr`.

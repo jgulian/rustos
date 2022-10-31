@@ -240,10 +240,8 @@ impl KernPageTable {
     pub fn new() -> KernPageTable {
         let mut page_table = PageTable::new(KERN_RW);
 
-        // TODO: memory_map is messed up figure out why
-        // let (start, end) = allocator::memory_map().unwrap_or((0, 0));
         let page_start = 0;
-        let page_end = allocator::util::align_down(100000000, PAGE_ALIGN);
+        let page_end = allocator::util::align_down(0x3c000000, PAGE_ALIGN);
         let page_count = (page_end - page_start) / PAGE_SIZE;
 
         for i in 0..page_count {
@@ -312,18 +310,14 @@ impl UserPageTable {
             panic!("invalid virtual address");
         }
 
-        info!("jere 1");
         va = va.sub(VirtualAddr::from(USER_IMG_BASE));
 
         if self.0.is_valid(va) {
             panic!("entry has already been allocated");
         }
-        info!("jere 2");
 
         let page = unsafe { ALLOCATOR.alloc(Page::layout()) };
         let address = page as u64;
-
-        info!("jere 3");
 
         let mut entry = RawL3Entry::new(0);
         entry.set_value(address >> PAGE_ALIGN, RawL3Entry::ADDR);
@@ -334,8 +328,6 @@ impl UserPageTable {
         entry.set_value(EntryValid::Valid, RawL3Entry::VALID);
         entry.set_value(0b1_u64, RawL3Entry::AF);
         self.0.set_entry(va, entry);
-
-        info!("jere 4");
 
         return unsafe {core::slice::from_raw_parts_mut(page, PAGE_SIZE)};
     }

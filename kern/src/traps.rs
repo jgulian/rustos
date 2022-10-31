@@ -62,8 +62,6 @@ impl fmt::Display for Info {
 pub extern "C" fn handle_exception(info: Info, esr: u32, tf: &mut TrapFrame) {
     let syndrome = Syndrome::from(esr);
 
-    let core = aarch64::affinity();
-
     //kprintln!("handle_exception {}: {}", core, info);
     //kprintln!("{}", syndrome);
 
@@ -75,7 +73,6 @@ pub extern "C" fn handle_exception(info: Info, esr: u32, tf: &mut TrapFrame) {
                     tf.elr += 4;
                 },
                 Syndrome::Svc(s) => {
-                    return;
                     handle_syscall(s, tf);
                 }
                 _ => {}

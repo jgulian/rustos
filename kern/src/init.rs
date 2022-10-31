@@ -143,8 +143,6 @@ unsafe fn kmain2() -> ! {
     address.write_volatile(0);
     VMM.wait();
 
-    loop {}
-
     SCHEDULER.start();
 }
 
@@ -156,16 +154,10 @@ pub unsafe fn initialize_app_cores() {
         address.write_volatile(start2 as usize);
     }
 
-    info!("amogus 0");
     aarch64::sev();
-    info!("amogus 1");
 
     for i in 1..4 {
         let address = SPINNING_BASE.add(i);
-        while address.read() != 0 {
-            info!("funny {}", i);
-        }
+        while address.read_volatile() != 0 {}
     }
-
-    info!("amogus 2");
 }

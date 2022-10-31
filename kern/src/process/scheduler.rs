@@ -10,7 +10,7 @@ use core::time::Duration;
 
 use aarch64;
 use pi::interrupt::{Controller, Interrupt};
-use pi::timer::{tick_in, Timer};
+use pi::timer::{spin_sleep, tick_in, Timer};
 use smoltcp::time::Instant;
 use pi::local_interrupt::{local_tick_in, LocalController, LocalInterrupt, Registers};
 
@@ -28,21 +28,6 @@ use crate::console::kprint;
 extern "C" {
     fn _start();
     fn context_restore();
-}
-
-extern fn run_shell() {
-    let mut prot_one = [0; 200];
-    let mut root = Shell::new("root> ");
-    let mut user = Shell::new("user>");
-    let mut prot_two = [0; 200];
-
-    root.run();
-
-    loop {
-        user.run();
-        prot_one[0] = prot_two[0];
-        prot_two[0] += 1;
-    }
 }
 
 /// Process scheduler for the entire machine.
@@ -68,12 +53,13 @@ impl GlobalScheduler {
     /// Adds a process to the scheduler's queue and returns that process's ID.
     /// For more details, see the documentation on `Scheduler::add()`.
     pub fn add(&self, mut process: Process) -> Option<Id> {
-        info!("adding process");
         process.context.ttbr0 = VMM.get_baddr().as_u64();
         process.context.ttbr1 = process.vmap.get_baddr().as_u64();
         process.context.elr = USER_IMG_BASE as u64;
-        info!("adding registers set");
-        self.critical(move |scheduler| scheduler.add(process))
+
+        let id = self.critical(move |scheduler| scheduler.add(process));
+        aarch64::sev();
+        id
     }
 
     /// Performs a context switch using `tf` by setting the state of the current
@@ -82,6 +68,7 @@ impl GlobalScheduler {
     /// the documentation on `Scheduler::schedule_out()` and `Scheduler::switch_to()`.
     pub fn switch(&self, new_state: State, tf: &mut TrapFrame) -> Id {
         self.critical(|scheduler| scheduler.schedule_out(new_state, tf));
+        aarch64::sev();
         self.switch_to(tf)
     }
 
@@ -92,7 +79,10 @@ impl GlobalScheduler {
     /// Returns the process's ID when a ready process is found.
     pub fn switch_to(&self, tf: &mut TrapFrame) -> Id {
         loop {
-            let rtn = self.critical(|scheduler| scheduler.switch_to(tf));
+            let rtn = self.critical(|scheduler| {
+                let core = aarch64::affinity();
+                scheduler.switch_to(tf)
+            });
             if let Some(id) = rtn {
                 trace!(
                     "[core-{}] switch_to {:?}, pc: {:x}, lr: {:x}, x29: {:x}, x28: {:x}, x27: {:x}",
@@ -115,7 +105,9 @@ impl GlobalScheduler {
     /// For more details, see the documentation on `Scheduler::kill()`.
     #[must_use]
     pub fn kill(&self, tf: &mut TrapFrame) -> Option<Id> {
-        self.critical(|scheduler| scheduler.kill(tf))
+        self.critical(|scheduler| {
+            scheduler.kill(tf)
+        })
     }
 
     /// Starts executing processes in user space using timer interrupt based
@@ -127,19 +119,6 @@ impl GlobalScheduler {
         self.initialize_global_timer_interrupt();
         self.initialize_local_timer_interrupt();
 
-        //unimplemented!("actually different");
-        //local_irq().register(Interrupt::Timer1, Box::new(|tf| {
-        //    tick_in(TICK);
-        //    SCHEDULER.switch(State::Ready, tf);
-        //}));
-        //tick_in(TICK);
-        //Controller::new().enable(Interrupt::Timer1);
-
-        info!("here 0");
-        let mut process = Process::new().expect("unable to create process");
-        process.state = State::Running;
-
-        info!("here 1");
         let mut trap_frame: TrapFrame = Default::default();
         self.switch_to(&mut trap_frame);
 
@@ -149,16 +128,12 @@ impl GlobalScheduler {
                 :: "r"((&mut trap_frame) as *const TrapFrame as u64)
                 :: "volatile");
             context_restore();
-            asm!("mov x28, 0");
-            asm!("mov x29, 0");
-            //TODO: it doesn't like this line
-            asm!("mov x0, $0
-                  mov sp, x0"
-                :: "r"(_start as *const () as u64)
-                :: "volatile");
+            asm!("ldp x28, x29, [SP], #16");
+            asm!("ldp lr, xzr, [SP], #16");
+
+            // Todo: Figure out how to reset SP_EL1
         }
 
-        info!("eret");
         unsafe {
             aarch64::eret();
         }
@@ -192,11 +167,11 @@ impl GlobalScheduler {
 
         local_irq().register(LocalInterrupt::cntpnsqirq, Box::new(|tf| {
             let core = aarch64::affinity();
-            LocalController::new(core);
-            local_tick_in(core, Duration::from_secs(1));
+            SCHEDULER.switch(State::Ready, tf);
             info!("pns {}", core);
+            local_tick_in(core, TICK);
         }));
-        local_tick_in(core, Duration::from_secs(1));
+        local_tick_in(core, TICK);
     }
 
     /// Initializes the scheduler and add userspace processes to the Scheduler.
@@ -268,8 +243,6 @@ impl Scheduler {
                 let p = self.processes.remove(i).unwrap();
                 self.processes.push_back(p);
 
-                aarch64::sev();
-
                 return true;
             }
         }
@@ -293,13 +266,17 @@ impl Scheduler {
             }
         };
 
-        let mut process = self.processes.remove(j)?;
-        process.state = State::Running;
-        let id = process.context.tpidr;
-        (*tf) = *process.context;
-        self.processes.push_front(process);
+        if j == self.processes.len() {
+            None
+        } else {
+            let mut process = self.processes.remove(j)?;
+            process.state = State::Running;
+            let id = process.context.tpidr;
+            (*tf) = *process.context;
+            self.processes.push_front(process);
 
-        Some(id)
+            Some(id)
+        }
     }
 
     /// Kills currently running process by scheduling out the current process
