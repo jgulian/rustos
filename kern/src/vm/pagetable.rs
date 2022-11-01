@@ -137,7 +137,7 @@ impl L3PageTable {
 #[repr(align(65536))]
 pub struct PageTable {
     pub l2: L2PageTable,
-    pub l3: [L3PageTable; 2],
+    pub l3: [L3PageTable; 3],
 }
 
 impl PageTable {
@@ -146,10 +146,10 @@ impl PageTable {
     fn new(perm: u64) -> Box<PageTable> {
         let mut page_table = Box::new(PageTable{
             l2: L2PageTable::new(),
-            l3: [L3PageTable::new(), L3PageTable::new()],
+            l3: [L3PageTable::new(), L3PageTable::new(), L3PageTable::new()],
         });
 
-        for i in 0..2 {
+        for i in 0..3 {
             let mut page_entry = RawL2Entry::new(0);
             page_entry.set_value(page_table.l3[i].as_ptr().as_u64() >> PAGE_ALIGN, RawL2Entry::ADDR);
             page_entry.set_value(1, RawL2Entry::AF);
@@ -166,8 +166,7 @@ impl PageTable {
     }
 
     /// Returns the (L2index, L3index) extracted from the given virtual address.
-    /// Since we are only supporting 1GB virtual memory in this system, L2index
-    /// should be smaller than 2.
+    /// L2index should be smaller than the number of L3PageTable.
     ///
     /// # Panics
     ///
@@ -180,7 +179,7 @@ impl PageTable {
 
         let l2_index = va.level2_index();
         let l3_index = va.level3_index();
-        if 2 <= l2_index {
+        if 3 <= l2_index {
             panic!("l2 index out of bounds");
         }
 
@@ -240,11 +239,10 @@ impl KernPageTable {
     /// more details.
     pub fn new() -> KernPageTable {
         let mut page_table = PageTable::new(KERN_RW);
-        let (start, end) = allocator::memory_map().unwrap_or((0, 0));
-        let page_start = 0;
-        let page_end = allocator::util::align_down(end, PAGE_ALIGN);
-        let page_count = (page_end - page_start) / PAGE_SIZE;
 
+        let page_start = 0;
+        let page_end = allocator::util::align_down(0x3c000000, PAGE_ALIGN);
+        let page_count = (page_end - page_start) / PAGE_SIZE;
 
         for i in 0..page_count {
             let address = page_start + PAGE_SIZE * i;
@@ -276,9 +274,7 @@ impl KernPageTable {
             page_table.set_entry(VirtualAddr::from(address), entry);
         }
 
-        KernPageTable{
-            0: page_table
-        }
+        KernPageTable(page_table)
     }
 }
 

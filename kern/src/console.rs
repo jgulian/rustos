@@ -1,6 +1,5 @@
 use core::fmt;
 use core::fmt::Write;
-use kernel_api::print;
 use pi::uart::MiniUart;
 use shim::io;
 

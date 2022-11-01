@@ -14,14 +14,19 @@
 mod init;
 
 extern crate alloc;
+#[macro_use]
+extern crate log;
 
 pub mod allocator;
 pub mod console;
 pub mod fs;
+pub mod logger;
 pub mod mutex;
-pub mod shell;
+pub mod net;
 pub mod param;
+pub mod percore;
 pub mod process;
+pub mod shell;
 pub mod traps;
 pub mod vm;
 
@@ -30,6 +35,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::alloc::{GlobalAlloc, Layout};
 use core::fmt::Write;
+use aarch64::SCR_EL3::IRQ;
 use shim::path::{Path, PathBuf};
 use console::kprintln;
 
@@ -37,8 +43,10 @@ use allocator::Allocator;
 use fs::FileSystem;
 use pi::interrupt::{Controller, Interrupt};
 use pi::timer::tick_in;
+use net::uspi::Usb;
+use net::GlobalEthernetDriver;
 use process::GlobalScheduler;
-use traps::irq::Irq;
+use traps::irq::{Fiq, GlobalIrq};
 use vm::VMManager;
 use pi::uart::MiniUart;
 use crate::param::TICK;
@@ -51,35 +59,33 @@ pub static ALLOCATOR: Allocator = Allocator::uninitialized();
 pub static FILESYSTEM: FileSystem = FileSystem::uninitialized();
 pub static SCHEDULER: GlobalScheduler = GlobalScheduler::uninitialized();
 pub static VMM: VMManager = VMManager::uninitialized();
-pub static IRQ: Irq = Irq::uninitialized();
+pub static USB: Usb = Usb::uninitialized();
+pub static GLOABAL_IRQ: GlobalIrq = GlobalIrq::new();
+pub static FIQ: Fiq = Fiq::new();
+pub static ETHERNET: GlobalEthernetDriver = GlobalEthernetDriver::uninitialized();
 
-fn run_shell() {
-    Shell::new(">").run();
-}
+unsafe fn kmain() -> ! {
+    logger::init_logger();
 
-fn kmain() -> ! {
-    unsafe {
-        ALLOCATOR.initialize();
-        FILESYSTEM.initialize();
-        IRQ.initialize();
-        SCHEDULER.initialize();
-        VMM.initialize();
-    }
+    ALLOCATOR.initialize();
+    FILESYSTEM.initialize();
+    VMM.initialize();
+    SCHEDULER.initialize();
 
-    let mut controller = Controller::new();
-    for int in Interrupt::iter() {
-        controller.disable(*int);
-    }
+    SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
+
+    init::initialize_app_cores();
+    VMM.wait();
+
+    info!("cores initialized");
+
+    //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
+    //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
+    //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
+
+    SCHEDULER.start();
 
     kprintln!("Welcome to cs3210!");
-    SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
-    SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
-    //SCHEDULER.add(Process::load(PathBuf::from("/sleep")).expect("should exist"));
-    SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
-    //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
-    //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
 
-    unsafe {
-        SCHEDULER.start();
-    }
+    //SCHEDULER.start();
 }

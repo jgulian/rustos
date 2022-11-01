@@ -5,7 +5,7 @@
 mod cr0;
 
 use kernel_api::println;
-use kernel_api::syscall::{getpid, time};
+use kernel_api::syscall::{getpid, time, exit};
 
 fn fib(n: u64) -> u64 {
     match n {
@@ -16,9 +16,15 @@ fn fib(n: u64) -> u64 {
 }
 
 fn main() {
-    println!("Started...");
+    let pid: u64 = getpid();
+    let beg = time();
+    println!("test");
+    println!("[{}] Started: {}", pid, beg.as_millis());
 
     let rtn = fib(40);
 
-    println!("Ended: Result = {}", rtn);
+    let end = time();
+    println!("[{}] Ended: {}", pid, end.as_millis());
+    println!("[{}] Result: {} ({})", pid, rtn, (end - beg).as_millis());
+    exit();
 }

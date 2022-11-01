@@ -28,6 +28,7 @@ impl Stack {
     pub fn new() -> Option<Stack> {
         let raw_ptr = unsafe {
             let raw_ptr: *mut u8 = ALLOCATOR.alloc(Stack::layout());
+            info!("raw ptr {:p}", raw_ptr);
             assert!(!raw_ptr.is_null());
             raw_ptr.write_bytes(0, Self::SIZE);
             raw_ptr

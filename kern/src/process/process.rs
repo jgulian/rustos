@@ -1,11 +1,13 @@
 use alloc::boxed::Box;
 use core::mem;
+use alloc::vec::Vec;
 use shim::io;
 use shim::path::Path;
 
 use aarch64;
 use aarch64::EntryPerm::USER_RW;
 use aarch64::SPSR_EL1;
+use smoltcp::socket::SocketHandle;
 
 use crate::param::*;
 use crate::process::{Stack, State};
@@ -29,6 +31,9 @@ pub struct Process {
     pub vmap: Box<UserPageTable>,
     /// The scheduling state of the process.
     pub state: State,
+    // Lab 5 2.C
+    // /// Socket handles held by the current process
+    //pub sockets: Vec<SocketHandle>,
 }
 
 impl Process {
@@ -43,12 +48,13 @@ impl Process {
             context: Box::new(Default::default()),
             stack,
             vmap: Box::new(UserPageTable::new()),
-            state: State::Ready
+            state: State::Ready,
+        //    sockets: Vec::new(),
         })
     }
 
-    /// Load a program stored in the given path by calling `do_load()` method.
-    /// Set trapframe `context` corresponding to the its page table.
+    /// Loads a program stored in the given path by calling `do_load()` method.
+    /// Sets trapframe `context` corresponding to its page table.
     /// `sp` - the address of stack top
     /// `elr` - the address of image base.
     /// `ttbr0` - the base address of kernel page table
@@ -80,7 +86,6 @@ impl Process {
         let mut process = Process::new()?;
         process.vmap.alloc(Process::get_stack_base(), PagePerm::RW);
         let user_image = process.vmap.alloc(Process::get_image_base(), PagePerm::RWX);
-
 
         let mut file = FILESYSTEM.open(pn)?.into_file().ok_or(OsError::IoError)?;
         file.read(user_image)?;

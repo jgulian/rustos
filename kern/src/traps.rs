@@ -7,13 +7,18 @@ pub mod irq;
 use core::convert::TryInto;
 use core::fmt;
 use core::fmt::Formatter;
+use aarch64::enable_fiq_interrupt;
 pub use self::frame::TrapFrame;
 
 use pi::interrupt::{Controller, Interrupt};
-use crate::{IRQ, kprintln, Shell};
+use crate::{GLOABAL_IRQ, IRQ, kprintln, Shell};
+use pi::local_interrupt::{LocalController, LocalInterrupt};
 
 use self::syndrome::Syndrome;
 use self::syscall::handle_syscall;
+use crate::percore;
+use crate::percore::local_irq;
+use crate::traps::irq::IrqHandlerRegistry;
 
 #[repr(u16)]
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
@@ -57,11 +62,12 @@ impl fmt::Display for Info {
 pub extern "C" fn handle_exception(info: Info, esr: u32, tf: &mut TrapFrame) {
     let syndrome = Syndrome::from(esr);
 
-    //kprintln!("handle_exception {}", info);
+    //kprintln!("handle_exception {}: {}", core, info);
     //kprintln!("{}", syndrome);
 
     match info.kind {
         Kind::Synchronous => {
+            enable_fiq_interrupt();
             match syndrome {
                 Syndrome::Brk(_) => {
                     tf.elr += 4;
@@ -73,13 +79,27 @@ pub extern "C" fn handle_exception(info: Info, esr: u32, tf: &mut TrapFrame) {
             }
         }
         Kind::Irq => {
-            let controller = Controller::new();
-            for int in Interrupt::iter() {
-                if controller.is_pending(*int) {
-                    IRQ.invoke(*int, tf);
+            enable_fiq_interrupt();
+            let core = aarch64::affinity();
+            if core == 0 {
+                let global_controller = Controller::new();
+                for global_interrupt in Interrupt::iter() {
+                    if global_controller.is_pending(global_interrupt) {
+                        GLOABAL_IRQ.invoke(global_interrupt, tf);
+                    }
+                }
+            }
+
+            let local_controller = LocalController::new(core);
+            for local_int in LocalInterrupt::iter() {
+                if local_controller.is_pending(local_int) {
+                    local_irq().invoke(local_int, tf);
                 }
             }
         }
+        Kind::Fiq => {
+
+        },
         _ => {}
     }
 }

@@ -7,6 +7,7 @@ use core::ptr;
 use crate::allocator::linked_list::LinkedList;
 use crate::allocator::util::*;
 use crate::allocator::LocalAlloc;
+use crate::param::{KERN_STACK_BASE, KERN_STACK_SIZE};
 
 const BIN_COUNT: usize = 20;
 
