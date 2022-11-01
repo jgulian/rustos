@@ -7,7 +7,6 @@ use shim::path::Path;
 use aarch64;
 use aarch64::EntryPerm::USER_RW;
 use aarch64::SPSR_EL1;
-use smoltcp::socket::SocketHandle;
 
 use crate::param::*;
 use crate::process::{Stack, State};
@@ -26,14 +25,12 @@ pub struct Process {
     /// The saved trap frame of a process.
     pub context: Box<TrapFrame>,
     /// The memory allocation used for the process's stack.
+    /// TODO: remove this its not usefu;
     pub stack: Stack,
     /// The page table describing the Virtual Memory of the process
     pub vmap: Box<UserPageTable>,
     /// The scheduling state of the process.
     pub state: State,
-    // Lab 5 2.C
-    // /// Socket handles held by the current process
-    //pub sockets: Vec<SocketHandle>,
 }
 
 impl Process {

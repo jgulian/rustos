@@ -1,4 +1,0 @@
-With multicore each process finishes in an average of 16239.25 milliseconds.
-Without multicore it takes 82395.5; this is likely due to the fact that the
-caches are effectively reset everytime a process starts running on single
-core because the previously run process loaded its memory into the cache.

@@ -110,36 +110,6 @@ pub fn getpid() -> u64 {
     pid
 }
 
-pub fn sock_create() -> SocketDescriptor {
-    // Lab 5 2.D
-    unimplemented!("sock_create")
-}
-
-pub fn sock_status(descriptor: SocketDescriptor) -> OsResult<SocketStatus> {
-    // Lab 5 2.D
-    unimplemented!("sock_status")
-}
-
-pub fn sock_connect(descriptor: SocketDescriptor, addr: IpAddr) -> OsResult<()> {
-    // Lab 5 2.D
-    unimplemented!("sock_connect")
-}
-
-pub fn sock_listen(descriptor: SocketDescriptor, local_port: u16) -> OsResult<()> {
-    // Lab 5 2.D
-    unimplemented!("sock_listen")
-}
-
-pub fn sock_send(descriptor: SocketDescriptor, buf: &[u8]) -> OsResult<usize> {
-    // Lab 5 2.D
-    unimplemented!("sock_send")
-}
-
-pub fn sock_recv(descriptor: SocketDescriptor, buf: &mut [u8]) -> OsResult<usize> {
-    // Lab 5 2.D
-    unimplemented!("sock_recv")
-}
-
 struct Console;
 
 impl fmt::Write for Console {

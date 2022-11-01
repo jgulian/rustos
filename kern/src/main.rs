@@ -22,7 +22,6 @@ pub mod console;
 pub mod fs;
 pub mod logger;
 pub mod mutex;
-pub mod net;
 pub mod param;
 pub mod percore;
 pub mod process;
@@ -43,8 +42,6 @@ use allocator::Allocator;
 use fs::FileSystem;
 use pi::interrupt::{Controller, Interrupt};
 use pi::timer::tick_in;
-use net::uspi::Usb;
-use net::GlobalEthernetDriver;
 use process::GlobalScheduler;
 use traps::irq::{Fiq, GlobalIrq};
 use vm::VMManager;
@@ -59,10 +56,8 @@ pub static ALLOCATOR: Allocator = Allocator::uninitialized();
 pub static FILESYSTEM: FileSystem = FileSystem::uninitialized();
 pub static SCHEDULER: GlobalScheduler = GlobalScheduler::uninitialized();
 pub static VMM: VMManager = VMManager::uninitialized();
-pub static USB: Usb = Usb::uninitialized();
 pub static GLOABAL_IRQ: GlobalIrq = GlobalIrq::new();
 pub static FIQ: Fiq = Fiq::new();
-pub static ETHERNET: GlobalEthernetDriver = GlobalEthernetDriver::uninitialized();
 
 unsafe fn kmain() -> ! {
     logger::init_logger();

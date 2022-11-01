@@ -11,17 +11,14 @@ use core::time::Duration;
 use aarch64;
 use pi::interrupt::{Controller, Interrupt};
 use pi::timer::{spin_sleep, tick_in, Timer};
-use smoltcp::time::Instant;
 use pi::local_interrupt::{local_tick_in, LocalController, LocalInterrupt, Registers};
 
 use crate::mutex::Mutex;
-use crate::net::uspi::TKernelTimerHandle;
 use crate::param::*;
 use crate::percore::{get_preemptive_counter, is_mmu_ready, local_irq};
 use crate::process::{Id, Process, State};
 use crate::traps::irq::IrqHandlerRegistry;
 use crate::traps::TrapFrame;
-use crate::{ETHERNET, USB};
 use crate::{IRQ, kprintln, SCHEDULER, shell, Shell, VMM};
 use crate::console::kprint;
 
@@ -181,13 +178,6 @@ impl GlobalScheduler {
 
 }
 
-/// Poll the ethernet driver and re-register a timer handler using
-/// `Usb::start_kernel_timer`.
-extern "C" fn poll_ethernet(_: TKernelTimerHandle, _: *mut c_void, _: *mut c_void) {
-    // Lab 5 2.B
-    unimplemented!("poll_ethernet")
-}
-
 /// Internal scheduler struct which is not thread-safe.
 pub struct Scheduler {
     processes: VecDeque<Process>,
@@ -290,12 +280,6 @@ impl Scheduler {
         let pid = process.context.tpidr;
 
         Some(pid)
-    }
-
-    /// Releases all process resources held by the current process such as sockets.
-    fn release_process_resources(&mut self, tf: &mut TrapFrame) {
-        // Lab 5 2.C
-        unimplemented!("release_process_resources")
     }
 
     /// Finds a process corresponding with tpidr saved in a trap frame.
