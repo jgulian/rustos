@@ -3,7 +3,7 @@
 IMG=fs.img
 MNT=mnt
 
-PROGS=(sleep fib echo)
+PROGS=(sleep fib)
 
 for d in ${PROGS[@]}; do
     (cd $d; make build)
@@ -36,3 +36,6 @@ trap "sudo umount $MNT; rmdir $MNT; sudo losetup -d $LO" EXIT
 for d in ${PROGS[@]}; do
     sudo cp ~/build/$d/$d.bin $MNT/$d
 done
+
+# TODO: find a general way to fix this
+qemu-img resize fs.img 256M

@@ -68,6 +68,12 @@ unsafe fn kmain() -> ! {
     SCHEDULER.initialize();
 
     SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
+    SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
+    SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
+    SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
+
+    //TODO: there's an issue with locking? wherein nothing will run unless the following is here
+    info!("any sussers");
 
     init::initialize_app_cores();
     VMM.wait();

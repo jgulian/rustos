@@ -165,7 +165,6 @@ impl GlobalScheduler {
         local_irq().register(LocalInterrupt::cntpnsqirq, Box::new(|tf| {
             let core = aarch64::affinity();
             SCHEDULER.switch(State::Ready, tf);
-            info!("pns {}", core);
             local_tick_in(core, TICK);
         }));
         local_tick_in(core, TICK);
