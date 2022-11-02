@@ -3,7 +3,6 @@
 #![feature(optin_builtin_traits)]
 #![feature(never_type)]
 
-#[cfg(feature = "alloc")]
 extern crate alloc;
 
 cfg_if::cfg_if! {

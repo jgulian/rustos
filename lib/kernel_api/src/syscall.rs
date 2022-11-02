@@ -110,6 +110,23 @@ pub fn getpid() -> u64 {
     pid
 }
 
+pub fn sbrk() -> usize {
+    let mut ecode: u64;
+    let mut ptr: usize;
+
+    unsafe {
+        asm!("svc $2
+              mov $0, x0
+              mov $1, x7"
+             : "=r"(ptr), "=r"(ecode)
+             : "i"(NR_SBRK)
+             : "x0", "x7"
+             : "volatile");
+    }
+
+    ptr
+}
+
 struct Console;
 
 impl fmt::Write for Console {

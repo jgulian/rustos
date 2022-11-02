@@ -143,9 +143,6 @@ impl GlobalScheduler {
     /// should be configured in a way that `Timer1` interrupt fires every
     /// `TICK` duration, which is defined in `param.rs`.
     ///
-    /// # Lab 5
-    /// Registers a timer handler with `Usb::start_kernel_timer` which will
-    /// invoke `poll_ethernet` after 1 second.
     pub fn initialize_global_timer_interrupt(&self) {
         if aarch64::affinity() != 0 {
             return;

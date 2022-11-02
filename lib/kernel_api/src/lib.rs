@@ -1,12 +1,15 @@
 #![feature(asm)]
 #![no_std]
 
-use core::fmt;
-
 use shim::io;
 
 #[cfg(feature = "user-space")]
 pub mod syscall;
+#[cfg(feature = "user-space")]
+mod alloc;
+#[cfg(feature = "user-space")]
+#[global_allocator]
+pub static USER_ALLOCATOR: alloc::UserAllocator = alloc::UserAllocator::uninitialized();
 
 pub type OsResult<T> = core::result::Result<T, OsError>;
 
@@ -78,3 +81,4 @@ pub const NR_EXIT: usize = 3;
 pub const NR_WRITE: usize = 4;
 pub const NR_GETPID: usize = 5;
 pub const NR_WRITE_STR: usize = 6;
+pub const NR_SBRK: usize = 7;

@@ -27,12 +27,5 @@ pub const KERN_STACK_ALIGN: usize = PAGE_ALIGN;
 pub const KERN_STACK_SIZE: usize = PAGE_SIZE;
 
 /// The `tick` time.
-// FIXME: When you're ready, change this to something more reasonable.
 pub const TICK: Duration = Duration::from_millis(10);
 
-// Match this value with `HZ` in `timer.h`
-pub const USPI_TIMER_HZ: usize = 10;
-
-// Match this value with `USPI_FRAME_BUFFER_SIZE` in `uspi.h`
-pub const USPI_FRAME_BUFFER_SIZE: u32 = 1600;
-pub const MTU: u32 = 1500;
