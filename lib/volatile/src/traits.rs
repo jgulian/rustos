@@ -13,12 +13,10 @@ pub trait Wrapper {
 /// Trait implemented by **readable** volatile wrappers.
 pub trait Readable<T> {
     /// Returns the inner pointer.
-    #[inline(always)]
     fn inner(&self) -> *const T;
 
     /// Reads and returns the value pointed to by `self`. The read is always
     /// done using volatile semantics.
-    #[inline(always)]
     fn read(&self) -> T {
         unsafe { ::core::ptr::read_volatile(self.inner()) }
     }
@@ -37,12 +35,10 @@ pub trait Readable<T> {
 /// Trait implemented by **writeable** volatile wrappers.
 pub trait Writeable<T> {
     /// Returns the inner pointer.
-    #[inline(always)]
     fn inner(&mut self) -> *mut T;
 
     /// Writes the value `val` to the inner address of `self`. The write is
     /// always done using volatile semantics.
-    #[inline(always)]
     fn write(&mut self, val: T) {
         unsafe { ::core::ptr::write_volatile(self.inner(), val) }
     }

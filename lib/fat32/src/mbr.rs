@@ -57,8 +57,8 @@ impl Debug for PartitionEntry {
             .field("starting_chs", &self.starting_chs)
             .field("partition_type", &self.partition_type)
             .field("ending_chs", &self.ending_chs)
-            .field("relative_sector", &self.relative_sector)
-            .field("total_sectors", &self.total_sectors)
+            //.field("relative_sector", &self.relative_sector)
+            //.field("total_sectors", &self.total_sectors)
             .finish()
     }
 }
