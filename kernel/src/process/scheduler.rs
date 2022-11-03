@@ -1,6 +1,7 @@
 use alloc::boxed::Box;
 use alloc::collections::vec_deque::VecDeque;
 use alloc::vec::Vec;
+use core::arch::asm;
 
 use core::ffi::c_void;
 use core::fmt;
@@ -9,6 +10,7 @@ use core::ptr::read_volatile;
 use core::time::Duration;
 
 use aarch64;
+use aarch64::SP;
 use pi::interrupt::{Controller, Interrupt};
 use pi::timer::{spin_sleep, tick_in, Timer};
 use pi::local_interrupt::{local_tick_in, LocalController, LocalInterrupt, Registers};
@@ -120,10 +122,7 @@ impl GlobalScheduler {
         self.switch_to(&mut trap_frame);
 
         unsafe {
-            asm!("mov x0, $0
-                  mov sp, x0"
-                :: "r"((&mut trap_frame) as *const TrapFrame as u64)
-                :: "volatile");
+            SP.set((&mut trap_frame) as *const TrapFrame as u64);
             context_restore();
             asm!("ldp x28, x29, [SP], #16");
             asm!("ldp lr, xzr, [SP], #16");
@@ -302,24 +301,5 @@ impl fmt::Debug for Scheduler {
             )?;
         }
         Ok(())
-    }
-}
-
-pub extern "C" fn test_user_process() -> ! {
-    loop {
-        let ms = 10000;
-        let error: u64;
-        let elapsed_ms: u64;
-
-        unsafe {
-            asm!("mov x0, $2
-              svc 1
-              mov $0, x0
-              mov $1, x7"
-                 : "=r"(elapsed_ms), "=r"(error)
-                 : "r"(ms)
-                 : "x0", "x7"
-                 : "volatile");
-        }
     }
 }

@@ -54,7 +54,7 @@ impl Process {
     /// Sets trapframe `context` corresponding to its page table.
     /// `sp` - the address of stack top
     /// `elr` - the address of image base.
-    /// `ttbr0` - the base address of kernel page table
+    /// `ttbr0` - the base address of kernel2 page table
     /// `ttbr1` - the base address of user page table
     /// `spsr` - `F`, `A`, `D` bit should be set.
     ///

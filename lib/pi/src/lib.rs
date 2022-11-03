@@ -1,5 +1,4 @@
 #![feature(core_intrinsics)]
-#![feature(const_fn)]
 #![feature(duration_float)]
 #![feature(asm)]
 #![feature(decl_macro)]

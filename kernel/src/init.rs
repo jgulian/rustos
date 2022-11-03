@@ -1,3 +1,4 @@
+use core::arch::{asm, global_asm};
 use aarch64::*;
 
 use core::mem::zeroed;
@@ -28,7 +29,7 @@ global_asm!(include_str!("init/vectors.s"));
 #[no_mangle]
 pub unsafe extern "C" fn _start() -> ! {
     if MPIDR_EL1.get_value(MPIDR_EL1::Aff0) == 0 {
-        SP.set(KERN_STACK_BASE);
+        SP.set(KERN_STACK_BASE as u64);
         kinit()
     }
     loop {}
@@ -98,10 +99,10 @@ unsafe fn switch_to_el1() {
         // change execution level to EL1 (ref: C5.2.19)
         SPSR_EL2.set(
             (SPSR_EL2::M & 0b0101) // EL1h
-            | SPSR_EL2::F
-            | SPSR_EL2::I
-            | SPSR_EL2::D
-            | SPSR_EL2::A,
+                | SPSR_EL2::F
+                | SPSR_EL2::I
+                | SPSR_EL2::D
+                | SPSR_EL2::A,
         );
 
         // FIXME: eret to itself, expecting current_el() == 1 this time
@@ -123,11 +124,7 @@ unsafe fn kinit() -> ! {
 pub unsafe extern "C" fn start2() -> ! {
     let core_index = MPIDR_EL1.get() & 0b11;
     let stack_address = KERN_STACK_BASE - KERN_STACK_SIZE * core_index as usize;
-
-    asm!("mov sp, $0"
-         :: "r"(stack_address)
-         :: "volatile");
-
+    SP.set(stack_address as u64);
     kinit2();
 }
 

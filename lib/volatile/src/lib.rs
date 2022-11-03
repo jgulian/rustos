@@ -1,5 +1,5 @@
+#![feature(negative_impls)]
 #![feature(decl_macro)]
-#![feature(optin_builtin_traits)]
 
 #![no_std]
 
@@ -18,7 +18,7 @@ use macros::*;
 /// use volatile::prelude::*;
 /// ```
 pub mod prelude {
-	#[doc(no_inline)]
+    #[doc(no_inline)]
     pub use super::{Readable, Writeable, ReadableWriteable, Wrapper};
 }
 

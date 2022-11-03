@@ -90,14 +90,14 @@ pub fn _print(args: fmt::Arguments) {
     }
 }
 
-/// Like `println!`, but for kernel-space.
+/// Like `println!`, but for kernel2-space.
 pub macro kprintln {
 () => (kprint!("\n")),
 ($fmt:expr) => (kprint!(concat!($fmt, "\n"))),
 ($fmt:expr, $($arg:tt)*) => (kprint!(concat!($fmt, "\n"), $($arg)*))
 }
 
-/// Like `print!`, but for kernel-space.
+/// Like `print!`, but for kernel2-space.
 pub macro kprint($($arg:tt)*) {
 _print(format_args!($($arg)*))
 }

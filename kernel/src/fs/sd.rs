@@ -45,7 +45,7 @@ pub struct Sd;
 impl Sd {
     /// Initializes the SD card controller and returns a handle to it.
     /// The caller should assure that the method is invoked only once during the
-    /// kernel initialization. We can enforce the requirement in safe Rust code
+    /// kernel2 initialization. We can enforce the requirement in safe Rust code
     /// with atomic memory access, but we can't use it yet since we haven't
     /// written the memory management unit (MMU).
     pub unsafe fn new() -> Result<Sd, io::Error> {

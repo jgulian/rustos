@@ -52,7 +52,7 @@ impl FileSystem {
 
     /// Initializes the file system.
     /// The caller should assure that the method is invoked only once during the
-    /// kernel initialization.
+    /// kernel2 initialization.
     ///
     /// # Panics
     ///
