@@ -7,11 +7,11 @@ pub struct VirtualAddr(usize);
 
 impl VirtualAddr {
     pub fn level2_index(&self) -> u64 {
-        ((self.as_u64() & ((1 << 42) - (1 << 29))) >> 29)
+        (self.as_u64() & ((1 << 42) - (1 << 29))) >> 29
     }
 
     pub fn level3_index(&self) -> u64 {
-        ((self.as_u64() & ((1 << 29) - (1 << 16))) >> 16)
+        (self.as_u64() & ((1 << 29) - (1 << 16))) >> 16
     }
 }
 

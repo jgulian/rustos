@@ -1,11 +1,9 @@
 use alloc::boxed::Box;
 use core::mem;
-use alloc::vec::Vec;
 use shim::io;
 use shim::path::Path;
 
 use aarch64;
-use aarch64::EntryPerm::USER_RW;
 use aarch64::SPSR_EL1;
 
 use crate::param::*;
@@ -14,7 +12,7 @@ use crate::traps::TrapFrame;
 use crate::vm::*;
 use kernel_api::{OsError, OsResult};
 use fat32::traits::FileSystem;
-use crate::{FILESYSTEM, kprintln};
+use crate::FILESYSTEM;
 
 /// Type alias for the type of a process ID.
 pub type Id = u64;
@@ -90,20 +88,19 @@ impl Process {
         Ok(process)
     }
 
-    pub fn load_from_kernel(function: fn ()) -> OsResult<Process> {
-        let mut process = Process::new()?;
-
-        let mut page = process.vmap.alloc(
-            VirtualAddr::from(USER_IMG_BASE as u64), PagePerm::RWX);
-
-        let text = unsafe {
-            core::slice::from_raw_parts(function as *const u8, 24)
-        };
-
+    pub fn load_from_kernel(_function: fn ()) -> OsResult<Process> {
         unimplemented!("need to fix text");
-
-        page[0..24].copy_from_slice(text);
-        Err(OsError::NoMemory)
+        //let mut process = Process::new()?;
+        //
+        //let mut page = process.vmap.alloc(
+        //    VirtualAddr::from(USER_IMG_BASE as u64), PagePerm::RWX);
+        //
+        //let text = unsafe {
+        //    core::slice::from_raw_parts(function as *const u8, 24)
+        //};
+        //
+        //page[0..24].copy_from_slice(text);
+        //Err(OsError::NoMemory)
     }
 
     /// Returns the highest `VirtualAddr` that is supported by this system.
@@ -147,12 +144,12 @@ impl Process {
         //TODO: clean up, also go through code base and replace a lot of match statements with these
         // lol
         if let State::Waiting(p) = &mut self.state {
-            let mut poll = mem::replace(p, Box::new(|p| false));
+            let mut poll = mem::replace(p, Box::new(|_| false));
             if poll(self) {
                 self.state = State::Ready;
             } else {
                 if let State::Waiting(pr) = &mut self.state {
-                    mem::replace(pr, poll);
+                    let _ = mem::replace(pr, poll);
                 }
             }
         }

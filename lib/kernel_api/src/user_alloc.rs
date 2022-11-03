@@ -1,7 +1,5 @@
 use core::alloc::{GlobalAlloc, Layout};
 
-use super::syscall::sbrk;
-
 // FIXME: use another allocator, maybe adapt bin-buddy
 
 pub struct UserAllocator {

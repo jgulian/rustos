@@ -14,7 +14,7 @@ use core::cmp::max;
 use core::fmt;
 
 use crate::mutex::Mutex;
-use pi::atags::{Atag, Atags};
+use pi::atags::Atags;
 use crate::allocator::util::{align_down, align_up};
 
 /// `LocalAlloc` is an analogous trait to the standard library's `GlobalAlloc`,

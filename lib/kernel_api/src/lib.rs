@@ -1,4 +1,3 @@
-#![feature(asm)]
 #![no_std]
 
 use shim::io;
@@ -6,12 +5,9 @@ use shim::io;
 #[cfg(feature = "user-space")]
 pub mod syscall;
 #[cfg(feature = "user-space")]
-mod alloc;
-#[cfg(feature = "user-space")]
-#[global_allocator]
-pub static USER_ALLOCATOR: alloc::UserAllocator = alloc::UserAllocator::uninitialized();
+pub mod user_alloc;
 
-pub type OsResult<T> = core::result::Result<T, OsError>;
+pub type OsResult<T> = Result<T, OsError>;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum OsError {
@@ -75,10 +71,26 @@ impl core::convert::From<io::Error> for OsError {
     }
 }
 
-pub const NR_SLEEP: usize = 1;
-pub const NR_TIME: usize = 2;
-pub const NR_EXIT: usize = 3;
-pub const NR_WRITE: usize = 4;
-pub const NR_GETPID: usize = 5;
-pub const NR_WRITE_STR: usize = 6;
-pub const NR_SBRK: usize = 7;
+pub enum Syscall {
+    Sleep = 0,
+    Time = 1,
+    Exit = 2,
+    Write = 3,
+    GetPid = 4,
+    Sbrk = 5,
+    Unknown = 256,
+}
+
+impl From<u16> for Syscall {
+    fn from(value: u16) -> Self {
+        match value {
+            0 => Syscall::Sleep,
+            1 => Syscall::Time,
+            2 => Syscall::Exit,
+            3 => Syscall::Write,
+            4 => Syscall::GetPid,
+            5 => Syscall::Sbrk,
+            _ => Syscall::Unknown,
+        }
+    }
+}

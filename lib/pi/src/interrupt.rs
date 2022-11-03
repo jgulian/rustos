@@ -1,7 +1,7 @@
 use crate::common::IO_BASE;
 
 use volatile::prelude::*;
-use volatile::{ReadVolatile, Volatile};
+use volatile::Volatile;
 
 const INT_BASE: usize = IO_BASE + 0xB000 + 0x200;
 
@@ -28,7 +28,7 @@ impl Interrupt {
     }
 
     pub fn register(&self) -> (usize, u32) {
-        let v = (*self as usize);
+        let v = *self as usize;
         (v / 32, 1 << (v % 32))
     }
 }

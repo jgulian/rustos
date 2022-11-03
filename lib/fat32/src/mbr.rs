@@ -1,5 +1,5 @@
 use core::{fmt, mem};
-use core::fmt::{Debug, Write};
+use core::fmt::Debug;
 use shim::const_assert_size;
 use shim::io;
 

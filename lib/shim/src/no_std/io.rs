@@ -1,8 +1,6 @@
 use core::{cmp, result};
 use alloc::boxed::Box;
-use alloc::string::String;
 use alloc::vec::Vec;
-use core::borrow::{Borrow, BorrowMut};
 use core::fmt::Formatter;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -110,7 +108,7 @@ pub trait Seek {
 pub trait Read {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize>;
 
-    fn read_exact(&mut self, mut buf: &mut [u8]) -> Result<()> {
+    fn read_exact(&mut self, buf: &mut [u8]) -> Result<()> {
         let mut i = 0;
         while i < buf.len() {
             match self.read(&mut buf[i..]) {
@@ -191,7 +189,7 @@ impl Read for &mut [u8] {
             buf[i] = self[i];
         }
 
-        Ok((length))
+        Ok(length)
     }
 }
 

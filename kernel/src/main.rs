@@ -1,7 +1,5 @@
 #![feature(alloc_error_handler)]
 #![feature(decl_macro)]
-#![feature(asm)]
-#![feature(global_asm)]
 #![feature(const_mut_refs)]
 #![feature(ptr_internals)]
 #![feature(negative_impls)]
@@ -29,27 +27,15 @@ pub mod shell;
 pub mod traps;
 pub mod vm;
 
-use alloc::boxed::Box;
-use alloc::string::String;
-use alloc::vec::Vec;
-use core::alloc::{GlobalAlloc, Layout};
-use core::fmt::Write;
-use aarch64::SCR_EL3::IRQ;
-use shim::path::{Path, PathBuf};
+use shim::path::PathBuf;
 use console::kprintln;
 
 use allocator::Allocator;
 use fs::FileSystem;
-use pi::interrupt::{Controller, Interrupt};
-use pi::timer::tick_in;
 use process::GlobalScheduler;
 use traps::irq::{Fiq, GlobalIrq};
 use vm::VMManager;
-use pi::uart::MiniUart;
-use crate::param::TICK;
 use crate::process::Process;
-use crate::shell::Shell;
-use crate::traps::TrapFrame;
 
 #[cfg_attr(not(test), global_allocator)]
 pub static ALLOCATOR: Allocator = Allocator::uninitialized();
@@ -84,9 +70,7 @@ unsafe fn kmain() -> ! {
     //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
     //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
 
-    SCHEDULER.start();
-
     kprintln!("Welcome to cs3210!");
 
-    //SCHEDULER.start();
+    SCHEDULER.start();
 }

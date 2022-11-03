@@ -79,7 +79,6 @@ pub static CONSOLE: Mutex<Console> = Mutex::new(Console::new());
 pub fn _print(args: fmt::Arguments) {
     #[cfg(not(test))]
     {
-        use core::fmt::Write;
         let mut console = CONSOLE.lock();
         console.write_fmt(args).unwrap();
     }

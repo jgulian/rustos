@@ -1,28 +1,19 @@
 use alloc::boxed::Box;
 use alloc::collections::vec_deque::VecDeque;
-use alloc::vec::Vec;
 use core::arch::asm;
-
-use core::ffi::c_void;
 use core::fmt;
-use core::mem;
-use core::ptr::read_volatile;
-use core::time::Duration;
 
 use aarch64;
 use aarch64::SP;
-use pi::interrupt::{Controller, Interrupt};
-use pi::timer::{spin_sleep, tick_in, Timer};
-use pi::local_interrupt::{local_tick_in, LocalController, LocalInterrupt, Registers};
+use pi::local_interrupt::{local_tick_in, LocalController, LocalInterrupt};
 
 use crate::mutex::Mutex;
 use crate::param::*;
-use crate::percore::{get_preemptive_counter, is_mmu_ready, local_irq};
+use crate::percore::local_irq;
 use crate::process::{Id, Process, State};
 use crate::traps::irq::IrqHandlerRegistry;
 use crate::traps::TrapFrame;
-use crate::{IRQ, kprintln, SCHEDULER, shell, Shell, VMM};
-use crate::console::kprint;
+use crate::{SCHEDULER, VMM};
 
 extern "C" {
     fn _start();
@@ -79,7 +70,6 @@ impl GlobalScheduler {
     pub fn switch_to(&self, tf: &mut TrapFrame) -> Id {
         loop {
             let rtn = self.critical(|scheduler| {
-                let core = aarch64::affinity();
                 scheduler.switch_to(tf)
             });
             if let Some(id) = rtn {
@@ -113,8 +103,6 @@ impl GlobalScheduler {
     /// preemptive scheduling. This method should not return under normal
     /// conditions.
     pub fn start(&self) -> ! {
-        let core_index = aarch64::affinity();
-
         self.initialize_global_timer_interrupt();
         self.initialize_local_timer_interrupt();
 
@@ -158,7 +146,7 @@ impl GlobalScheduler {
         let mut controller = LocalController::new(core);
         controller.enable_local_timer();
 
-        local_irq().register(LocalInterrupt::cntpnsqirq, Box::new(|tf| {
+        local_irq().register(LocalInterrupt::CntPnsIrq, Box::new(|tf| {
             let core = aarch64::affinity();
             SCHEDULER.switch(State::Ready, tf);
             local_tick_in(core, TICK);
@@ -271,7 +259,7 @@ impl Scheduler {
     fn kill(&mut self, tf: &mut TrapFrame) -> Option<Id> {
         self.schedule_out(State::Dead, tf);
 
-        let mut process = self.processes.pop_back()?;
+        let process = self.processes.pop_back()?;
         let pid = process.context.tpidr;
 
         Some(pid)

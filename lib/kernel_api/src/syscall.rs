@@ -1,3 +1,4 @@
+use core::arch::asm;
 use core::fmt;
 use core::fmt::Write;
 use core::time::Duration;
@@ -15,116 +16,95 @@ macro_rules! err_or {
     }};
 }
 
+
+
+unsafe fn syscall(call: Syscall, a: u64, b: u64, c: u64) -> OsResult<(u64, u64, u64)> {
+    //FIXME: simplify this... it can be done (and probably should) in an inline macro
+    let x: u64;
+    let y: u64;
+    let z: u64;
+    let e: u64;
+    asm!(
+    "mov x0, {a}",
+    "mov x1, {b}",
+    "mov x2, {c}",
+    "svc 0",
+    "mov {x}, x0",
+    "mov {y}, x1",
+    "mov {z}, x2",
+    "mov {e}, x7",
+    a = in(reg) a,
+    b = in(reg) b,
+    c = in(reg) c,
+    //t = in(reg) (call as u16),
+    x = out(reg) x,
+    y = out(reg) y,
+    z = out(reg) z,
+    e = out(reg) e,
+    );
+
+    err_or!(e, (x, y, z))
+}
+
 pub fn sleep(span: Duration) -> OsResult<Duration> {
     if span.as_millis() > core::u64::MAX as u128 {
         panic!("too big!");
     }
 
     let ms = span.as_millis() as u64;
-    let mut ecode: u64;
-    let mut elapsed_ms: u64;
+    let elapsed_ms: u64;
 
     unsafe {
-        asm!("mov x0, $2
-              svc $3
-              mov $0, x0
-              mov $1, x7"
-             : "=r"(elapsed_ms), "=r"(ecode)
-             : "r"(ms), "i"(NR_SLEEP)
-             : "x0", "x7"
-             : "volatile");
+        elapsed_ms = syscall(Syscall::Sleep, ms, 0, 0)?.0
     }
 
-    err_or!(ecode, Duration::from_millis(elapsed_ms))
+    Ok(Duration::from_millis(elapsed_ms))
 }
 
-pub fn time() -> Duration {
-    let mut ecode: u64;
-    let mut elapsed_s: u64;
-    let mut elapsed_ns: u64;
+pub fn time() -> OsResult<Duration> {
+    let returned = unsafe {
+        syscall(Syscall::Time, 0, 0, 0)?
+    };
 
-    unsafe {
-        asm!("svc $3
-              mov $0, x0
-              mov $1, x1
-              mov $2, x7"
-             : "=r"(elapsed_s), "=r"(elapsed_ns), "=r"(ecode)
-             : "i"(NR_TIME)
-             : "x0", "x7"
-             : "volatile");
-    }
-
-    Duration::from_secs(elapsed_s) + Duration::from_nanos(elapsed_ns)
+    Ok(Duration::from_secs(returned.0) + Duration::from_nanos(returned.1))
 }
 
-pub fn exit() -> ! {
-    let mut ecode: u64;
-
+pub fn exit() -> OsResult<()> {
     unsafe {
-        asm!("svc $1
-              mov $0, x7"
-             : "=r"(ecode)
-             : "i"(NR_EXIT)
-             : "x0", "x7"
-             : "volatile");
+        syscall(Syscall::Exit, 0, 0, 0)?;
     }
 
-    loop {}
+    Ok(())
 }
 
-pub fn write(b: u8) {
-    let mut ecode: u64;
-
+pub fn write(b: u8) -> OsResult<()> {
     unsafe {
-        asm!("mov x0, $1
-              svc $2
-              mov $1, x7"
-             : "=r"(ecode)
-             : "r"(b), "i"(NR_WRITE)
-             : "x0", "x7"
-             : "volatile");
+        syscall(Syscall::Write, b as u64, 0, 0)?;
     }
+
+    Ok(())
 }
 
 pub fn write_str(msg: &str) {
-    let pad = [0; 64];
     for c in msg.bytes() {
-        write(c);
+        while write(c).is_err() {}
     }
 }
 
-pub fn getpid() -> u64 {
-    let mut ecode: u64;
-    let mut pid: u64;
+pub fn getpid() -> OsResult<u64> {
+    let pid = unsafe {
+        syscall(Syscall::GetPid, 0, 0, 0)?.0
+    };
 
-    unsafe {
-        asm!("svc $2
-              mov $0, x0
-              mov $1, x7"
-             : "=r"(pid), "=r"(ecode)
-             : "i"(NR_GETPID)
-             : "x0", "x7"
-             : "volatile");
-    }
-
-    pid
+    Ok(pid)
 }
 
-pub fn sbrk() -> usize {
-    let mut ecode: u64;
-    let mut ptr: usize;
+pub fn sbrk() -> OsResult<usize> {
+    let ptr = unsafe {
+        syscall(Syscall::Sbrk, 0, 0, 0)?.0 as usize
+    };
 
-    unsafe {
-        asm!("svc $2
-              mov $0, x0
-              mov $1, x7"
-             : "=r"(ptr), "=r"(ecode)
-             : "i"(NR_SBRK)
-             : "x0", "x7"
-             : "volatile");
-    }
-
-    ptr
+    Ok(ptr)
 }
 
 struct Console;

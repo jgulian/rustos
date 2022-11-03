@@ -1,10 +1,7 @@
 use core::time::Duration;
 use shim::io;
-use shim::ioerr;
 
 use fat32::traits::BlockDevice;
-use crate::console::kprint;
-use crate::kprintln;
 
 extern "C" {
     /// A global representing the last SD controller error that occured.

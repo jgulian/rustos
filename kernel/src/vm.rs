@@ -7,7 +7,6 @@ pub use self::pagetable::*;
 
 use aarch64::*;
 use core::sync::atomic::{AtomicUsize, Ordering};
-use crate::kprintln;
 
 use crate::mutex::Mutex;
 use crate::param::{KERNEL_MASK_BITS, USER_MASK_BITS};
@@ -36,13 +35,13 @@ impl VMManager {
     /// The caller should assure that the method is invoked only once during the kernel2
     /// initialization.
     pub fn initialize(&self) {
-        let mut kernel_page_table = KernPageTable::new();
-        let baddr = kernel_page_table.get_baddr();
+        let kernel_page_table = KernPageTable::new();
+        let base_address = kernel_page_table.get_baddr();
 
         if self.kern_pt.lock().replace(kernel_page_table).is_some() {
             panic!("VMManager initialize called twice");
         }
-        self.kern_pt_addr.store(baddr.as_usize(), Ordering::Relaxed);
+        self.kern_pt_addr.store(base_address.as_usize(), Ordering::Relaxed);
     }
 
     /// Set up the virtual memory manager for the current core.

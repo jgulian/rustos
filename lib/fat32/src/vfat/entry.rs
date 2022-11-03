@@ -1,7 +1,6 @@
 use alloc::string::String;
 use crate::traits;
-use crate::vfat::{Cluster, Dir, File, Metadata, VFatHandle};
-use core::fmt;
+use crate::vfat::{Dir, File, Metadata, VFatHandle};
 
 // You can change this definition if you want
 #[derive(Debug)]

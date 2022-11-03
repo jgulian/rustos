@@ -3,21 +3,18 @@ use core::ops::{Deref, DerefMut, Sub};
 use core::slice::Iter;
 
 use alloc::boxed::Box;
-use alloc::{fmt, format};
+use alloc::fmt;
 use core::alloc::{GlobalAlloc, Layout};
 use core::fmt::Formatter;
 use aarch64::EntryPerm::{KERN_RW, USER_RW};
-use aarch64::EntryValid::Valid;
 
-use crate::{allocator, kprintln};
+use crate::allocator;
 use crate::param::*;
 use crate::vm::{PhysicalAddr, VirtualAddr};
 use crate::ALLOCATOR;
-use fmt::Debug;
 
 use aarch64::vmsa::*;
 use shim::const_assert_size;
-use crate::console::kprint;
 
 #[repr(C)]
 pub struct Page([u8; PAGE_SIZE]);
@@ -65,16 +62,6 @@ impl L3Entry {
     /// Returns `true` if the L3Entry is valid and `false` otherwise.
     fn is_valid(&self) -> bool {
         self.0.get_value(RawL3Entry::VALID) > 0
-    }
-
-    /// Extracts `ADDR` field of the L3Entry and returns as a `PhysicalAddr`
-    /// if valid. Otherwise, return `None`.
-    fn get_page_addr(&self) -> Option<PhysicalAddr> {
-        if self.is_valid() {
-            Some(PhysicalAddr::from(self.0.get_value(RawL3Entry::ADDR) << PAGE_ALIGN))
-        } else {
-            None
-        }
     }
 }
 

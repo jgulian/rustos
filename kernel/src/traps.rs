@@ -4,19 +4,17 @@ mod syscall;
 
 pub mod irq;
 
-use core::convert::TryInto;
 use core::fmt;
 use core::fmt::Formatter;
 use aarch64::enable_fiq_interrupt;
 pub use self::frame::TrapFrame;
 
 use pi::interrupt::{Controller, Interrupt};
-use crate::{GLOABAL_IRQ, IRQ, kprintln, Shell};
+use crate::GLOABAL_IRQ;
 use pi::local_interrupt::{LocalController, LocalInterrupt};
 
 use self::syndrome::Syndrome;
 use self::syscall::handle_syscall;
-use crate::percore;
 use crate::percore::local_irq;
 use crate::traps::irq::IrqHandlerRegistry;
 

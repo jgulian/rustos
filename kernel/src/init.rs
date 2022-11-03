@@ -1,18 +1,14 @@
-use core::arch::{asm, global_asm};
+use core::arch::global_asm;
 use aarch64::*;
 
 use core::mem::zeroed;
-use core::ops::Add;
 use core::ptr::write_volatile;
-use core::time::Duration;
-use pi::local_interrupt::local_tick_in;
 
 mod oom;
 mod panic;
 
-use crate::{kmain, kprintln, SCHEDULER};
+use crate::{kmain, SCHEDULER};
 use crate::param::*;
-use crate::percore::local_irq;
 use crate::VMM;
 
 global_asm!(include_str!("init/vectors.s"));
@@ -32,8 +28,8 @@ pub unsafe extern "C" fn _start() -> ! {
         SP.set(KERN_STACK_BASE as u64);
         kinit()
     }
+
     loop {}
-    unreachable!()
 }
 
 unsafe fn zeros_bss() {

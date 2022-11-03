@@ -1,6 +1,3 @@
-use core::fmt;
-use core::fmt::Formatter;
-
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Copy, Clone, Hash)]
 pub struct Cluster(u32);
 

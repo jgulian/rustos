@@ -6,33 +6,13 @@ use alloc::boxed::Box;
 use alloc::rc::Rc;
 use alloc::string::String;
 use alloc::vec::Vec;
-use core::fmt::{self, Formatter, Write};
+use core::fmt;
 use core::mem;
 use core::str;
-use core::str::lossy::{Utf8Lossy, Utf8LossyChunk};
 
 #[derive(Clone, Hash)]
 pub(crate) struct Buf {
     pub inner: Vec<u8>,
-}
-
-fn debug_fmt_bytestring(slice: &[u8], f: &mut Formatter<'_>) -> fmt::Result {
-    // Writes out a valid unicode string with the correct escape sequences
-    fn write_str_escaped(f: &mut Formatter<'_>, s: &str) -> fmt::Result {
-        for c in s.chars().flat_map(|c| c.escape_debug()) {
-            f.write_char(c)?
-        }
-        Ok(())
-    }
-
-    f.write_str("\"")?;
-    for Utf8LossyChunk { valid, broken } in Utf8Lossy::from_bytes(slice).chunks() {
-        write_str_escaped(f, valid)?;
-        for b in broken {
-            write!(f, "\\x{:02X}", b)?;
-        }
-    }
-    f.write_str("\"")
 }
 
 // FIXME:
@@ -46,14 +26,14 @@ pub(crate) struct Slice {
 }
 
 impl fmt::Debug for Slice {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        debug_fmt_bytestring(&self.inner, formatter)
+    fn fmt(&self, _formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        unimplemented!("this is not implemented")
     }
 }
 
 impl fmt::Display for Slice {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Display::fmt(&Utf8Lossy::from_bytes(&self.inner), formatter)
+    fn fmt(&self, _formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        unimplemented!("this is not implemented")
     }
 }
 

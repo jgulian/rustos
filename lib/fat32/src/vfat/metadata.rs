@@ -1,6 +1,5 @@
 use core::fmt;
 
-use alloc::string::String;
 use core::fmt::Formatter;
 use crate::traits;
 

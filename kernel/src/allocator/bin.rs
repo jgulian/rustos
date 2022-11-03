@@ -1,4 +1,3 @@
-use alloc::format;
 use core::alloc::Layout;
 use core::fmt;
 use core::fmt::{Debug, Formatter};
@@ -7,7 +6,6 @@ use core::ptr;
 use crate::allocator::linked_list::LinkedList;
 use crate::allocator::util::*;
 use crate::allocator::LocalAlloc;
-use crate::param::{KERN_STACK_BASE, KERN_STACK_SIZE};
 
 const BIN_COUNT: usize = 20;
 
@@ -33,7 +31,7 @@ pub struct Allocator {
 impl Allocator {
     /// Creates a new bin allocator that will allocate memory from the region
     /// starting at address `start` and ending at address `end`.
-    pub fn new(start: usize, mut end: usize) -> Allocator {
+    pub fn new(start: usize, end: usize) -> Allocator {
         let mut bins = [LinkedList::new(); BIN_COUNT];
         Allocator::allocate_bins(&mut bins, BIN_COUNT - 1, start, end);
 

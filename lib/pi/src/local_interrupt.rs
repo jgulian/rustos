@@ -1,4 +1,3 @@
-use core::ptr::write_volatile;
 use core::time::Duration;
 use shim::const_assert_size;
 
@@ -10,19 +9,19 @@ const INT_BASE: usize = 0x4000_0000;
 /// Core interrupt sources (QA7: 4.10)
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum LocalInterrupt {
-    cntpsirq = 0,
-    cntpnsqirq = 1,
-    cnthpirq = 2,
-    cntvirq = 3,
-    mailbox_1 = 4,
-    mailbox_2 = 5,
-    mailbox_3 = 6,
-    mailbox_4 = 7,
-    gpu = 8,
-    pmu = 9,
-    axi = 10,
-    timer = 11,
-    unknown = 12,
+    CntPsIrq = 0,
+    CntPnsIrq = 1,
+    CntHpIrq = 2,
+    CntVIrq = 3,
+    Mailbox1 = 4,
+    Mailbox2 = 5,
+    Mailbox3 = 6,
+    Mailbox4 = 7,
+    Gpu = 8,
+    Pmu = 9,
+    Axi = 10,
+    Timer = 11,
+    Unknown = 12,
 }
 
 impl LocalInterrupt {
@@ -36,19 +35,19 @@ impl LocalInterrupt {
 impl From<usize> for LocalInterrupt {
     fn from(irq: usize) -> LocalInterrupt {
         match irq {
-            0 => LocalInterrupt::cntpsirq,
-            1 => LocalInterrupt::cntpnsqirq,
-            2 => LocalInterrupt::cnthpirq,
-            3 => LocalInterrupt::cntvirq,
-            4 => LocalInterrupt::mailbox_1,
-            5 => LocalInterrupt::mailbox_2,
-            6 => LocalInterrupt::mailbox_3,
-            7 => LocalInterrupt::mailbox_4,
-            8 => LocalInterrupt::gpu,
-            9 => LocalInterrupt::pmu,
-            10 => LocalInterrupt::axi,
-            11 => LocalInterrupt::timer,
-            _ => LocalInterrupt::unknown,
+            0 => LocalInterrupt::CntPsIrq,
+            1 => LocalInterrupt::CntPnsIrq,
+            2 => LocalInterrupt::CntHpIrq,
+            3 => LocalInterrupt::CntVIrq,
+            4 => LocalInterrupt::Mailbox1,
+            5 => LocalInterrupt::Mailbox2,
+            6 => LocalInterrupt::Mailbox3,
+            7 => LocalInterrupt::Mailbox4,
+            8 => LocalInterrupt::Gpu,
+            9 => LocalInterrupt::Pmu,
+            10 => LocalInterrupt::Axi,
+            11 => LocalInterrupt::Timer,
+            _ => LocalInterrupt::Unknown,
         }
     }
 }

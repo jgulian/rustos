@@ -2,7 +2,6 @@ use core::fmt;
 use core::time::Duration;
 
 use shim::io;
-use shim::const_assert_size;
 
 use volatile::prelude::*;
 use volatile::{Volatile, Reserved};
@@ -162,7 +161,6 @@ impl fmt::Write for MiniUart {
 mod uart_io {
     use super::io;
     use super::MiniUart;
-    use volatile::prelude::*;
     use shim::ioerr;
 
     // FIXME: Implement `io::Read` and `io::Write` for `MiniUart`.

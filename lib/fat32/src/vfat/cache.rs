@@ -120,7 +120,7 @@ impl CachedPartition {
 
             for i in 0..(self.partition.sector_size / self.device.sector_size()) {
                 let slice = &mut data.as_mut_slice()[(self.device.sector_size() * i) as usize..];
-                (*self.device).read_sector(physical_sector + i, slice);
+                (*self.device).read_sector(physical_sector + i, slice)?;
             }
 
             self.cache.insert(virtual_sector, CacheEntry{

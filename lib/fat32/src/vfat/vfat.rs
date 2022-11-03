@@ -1,24 +1,16 @@
-use alloc::string::ToString;
 use core::fmt::{Debug, Formatter};
 use core::marker::PhantomData;
-use core::mem::size_of;
 
 use alloc::vec::Vec;
 use core::cmp::min;
-use core::iter::Chain;
 use core::{fmt, mem};
-use core::ptr::read;
 
 use shim::io;
-use shim::ioerr;
-use shim::newioerr;
-use shim::path;
 use shim::path::{Component, Path};
 
 use crate::mbr::MasterBootRecord;
-use crate::{mbr, PartitionEntry, traits, vfat};
+use crate::{PartitionEntry, traits};
 use crate::traits::{BlockDevice, FileSystem};
-use crate::util::SliceExt;
 use crate::vfat::{BiosParameterBlock, CachedPartition, Partition};
 use crate::vfat::{Cluster, Dir, Entry, Error, FatEntry, File, Status};
 
@@ -34,7 +26,7 @@ pub struct VFat<HANDLE: VFatHandle> {
     device: CachedPartition,
     bytes_per_sector: u16,
     sectors_per_cluster: u8,
-    sectors_per_fat: u32,
+    _sectors_per_fat: u32,
     fat_start_sector: u64,
     data_start_sector: u64,
     rootdir_cluster: Cluster,
@@ -82,7 +74,7 @@ impl<HANDLE: VFatHandle> VFat<HANDLE> {
             device: CachedPartition::new(device, partition),
             bytes_per_sector: bios_parameter_block.bytes_per_sector,
             sectors_per_cluster: bios_parameter_block.sectors_per_cluster,
-            sectors_per_fat: sectors_per_fat,
+            _sectors_per_fat: sectors_per_fat,
             fat_start_sector: bios_parameter_block.reserved_sectors as u64,
             data_start_sector: data_start_sector as u64,
             rootdir_cluster: Cluster::from(bios_parameter_block.root_cluster),
@@ -122,7 +114,7 @@ impl<HANDLE: VFatHandle> VFat<HANDLE> {
 
             if offset.bytes_within_cluster == 0 {
                 match self.fat_entry(offset.current_cluster)?.status() {
-                    Status::Eoc(status) => {
+                    Status::Eoc(_status) => {
                         offset.exhausted = true;
                     }
                     Status::Data(next_cluster) => {
@@ -231,10 +223,6 @@ impl ChainOffset {
             current_cluster: start,
             exhausted: false,
         }
-    }
-
-    fn bytes_read(&self) -> usize {
-        self.total_bytes
     }
 }
 

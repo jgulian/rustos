@@ -1,23 +1,15 @@
-use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 use alloc::vec;
-use shim::{io, ioerr};
-use shim::path::{Path, PathBuf};
+use shim::io;
+use shim::path::PathBuf;
 
 use stack_vec::StackVec;
 use fat32::traits::{FileSystem};
 use fat32::vfat::{Dir, Entry, File};
-use crate::{console, FILESYSTEM};
-
-use pi::atags::Atags;
-
-//use fat32::traits::FileSystem;
-//use fat32::traits::{Dir, Entry};
+use crate::FILESYSTEM;
 
 use crate::console::{kprint, kprintln, CONSOLE};
 use crate::fs::PiVFatHandle;
-//use crate::ALLOCATOR;
-//use crate::FILESYSTEM;
 
 /// Error type for `Command` parse failures.
 #[derive(Debug)]
@@ -168,8 +160,6 @@ impl Shell {
             return;
         }
 
-        use fat32::traits::{Entry, Dir};
-
         let mut path = self.cwd.clone();
         path.push(PathBuf::from(command.args[1]));
 
@@ -201,7 +191,7 @@ impl Shell {
         };
 
         let entries = match dir.entries() {
-            Err(e) => {
+            Err(_) => {
                 kprintln!("unable to read entries of {}", path_name(&path));
                 return;
             }
@@ -219,7 +209,6 @@ impl Shell {
 
     fn cat(&self, command: &Command) {
         use io::Read;
-        use fat32::traits::{Entry, File};
 
         if command.args.len() < 2 {
             kprintln!("not enough args for cat");
@@ -233,13 +222,13 @@ impl Shell {
         };
 
         let mut data = vec![0u8; file.file_size as usize];
-        let n = match file.read(data.as_mut_slice()) {
-            Err(e) => {
+        match file.read(data.as_mut_slice()) {
+            Err(_) => {
                 kprintln!("unable to read file");
                 return;
             }
-            Ok(n) => n,
-        };
+            Ok(n) => {},
+        }
         let str: String = data.iter().map(|x| (*x as char)).collect();
 
         kprintln!("{}", str);
@@ -261,7 +250,7 @@ impl Shell {
 
 fn open(path: &PathBuf) -> Option<Entry<PiVFatHandle>> {
     match FILESYSTEM.open(path.clone()) {
-        Err(e) => {
+        Err(_) => {
             kprintln!("unable to open {}", path_name(&path));
             None
         }

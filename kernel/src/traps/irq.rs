@@ -4,7 +4,7 @@ use core::ops::Index;
 use pi::interrupt::Interrupt;
 use pi::local_interrupt::LocalInterrupt;
 
-use crate::mutex::{Mutex, MutexGuard};
+use crate::mutex::Mutex;
 use crate::traps::TrapFrame;
 
 // Programmer Guide Chapter 10
@@ -85,7 +85,6 @@ impl Index<LocalInterrupt> for LocalIrq {
     type Output = IrqHandlerMutex;
 
     fn index(&self, int: LocalInterrupt) -> &IrqHandlerMutex {
-        use LocalInterrupt::*;
         &self.0[int as usize]
     }
 }

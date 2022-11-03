@@ -1,12 +1,9 @@
 use alloc::string::String;
-use alloc::vec::Vec;
-use core::cmp::min;
-use core::iter::Chain;
 
 use shim::io::{self, SeekFrom};
 
 use crate::traits;
-use crate::vfat::{Cluster, Metadata, VFatHandle};
+use crate::vfat::{Metadata, VFatHandle};
 use crate::vfat::vfat::ChainOffset;
 
 #[derive(Debug)]
@@ -29,7 +26,7 @@ impl<HANDLE: VFatHandle> traits::File for File<HANDLE> {
 }
 
 impl<HANDLE: VFatHandle> io::Write for File<HANDLE> {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+    fn write(&mut self, _buf: &[u8]) -> io::Result<usize> {
         unimplemented!("not required")
     }
 

@@ -24,7 +24,7 @@ impl Atag {
             return None;
         }
 
-        let mut next_atag: &Atag = unsafe {
+        let next_atag: &Atag = unsafe {
             let current_pointer = (self as *const Atag) as *const u32;
             let next_pointer = current_pointer.offset(self.dwords as isize);
             &*(next_pointer as *const Atag)

@@ -1,27 +1,23 @@
 use alloc::string::String;
 use alloc::vec::Vec;
-use core::marker::PhantomData;
-use core::mem::transmute;
 
 use shim::const_assert_size;
 use shim::ffi::OsStr;
 use shim::io;
-use shim::newioerr;
 
 use crate::traits;
-use crate::traits::Dummy;
 use crate::util::VecExt;
-use crate::vfat::{Attributes, Date, Error, Metadata, Time, Timestamp};
+use crate::vfat::{Date, Metadata, Timestamp};
 use crate::vfat::{Cluster, Entry, File, VFatHandle};
 use crate::vfat::vfat::ChainOffset;
 
 enum DirectoryAttribute {
-    ReadOnly = 0x01,
-    Hidden = 0x02,
-    System = 0x04,
-    VolumeId = 0x08,
+    _ReadOnly = 0x01,
+    _Hidden = 0x02,
+    _System = 0x04,
+    _VolumeId = 0x08,
     Directory = 0x10,
-    Archive = 0x20,
+    _Archive = 0x20,
     LongFileName = 0b1111,
 }
 
@@ -174,11 +170,9 @@ impl<HANDLE: VFatHandle> Iterator for DirIter<HANDLE> {
             }
 
             let regular_dir = regular.unwrap();
-            let mut name = String::new();
 
             let name = if long_file_names.is_empty() {
                 let mut result = String::new();
-                let mut found_dot = false;
                 for c in regular_dir.name.iter() {
                     if *c == b' ' || *c == 0 {
                         break;
