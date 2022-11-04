@@ -15,6 +15,7 @@ use core::{fmt, ptr};
 /// returned using `pop()` or returned (but not removed) using `peek()`.
 ///
 /// ```rust
+/// use allocator::linked_list::LinkedList;
 /// # let address_1 = (&mut (1 as usize)) as *mut usize;
 /// # let address_2 = (&mut (2 as usize)) as *mut usize;
 /// let mut list = LinkedList::new();
@@ -36,6 +37,7 @@ use core::{fmt, ptr};
 /// the value from the list, respectively.
 ///
 /// ```rust
+/// use allocator::linked_list::LinkedList;
 /// # let address_1 = (&mut (1 as usize)) as *mut usize;
 /// # let address_2 = (&mut (2 as usize)) as *mut usize;
 /// # let address_3 = (&mut (3 as usize)) as *mut usize;

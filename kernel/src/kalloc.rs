@@ -1,39 +1,23 @@
-mod linked_list;
-pub mod util;
-
-mod bin;
-mod bump;
-
-type AllocatorImpl = bin::Allocator;
-
-#[cfg(test)]
-mod tests;
-
 use core::alloc::{GlobalAlloc, Layout};
 use core::cmp::max;
 use core::fmt;
+use allocator::bin::BinAllocator;
+use allocator::GenericAllocator;
+use allocator::util::{align_down, align_up};
 
-use crate::mutex::Mutex;
 use pi::atags::Atags;
-use crate::allocator::util::{align_down, align_up};
-
-/// `LocalAlloc` is an analogous trait to the standard library's `GlobalAlloc`,
-/// but it takes `&mut self` in `alloc()` and `dealloc()`.
-pub trait LocalAlloc {
-    unsafe fn alloc(&mut self, layout: Layout) -> *mut u8;
-    unsafe fn dealloc(&mut self, ptr: *mut u8, layout: Layout);
-}
+use crate::multiprocessing::mutex::Mutex;
 
 /// Thread-safe (locking) wrapper around a particular memory allocator.
-pub struct Allocator(Mutex<Option<AllocatorImpl>>);
+pub struct KernelAllocator(Mutex<Option<BinAllocator>>);
 
-impl Allocator {
+impl KernelAllocator {
     /// Returns an uninitialized `Allocator`.
     ///
     /// The allocator must be initialized by calling `initialize()` before the
     /// first memory allocation. Failure to do will result in panics.
     pub const fn uninitialized() -> Self {
-        Allocator(Mutex::new(None))
+        KernelAllocator(Mutex::new(None))
     }
 
     /// Initializes the memory allocator.
@@ -46,11 +30,11 @@ impl Allocator {
     pub unsafe fn initialize(&self) {
         let (start, end) = memory_map().expect("failed to find memory map");
         info!("heap beg: {:x}, end: {:x}", start, end);
-        *self.0.lock() = Some(AllocatorImpl::new(start, end));
+        *self.0.lock() = Some(BinAllocator::new(start, end));
     }
 }
 
-unsafe impl GlobalAlloc for Allocator {
+unsafe impl GlobalAlloc for KernelAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         self.0
             .lock()
@@ -95,10 +79,10 @@ pub fn memory_map() -> Option<(usize, usize)> {
     None
 }
 
-impl fmt::Debug for Allocator {
+impl fmt::Debug for KernelAllocator {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.0.lock().as_mut() {
-            Some(ref alloc) => write!(f, "{:?}", alloc)?,
+            Some(_) => write!(f, "Initialized")?,
             None => write!(f, "Not yet initialized")?,
         }
         Ok(())

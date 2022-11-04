@@ -1,0 +1,9 @@
+[package]
+name = "allocator"
+version = "0.1.0"
+edition = "2021"
+authors = [
+    "Joseph Gulian <jgulian@gatech.edu>"
+]
+
+[dependencies]

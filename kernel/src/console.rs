@@ -2,8 +2,7 @@ use core::fmt;
 use core::fmt::Write;
 use pi::uart::MiniUart;
 use shim::io;
-
-use crate::mutex::Mutex;
+use crate::multiprocessing::mutex::Mutex;
 
 /// A global singleton allowing read/write access to the console.
 pub struct Console {

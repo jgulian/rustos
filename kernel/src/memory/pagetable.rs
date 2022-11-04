@@ -8,12 +8,12 @@ use core::alloc::{GlobalAlloc, Layout};
 use core::fmt::Formatter;
 use aarch64::EntryPerm::{KERN_RW, USER_RW};
 
-use crate::allocator;
 use crate::param::*;
-use crate::vm::{PhysicalAddr, VirtualAddr};
+use crate::memory::{PhysicalAddr, VirtualAddr};
 use crate::ALLOCATOR;
 
 use aarch64::vmsa::*;
+use allocator::util::{align_down, align_up};
 use shim::const_assert_size;
 
 #[repr(C)]
@@ -228,7 +228,7 @@ impl KernPageTable {
         let mut page_table = PageTable::new(KERN_RW);
 
         let page_start = 0;
-        let page_end = allocator::util::align_down(0x3c000000, PAGE_ALIGN);
+        let page_end = align_down(0x3c000000, PAGE_ALIGN);
         let page_count = (page_end - page_start) / PAGE_SIZE;
 
         for i in 0..page_count {
@@ -244,8 +244,8 @@ impl KernPageTable {
             page_table.set_entry(VirtualAddr::from(address), entry);
         }
 
-        let device_start = allocator::util::align_down(IO_BASE, PAGE_ALIGN);
-        let device_end = allocator::util::align_up(IO_BASE_END, PAGE_ALIGN);
+        let device_start = align_down(IO_BASE, PAGE_ALIGN);
+        let device_end = align_up(IO_BASE_END, PAGE_ALIGN);
         let device_page_count = (device_end - device_start) / PAGE_SIZE;
 
         for i in 0..device_page_count {

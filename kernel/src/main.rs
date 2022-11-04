@@ -15,30 +15,28 @@ extern crate alloc;
 #[macro_use]
 extern crate log;
 
-pub mod allocator;
+pub mod kalloc;
 pub mod console;
-pub mod fs;
+pub mod filesystem;
 pub mod logger;
-pub mod mutex;
 pub mod param;
-pub mod percore;
 pub mod process;
-pub mod shell;
 pub mod traps;
-pub mod vm;
+pub mod memory;
+pub mod multiprocessing;
 
 use shim::path::PathBuf;
 use console::kprintln;
 
-use allocator::Allocator;
-use fs::FileSystem;
+use filesystem::FileSystem;
 use process::GlobalScheduler;
 use traps::irq::{Fiq, GlobalIrq};
-use vm::VMManager;
+use memory::VMManager;
+use crate::kalloc::KernelAllocator;
 use crate::process::Process;
 
 #[cfg_attr(not(test), global_allocator)]
-pub static ALLOCATOR: Allocator = Allocator::uninitialized();
+pub static ALLOCATOR: KernelAllocator = KernelAllocator::uninitialized();
 pub static FILESYSTEM: FileSystem = FileSystem::uninitialized();
 pub static SCHEDULER: GlobalScheduler = GlobalScheduler::uninitialized();
 pub static VMM: VMManager = VMManager::uninitialized();

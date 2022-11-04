@@ -3,8 +3,8 @@ use core::ops::Index;
 
 use pi::interrupt::Interrupt;
 use pi::local_interrupt::LocalInterrupt;
+use crate::multiprocessing::mutex::Mutex;
 
-use crate::mutex::Mutex;
 use crate::traps::TrapFrame;
 
 // Programmer Guide Chapter 10

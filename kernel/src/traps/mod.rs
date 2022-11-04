@@ -12,10 +12,10 @@ pub use self::frame::TrapFrame;
 use pi::interrupt::{Controller, Interrupt};
 use crate::GLOABAL_IRQ;
 use pi::local_interrupt::{LocalController, LocalInterrupt};
+use crate::multiprocessing::per_core::local_irq;
 
 use self::syndrome::Syndrome;
 use self::syscall::handle_syscall;
-use crate::percore::local_irq;
 use crate::traps::irq::IrqHandlerRegistry;
 
 #[repr(u16)]

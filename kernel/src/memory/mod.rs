@@ -7,10 +7,10 @@ pub use self::pagetable::*;
 
 use aarch64::*;
 use core::sync::atomic::{AtomicUsize, Ordering};
+use crate::multiprocessing::mutex::Mutex;
+use crate::multiprocessing::per_core::{is_mmu_ready, set_mmu_ready};
 
-use crate::mutex::Mutex;
 use crate::param::{KERNEL_MASK_BITS, USER_MASK_BITS};
-use crate::percore::{is_mmu_ready, set_mmu_ready};
 
 pub struct VMManager {
     kern_pt: Mutex<Option<KernPageTable>>,

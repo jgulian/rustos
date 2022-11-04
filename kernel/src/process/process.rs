@@ -9,7 +9,7 @@ use aarch64::SPSR_EL1;
 use crate::param::*;
 use crate::process::{Stack, State};
 use crate::traps::TrapFrame;
-use crate::vm::*;
+use crate::memory::*;
 use kernel_api::{OsError, OsResult};
 use fat32::traits::FileSystem;
 use crate::FILESYSTEM;

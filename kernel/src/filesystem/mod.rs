@@ -7,8 +7,7 @@ use shim::path::Path;
 
 pub use fat32::traits;
 use fat32::vfat::{Dir, Entry, File, VFat, VFatHandle};
-
-use crate::mutex::Mutex;
+use crate::multiprocessing::mutex::Mutex;
 
 #[derive(Clone)]
 pub struct PiVFatHandle(Rc<Mutex<VFat<Self>>>);

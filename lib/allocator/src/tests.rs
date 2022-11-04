@@ -1,5 +1,5 @@
 mod align_util {
-    use crate::allocator::util::{align_down, align_up};
+    use crate::util::{align_down, align_up};
 
     #[test]
     fn test_align_down() {

@@ -7,13 +7,13 @@ use aarch64;
 use aarch64::SP;
 use pi::local_interrupt::{local_tick_in, LocalController, LocalInterrupt};
 
-use crate::mutex::Mutex;
 use crate::param::*;
-use crate::percore::local_irq;
 use crate::process::{Id, Process, State};
-use crate::traps::irq::IrqHandlerRegistry;
 use crate::traps::TrapFrame;
 use crate::{SCHEDULER, VMM};
+use crate::multiprocessing::mutex::Mutex;
+use crate::multiprocessing::per_core::local_irq;
+use crate::traps::irq::IrqHandlerRegistry;
 
 extern "C" {
     fn _start();

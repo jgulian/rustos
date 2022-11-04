@@ -2,7 +2,7 @@ use core::cell::UnsafeCell;
 use core::fmt;
 use core::ops::{Deref, DerefMut, Drop};
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use crate::percore::is_mmu_ready;
+use crate::multiprocessing::per_core::is_mmu_ready;
 
 #[repr(align(32))]
 pub struct Mutex<T> {
