@@ -26,7 +26,7 @@ global_asm!(include_str!("init/vectors.s"));
 pub unsafe extern "C" fn _start() -> ! {
     if MPIDR_EL1.get_value(MPIDR_EL1::Aff0) == 0 {
         SP.set(KERN_STACK_BASE as u64);
-        kinit()
+        kinit();
     }
 
     loop {}

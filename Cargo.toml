@@ -1,3 +1,8 @@
+[profile.release]
+debug = true
+lto = false
+strip = true
+
 [workspace]
 members = [
     "kernel",
