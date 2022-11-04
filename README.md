@@ -11,9 +11,11 @@ wrappers for unsafe c.
     * Move from the current c library to a rust library
 * Add page swapping mechanisms
 * Allow the stack to grow downwards (ie outside one page of memory)
+* Use smaller pages
 * Introduce a feature-rich IPC structure.
 * Support ELF file format
 * Add user space concurrency features (including locks, CVs, and semaphores)
 * Work on a hosted hypervisor
 * Networking
 * Use cargo fuzz and miri to libraries for security.
+* Update bootloader **
