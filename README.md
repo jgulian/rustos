@@ -6,6 +6,11 @@ longer offered. I completed all parts of the course excluding networking. I
 decided not to do networking because I would like to implement network drivers 
 in safe rust instead of writing safe wrappers for unsafe c.
 
+## Current State
+The current focus of the project over the past week has been moving away from 
+the course and towards modern Rust features. After this, I will proceed with 
+working on
+
 ## Installing
 Currently, the project is on `1.67.0-nightly`. I'm working on making it easier 
 to run on general (more) hardware, but for now qemu is recommended with the 
@@ -13,6 +18,9 @@ settings in the Makefile.
 
 ## Roadmap
 
+* Allow processes to open files
+* Add more system calls read, write (beyond single characters), fork, exec, wait, and pipe (maybe more?)
+* Implement shell and have stdin, stdout, and stderr
 * Make the file system writable
     * Move from the current c library to a rust library
 * Add page swapping mechanisms
