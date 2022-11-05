@@ -12,10 +12,7 @@ authors = [
 edition = "2021"
 
 [dependencies]
-cfg-if = "0.1"
-
-[dev-dependencies]
-hashbrown = "0.6.3"
+cfg-if = "1.0.0"
 
 [features]
 no_std = []

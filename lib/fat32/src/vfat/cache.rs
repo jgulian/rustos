@@ -1,7 +1,6 @@
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::fmt;
-use hashbrown::HashMap;
 use shim::io;
 
 use crate::traits::BlockDevice;
@@ -23,7 +22,6 @@ pub struct Partition {
 
 pub struct CachedPartition {
     device: Box<dyn BlockDevice>,
-    cache: HashMap<u64, CacheEntry>,
     partition: Partition,
 }
 
@@ -52,7 +50,6 @@ impl CachedPartition {
 
         CachedPartition {
             device: Box::new(device),
-            cache: HashMap::new(),
             partition: partition,
         }
     }
@@ -86,50 +83,25 @@ impl CachedPartition {
     /// # Errors
     ///
     /// Returns an error if there is an error reading the sector from the disk.
-    pub fn get_mut(&mut self, sector: u64) -> io::Result<&mut [u8]> {
-        if !self.cache.contains_key(&sector) {
-            self.load_from_disk(sector)?;
-        }
-
-        let entry =self.cache.get_mut(&sector).expect("should be cached");
-        entry.dirty = true;
-        Ok(entry.data.as_mut_slice())
+    pub fn get(&mut self, sector: u64) -> io::Result<Vec<u8>> {
+        let data = self.load_from_disk(sector)?;
+        Ok(data)
     }
 
-    /// Returns a reference to the cached sector `sector`. If the sector is not
-    /// already cached, the sector is first read from the disk.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if there is an error reading the sector from the disk.
-    pub fn get(&mut self, sector: u64) -> io::Result<&[u8]> {
-        if !self.cache.contains_key(&sector) {
-            self.load_from_disk(sector)?;
-        }
-
-        let entry =self.cache.get(&sector).expect("should be cached");
-        Ok(entry.data.as_slice())
-    }
-
-    fn load_from_disk(&mut self, virtual_sector: u64) -> io::Result<()> {
+    fn load_from_disk(&mut self, virtual_sector: u64) -> io::Result<Vec<u8>> {
         let physical_sector = self.virtual_to_physical(virtual_sector)
             .ok_or(io::Error::from(io::ErrorKind::Other))?;
-        if !self.cache.contains_key(&virtual_sector) {
-            let mut data: Vec<u8> = Vec::<u8>::new();
-            data.resize(self.partition.sector_size as usize, 0);
 
-            for i in 0..(self.partition.sector_size / self.device.sector_size()) {
-                let slice = &mut data.as_mut_slice()[(self.device.sector_size() * i) as usize..];
-                (*self.device).read_sector(physical_sector + i, slice)?;
-            }
+        let mut data: Vec<u8> = Vec::<u8>::new();
 
-            self.cache.insert(virtual_sector, CacheEntry{
-                data,
-                dirty: false,
-            });
+        data.resize(self.partition.sector_size as usize, 0);
+
+        for i in 0..(self.partition.sector_size / self.device.sector_size()) {
+            let slice = &mut data.as_mut_slice()[(self.device.sector_size() * i) as usize..];
+            (*self.device).read_sector(physical_sector + i, slice)?;
         }
 
-        Ok(())
+        Ok(data)
     }
 }
 
@@ -143,17 +115,12 @@ impl BlockDevice for CachedPartition {
     fn read_sector(&mut self, sector: u64, buf: &mut [u8]) -> io::Result<usize> {
         let buffer = self.get(sector)?;
         let length = buffer.len();
-        buf.copy_from_slice(buffer);
+        buf.copy_from_slice(buffer.as_slice());
         Ok(length)
     }
 
     fn write_sector(&mut self, sector: u64, buf: &[u8]) -> io::Result<usize> {
-        let partition = self.get_mut(sector)?;
-        for i in 0..(buf.len()) {
-            partition[i] = buf[i];
-        }
-
-        Ok(buf.len())
+        unimplemented!("this is not implemented")
     }
 }
 
@@ -161,7 +128,6 @@ impl fmt::Debug for CachedPartition {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("CachedPartition")
             .field("device", &"<block device>")
-            .field("cache", &self.cache)
             .finish()
     }
 }

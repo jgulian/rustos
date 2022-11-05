@@ -13,12 +13,9 @@ edition = "2021"
 
 [dependencies]
 shim = { path = "../shim", features = ["alloc"] }
-hashbrown = "0.6.3"
-#ahash = "=0.2.18"
-#const-random = "=0.1.6"
 
 [dev-dependencies]
-rand = "0.4"
+rand = "0.8.5"
 
 [features]
 no_std = ["shim/no_std"]

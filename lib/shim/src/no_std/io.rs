@@ -217,6 +217,8 @@ impl Read for Cursor<&mut [u8]> {
     }
 }
 
+// FIXME: use copy_from_slice
+
 impl Write for &mut [u8] {
     fn write(&mut self, buf: &[u8]) -> Result<usize> {
         let length = cmp::min(buf.len(), self.len());

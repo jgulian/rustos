@@ -77,7 +77,7 @@ pub fn sys_getpid(tf: &mut TrapFrame) {
 }
 
 pub fn handle_syscall(num: u16, tf: &mut TrapFrame) {
-    info!("syscall {}", num);
+    //info!("syscall {}", num);
 
     tf.xs[7] = 1;
 
