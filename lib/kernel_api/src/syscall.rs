@@ -16,54 +16,79 @@ macro_rules! err_or {
     }};
 }
 
-
-
-unsafe fn syscall(call: Syscall, a: u64, b: u64, c: u64) -> OsResult<(u64, u64, u64)> {
-    //FIXME: simplify this... it can be done (and probably should) in an inline macro
-    let x: u64;
-    let y: u64;
-    let z: u64;
-    let e: u64;
-    asm!(
-    "mov x0, {a}",
-    "mov x1, {b}",
-    "mov x2, {c}",
-    "svc 0",
-    "mov {x}, x0",
-    "mov {y}, x1",
-    "mov {z}, x2",
-    "mov {e}, x7",
-    a = in(reg) a,
-    b = in(reg) b,
-    c = in(reg) c,
-    //t = in(reg) (call as u16),
-    x = out(reg) x,
-    y = out(reg) y,
-    z = out(reg) z,
-    e = out(reg) e,
+macro_rules! syscall_args {
+    ($a:expr) => (
+        asm!("mov x0, {}", in(reg) $a);
     );
+    ($a:expr, $b:expr) => (
+        syscall_args!($a);
+        asm!("mov x1, {}", in(reg) $b);
+    );
+    ($a:expr, $b:expr, $c:expr) => (
+        syscall_args!($a, $b);
+        asm!("mov x2, {}", in(reg) $c);
+    );
+}
 
-    err_or!(e, (x, y, z))
+macro_rules! syscall {
+    ($syscall_number:expr) => (
+        asm!("svc {}", const { $syscall_number as u16 })
+    );
+}
+
+macro_rules! syscall_receive0 {
+    () => {{
+        let e: u64;
+        asm!("mov {}, x7", out(reg) e);
+        err_or!(e, ())
+    }};
+}
+
+macro_rules! syscall_receive1 {
+    () => {{
+        let _ = syscall_receive0!()?;
+        let x: u64;
+        asm!("mov {}, x0", out(reg) x);
+        Ok(x) as Result<u64, OsError>
+    }};
+}
+
+macro_rules! syscall_receive2 {
+    () => {{
+        let x = syscall_receive1!()?;
+        let y: u64;
+        asm!("mov {}, x1", out(reg) y);
+        Ok((x, y)) as Result<(u64, u64), OsError>
+    }};
+}
+
+macro_rules! syscall_receive3 {
+    () => {{
+        let p = syscall_receive2!()?;
+        let z: u64;
+        asm!("mov {}, x2", out(reg) z);
+        Ok((p.0, p.1, z)) as Result<(u64, u64, u64), OsError>
+    }};
 }
 
 pub fn sleep(span: Duration) -> OsResult<Duration> {
-    if span.as_millis() > core::u64::MAX as u128 {
+    if span.as_millis() > u64::MAX as u128 {
         panic!("too big!");
     }
 
-    let ms = span.as_millis() as u64;
-    let elapsed_ms: u64;
-
-    unsafe {
-        elapsed_ms = syscall(Syscall::Sleep, ms, 0, 0)?.0
-    }
+    let elapsed_ms = unsafe {
+        syscall_args!(span.as_millis() as u64);
+        syscall!(Syscall::Sleep);
+        syscall_receive1!()?
+    };
 
     Ok(Duration::from_millis(elapsed_ms))
 }
 
 pub fn time() -> OsResult<Duration> {
     let returned = unsafe {
-        syscall(Syscall::Time, 0, 0, 0)?
+        syscall!(Syscall::Time);
+        syscall_receive2!()?
     };
 
     Ok(Duration::from_secs(returned.0) + Duration::from_nanos(returned.1))
@@ -71,18 +96,17 @@ pub fn time() -> OsResult<Duration> {
 
 pub fn exit() -> OsResult<()> {
     unsafe {
-        syscall(Syscall::Exit, 0, 0, 0)?;
+        syscall!(Syscall::Exit);
+        syscall_receive0!()
     }
-
-    Ok(())
 }
 
 pub fn write(b: u8) -> OsResult<()> {
     unsafe {
-        syscall(Syscall::Write, b as u64, 0, 0)?;
+        syscall_args!(b as u64);
+        syscall!(Syscall::Write);
+        syscall_receive0!()
     }
-
-    Ok(())
 }
 
 pub fn write_str(msg: &str) {
@@ -92,24 +116,22 @@ pub fn write_str(msg: &str) {
 }
 
 pub fn getpid() -> OsResult<u64> {
-    let pid = unsafe {
-        syscall(Syscall::GetPid, 0, 0, 0)?.0
-    };
-
-    Ok(pid)
+    unsafe {
+        syscall!(Syscall::GetPid);
+        syscall_receive1!()
+    }
 }
 
 pub fn sbrk() -> OsResult<usize> {
-    let ptr = unsafe {
-        syscall(Syscall::Sbrk, 0, 0, 0)?.0 as usize
-    };
-
-    Ok(ptr)
+    unsafe {
+        syscall!(Syscall::Sbrk);
+        Ok(syscall_receive1!()? as usize)
+    }
 }
 
 struct Console;
 
-impl fmt::Write for Console {
+impl Write for Console {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         write_str(s);
         Ok(())

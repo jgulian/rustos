@@ -2,8 +2,9 @@
 
 IMG=fs.img
 MNT=mnt
+ROOT=$(git rev-parse --show-toplevel)
 
-PROGS=(sleep fib)
+PROGS=(fib)
 
 for d in ${PROGS[@]}; do
     (cd $d; make build)
@@ -34,7 +35,7 @@ sudo mount $LOP1 $MNT
 trap "sudo umount $MNT; rmdir $MNT; sudo losetup -d $LO" EXIT
 
 for d in ${PROGS[@]}; do
-    sudo cp ~/build/$d/$d.bin $MNT/$d
+    sudo cp $ROOT/target/aarch64-unknown-none/release/$d/$d.bin $MNT/$d
 done
 
 # TODO: find a general way to fix this

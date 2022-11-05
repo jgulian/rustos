@@ -1,5 +1,5 @@
 [package]
-name = "sleep"
+name = "user"
 version = "0.1.0"
 authors = [
     "Sergio Benitez <sb@sergio.bz>",
@@ -11,11 +11,15 @@ authors = [
 ]
 edition = "2021"
 
-[package.metadata.cargo-xbuild]
-memcpy = true
-
 [dependencies]
-aarch64 = { path = "../../lib/aarch64/" }
+aarch64 = { path = "../lib/aarch64/" }
+kernel_api = { path = "../lib/kernel_api" }
 
-[dev-dependencies]
-shim = { path = "../../lib/shim", features = ["alloc"] }
+
+[[bin]]
+name = "fib"
+path = "src/bin/fib.rs"
+
+[[bin]]
+name = "sleep"
+path = "src/bin/sleep.rs"

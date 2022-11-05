@@ -1,7 +1,8 @@
 ROOT := $(shell git rev-parse --show-toplevel)
 
 KERN := kernel
-TARGET := target/aarch64-unknown-none/release/${KERN}
+TARGET_DIR := target/aarch64-unknown-none/release/
+TARGET := $(TARGET_DIR)/$(KERN)
 BINARY := $(TARGET).bin
 SDCARD ?= $(ROOT)/user/fs.img
 
@@ -14,7 +15,7 @@ QEMU_ARGS := -nographic -M raspi3b -serial null -serial mon:stdio \
 all: build
 
 build:
-	@echo "+ Building build/$(KERN).elf [xbuild/$@]"
+	@echo "+ Building build/$(KERN).elf [build/$@]"
 	@cargo build --bin kernel --release
 
 	@echo "+ Building build/$(KERN).bin [objcopy]"
@@ -37,3 +38,10 @@ objdump: build
 
 clean:
 	cargo clean
+
+user:
+	@echo "+ Building user programs"
+	cargo build --bin fib --release
+	llvm-objcopy -O binary $(TARGET_DIR)/fib $(TARGET_DIR)/fib.bin
+
+drive:

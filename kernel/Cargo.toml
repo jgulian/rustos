@@ -11,9 +11,6 @@ authors = [
 ]
 edition = "2021"
 
-[package.metadata.cargo-xbuild]
-memcpy = true
-
 [dependencies]
 aarch64 = { path = "../lib/aarch64/" }
 allocator = { path = "../lib/allocator" }

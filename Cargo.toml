@@ -17,5 +17,5 @@ members = [
     "lib/volatile",
     "lib/xmodem",
 
-    "user/fib",
+    "user",
 ]

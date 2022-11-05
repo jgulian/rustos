@@ -77,6 +77,10 @@ pub fn sys_getpid(tf: &mut TrapFrame) {
 }
 
 pub fn handle_syscall(num: u16, tf: &mut TrapFrame) {
+    info!("syscall {}", num);
+
+    tf.xs[7] = 1;
+
     match Syscall::from(num) {
         Syscall::Sleep => {
             sys_sleep(tf.xs[0] as u32, tf);

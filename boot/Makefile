@@ -10,7 +10,7 @@ BUILD := ~/build/boot
 all: build
 
 build:
-	@echo "+ Building build/$(KERN).elf [xbuild/$@]"
+	@echo "+ Building build/$(KERN).elf [build/$@]"
 	@cargo xbuild --release --target-dir ~/target/boot/
 	@mkdir -p $(BUILD)
 	@cp -f $(TARGET) $(BUILD)/$(KERN).elf

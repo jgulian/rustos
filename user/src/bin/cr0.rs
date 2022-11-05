@@ -1,11 +1,17 @@
 use core::mem::zeroed;
 use core::panic::PanicInfo;
 use core::ptr::write_volatile;
+use kernel_api::syscall::exit;
 use kernel_api::user_alloc::UserAllocator;
 
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
-    loop {}
+    close();
+}
+
+#[alloc_error_handler]
+fn my_example_handler(layout: core::alloc::Layout) -> ! {
+    panic!("memory allocation of {} bytes failed", layout.size())
 }
 
 unsafe fn zeros_bss() {
@@ -27,9 +33,14 @@ unsafe fn zeros_bss() {
 pub unsafe extern "C" fn _start() -> ! {
     zeros_bss();
     crate::main();
-    kernel_api::syscall::exit();
+    close();
 }
 
+fn close() -> ! {
+    loop {
+        let _ = exit();
+    }
+}
 
 #[global_allocator]
 pub static USER_ALLOCATOR: UserAllocator = UserAllocator::uninitialized();

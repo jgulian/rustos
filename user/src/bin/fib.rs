@@ -1,4 +1,4 @@
-#![feature(asm)]
+#![feature(alloc_error_handler)]
 #![no_std]
 #![no_main]
 
@@ -16,15 +16,14 @@ fn fib(n: u64) -> u64 {
 }
 
 fn main() {
-    let pid: u64 = getpid();
-    let beg = time();
+    let pid: u64 = getpid().expect("");
+    let beg = time().expect("");
     println!("test");
     println!("[{}] Started: {}", pid, beg.as_millis());
 
     let rtn = fib(40);
 
-    let end = time();
+    let end = time().expect("");
     println!("[{}] Ended: {}", pid, end.as_millis());
     println!("[{}] Result: {} ({})", pid, rtn, (end - beg).as_millis());
-    exit();
 }
