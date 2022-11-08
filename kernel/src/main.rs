@@ -27,6 +27,7 @@ pub mod multiprocessing;
 
 use shim::path::PathBuf;
 use console::kprintln;
+use fat32::traits::Dir;
 
 use filesystem::FileSystem;
 use process::GlobalScheduler;
@@ -51,16 +52,25 @@ unsafe fn kmain() -> ! {
     VMM.initialize();
     SCHEDULER.initialize();
 
-    SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
-    SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
-    SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
-    SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
+    //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
+    //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
+    //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
+    //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
 
     //TODO: there's an issue with locking? wherein nothing will run unless the following is here
     info!("any sussers");
 
     init::initialize_app_cores();
     VMM.wait();
+
+    use fat32::traits::{FileSystem, Entry};
+
+    info!("root dir files");
+    let root = PathBuf::from("/");
+    let root_dir = FILESYSTEM.open_dir(root).expect("root should exist");
+    for file in root_dir.entries().expect("should be good") {
+        info!("{}", file.name());
+    }
 
     info!("cores initialized");
 
