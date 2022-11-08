@@ -11,7 +11,7 @@ use crate::process::{Stack, State};
 use crate::traps::TrapFrame;
 use crate::memory::*;
 use kernel_api::{OsError, OsResult};
-use fat32::traits::FileSystem;
+use filesystem::FileSystem;
 use crate::FILESYSTEM;
 
 /// Type alias for the type of a process ID.
@@ -75,7 +75,7 @@ impl Process {
     /// Allocates one page for stack with read/write permission, and N pages with read/write/execute
     /// permission to load file's contents.
     fn do_load<P: AsRef<Path>>(pn: P) -> OsResult<Process> {
-        use fat32::traits::Entry;
+        use filesystem::Entry;
         use io::Read;
 
         let mut process = Process::new()?;

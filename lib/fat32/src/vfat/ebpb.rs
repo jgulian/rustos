@@ -1,7 +1,7 @@
 use core::{fmt, mem};
 use shim::const_assert_size;
 
-use crate::traits::BlockDevice;
+use filesystem::BlockDevice;
 use crate::vfat::Error;
 
 #[repr(C, packed)]

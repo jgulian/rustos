@@ -12,6 +12,7 @@ authors = [
 edition = "2021"
 
 [dependencies]
+filesystem = { path = "../filesystem" }
 shim = { path = "../shim", features = ["alloc"] }
 
 [dev-dependencies]

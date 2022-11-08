@@ -2,7 +2,7 @@ use alloc::string::String;
 
 use shim::io::{self, SeekFrom};
 
-use crate::traits;
+use filesystem;
 use crate::vfat::{Metadata, VFatHandle};
 use crate::vfat::vfat::ChainOffset;
 
@@ -15,7 +15,7 @@ pub struct File<HANDLE: VFatHandle> {
     pub(crate) offset: ChainOffset,
 }
 
-impl<HANDLE: VFatHandle> traits::File for File<HANDLE> {
+impl<HANDLE: VFatHandle> filesystem::File for File<HANDLE> {
     fn sync(&mut self) -> io::Result<()> {
         unimplemented!("not required")
     }

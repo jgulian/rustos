@@ -3,7 +3,7 @@ use core::fmt::Debug;
 use shim::const_assert_size;
 use shim::io;
 
-use crate::traits::BlockDevice;
+use filesystem::BlockDevice;
 
 /// Sector includes bottom two bits of sector.
 #[repr(C)]

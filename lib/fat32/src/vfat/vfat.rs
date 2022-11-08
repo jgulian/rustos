@@ -9,8 +9,8 @@ use shim::io;
 use shim::path::{Component, Path};
 
 use crate::mbr::MasterBootRecord;
-use crate::{PartitionEntry, traits};
-use crate::traits::{BlockDevice, FileSystem};
+use crate::PartitionEntry;
+use filesystem::{BlockDevice, FileSystem};
 use crate::vfat::{BiosParameterBlock, CachedPartition, Partition};
 use crate::vfat::{Cluster, Dir, Entry, Error, FatEntry, File, Status};
 
@@ -168,14 +168,17 @@ impl<HANDLE: VFatHandle> VFat<HANDLE> {
     }
 }
 
-impl<'a, HANDLE: VFatHandle> FileSystem for &'a HANDLE {
+// FIXME: Remove this and probably most of the generics.
+pub struct HandleReference<'a, HANDLE: VFatHandle>(pub &'a HANDLE);
+
+impl<'a, HANDLE: VFatHandle> FileSystem for HandleReference<'a, HANDLE> {
     type File = File<HANDLE>;
     type Dir = Dir<HANDLE>;
     type Entry = Entry<HANDLE>;
 
     fn open<P: AsRef<Path>>(self, path: P) -> io::Result<Self::Entry> {
         let mut path_stack = Vec::<Entry<HANDLE>>::new();
-        path_stack.push(Entry::root(self.clone()));
+        path_stack.push(Entry::root(self.0.clone()));
 
         for component in path.as_ref().components() {
             match component {
@@ -184,14 +187,14 @@ impl<'a, HANDLE: VFatHandle> FileSystem for &'a HANDLE {
                 }
                 Component::RootDir => {
                     path_stack.clear();
-                    path_stack.push(Entry::root(self.clone()));
+                    path_stack.push(Entry::root(self.0.clone()));
                 }
                 Component::CurDir => {}
                 Component::ParentDir => {
                     path_stack.pop();
                 }
                 Component::Normal(name) => {
-                    use traits::Entry;
+                    use filesystem::Entry;
                     let top = path_stack.last().ok_or(io::Error::from(io::ErrorKind::InvalidInput))?;
                     match top.as_dir() {
                         Some(dir) => {

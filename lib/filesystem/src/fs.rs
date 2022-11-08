@@ -1,6 +1,6 @@
 use shim::{io, path::Path};
 
-use crate::traits::Metadata;
+use crate::Metadata;
 
 /// Trait implemented by files in the file system.
 pub trait File: io::Read + io::Write + io::Seek + Sized {

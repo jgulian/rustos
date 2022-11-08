@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 use core::fmt;
 use shim::io;
 
-use crate::traits::BlockDevice;
+use filesystem::BlockDevice;
 
 #[derive(Debug)]
 struct CacheEntry {

@@ -5,9 +5,9 @@ use shim::const_assert_size;
 use shim::ffi::OsStr;
 use shim::io;
 
-use crate::traits;
+use filesystem;
 use crate::util::VecExt;
-use crate::vfat::{Date, Metadata, Timestamp};
+use crate::vfat::{Date, file, Metadata, Timestamp};
 use crate::vfat::{Cluster, Entry, File, VFatHandle};
 use crate::vfat::vfat::ChainOffset;
 
@@ -91,7 +91,7 @@ impl<HANDLE: VFatHandle> Dir<HANDLE> {
     /// If `name` contains invalid UTF-8 characters, an error of `InvalidInput`
     /// is returned.
     pub fn find<P: AsRef<OsStr>>(&self, name: P) -> io::Result<Entry<HANDLE>> {
-        use traits::{Dir, Entry};
+        use filesystem::{Dir, Entry};
         let name = name.as_ref().to_str()
             .ok_or(io::Error::from(io::ErrorKind::InvalidInput))?;
 
@@ -105,7 +105,7 @@ impl<HANDLE: VFatHandle> Dir<HANDLE> {
     }
 }
 
-impl<HANDLE: VFatHandle> traits::Dir for Dir<HANDLE> {
+impl<HANDLE: VFatHandle> filesystem::Dir for Dir<HANDLE> {
     type Entry = Entry<HANDLE>;
     type Iter = DirIter<HANDLE>;
 

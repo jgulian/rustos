@@ -4,9 +4,9 @@ use alloc::rc::Rc;
 use core::fmt::{self, Debug};
 use shim::io;
 use shim::path::Path;
+use filesystem;
 
-pub use fat32::traits;
-use fat32::vfat::{Dir, Entry, File, VFat, VFatHandle};
+use fat32::vfat::{Dir, Entry, File, HandleReference, VFat, VFatHandle};
 use crate::multiprocessing::mutex::Mutex;
 
 #[derive(Clone)]
@@ -60,13 +60,12 @@ impl FileSystem {
     }
 }
 
-// FIXME: Implement `fat32::traits::FileSystem` for `&FileSystem`
-impl fat32::traits::FileSystem for &FileSystem {
+impl filesystem::FileSystem for &FileSystem {
     type File = File<PiVFatHandle>;
     type Dir = Dir<PiVFatHandle>;
     type Entry = Entry<PiVFatHandle>;
 
     fn open<P: AsRef<Path>>(self, path: P) -> io::Result<Self::Entry> {
-        self.0.lock().as_ref().unwrap().open(path)
+        HandleReference(self.0.lock().as_ref().unwrap()).open(path)
     }
 }

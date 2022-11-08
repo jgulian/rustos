@@ -15,7 +15,6 @@ mod mbr;
 mod tests;
 mod util;
 
-pub mod traits;
 pub mod vfat;
 
 pub use crate::mbr::*;

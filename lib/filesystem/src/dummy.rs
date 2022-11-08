@@ -1,6 +1,6 @@
 use shim::io;
 
-use crate::traits::{Dir, Entry, File, Metadata, Timestamp};
+use crate::{Dir, Entry, File, Metadata, Timestamp};
 
 /// A type that implements all of the file system traits.
 #[derive(Copy, Clone)]

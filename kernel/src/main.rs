@@ -17,7 +17,7 @@ extern crate log;
 
 pub mod kalloc;
 pub mod console;
-pub mod filesystem;
+pub mod disk;
 pub mod logger;
 pub mod param;
 pub mod process;
@@ -27,9 +27,9 @@ pub mod multiprocessing;
 
 use shim::path::PathBuf;
 use console::kprintln;
-use fat32::traits::Dir;
+use filesystem::Dir;
 
-use filesystem::FileSystem;
+use disk::FileSystem;
 use process::GlobalScheduler;
 use traps::irq::{Fiq, GlobalIrq};
 use memory::VMManager;
@@ -63,7 +63,7 @@ unsafe fn kmain() -> ! {
     init::initialize_app_cores();
     VMM.wait();
 
-    use fat32::traits::{FileSystem, Entry};
+    use filesystem::{FileSystem, Entry};
 
     info!("root dir files");
     let root = PathBuf::from("/");

@@ -1,7 +1,7 @@
 use core::fmt;
 
 use core::fmt::Formatter;
-use crate::traits;
+use filesystem;
 
 /// A date as represented in FAT32 on-disk structures.
 #[repr(C, packed)]
@@ -60,7 +60,7 @@ impl From<Date> for Timestamp {
     }
 }
 
-impl traits::Timestamp for Timestamp {
+impl filesystem::Timestamp for Timestamp {
     fn year(&self) -> usize {
         self.date.year()
     }
@@ -88,7 +88,7 @@ impl traits::Timestamp for Timestamp {
 
 impl fmt::Display for Timestamp {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        use traits::Timestamp;
+        use filesystem::Timestamp;
         f.debug_struct("Timestamp")
             .field("year", &self.year())
             .field("month", &self.month())
@@ -109,7 +109,7 @@ pub struct Metadata {
     pub last_modification: Timestamp,
 }
 
-impl traits::Metadata for Metadata {
+impl filesystem::Metadata for Metadata {
     type Timestamp = Timestamp;
 
     fn read_only(&self) -> bool {
@@ -135,7 +135,7 @@ impl traits::Metadata for Metadata {
 
 impl fmt::Display for Metadata {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        use traits::Metadata;
+        use filesystem::Metadata;
         f.debug_struct("Metadata")
             .field("read_only", &self.read_only())
             .field("hidden", &self.hidden())
