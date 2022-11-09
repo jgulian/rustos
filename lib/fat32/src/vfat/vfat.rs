@@ -4,6 +4,7 @@ use core::marker::PhantomData;
 use alloc::vec::Vec;
 use core::cmp::min;
 use core::{fmt, mem};
+use log::info;
 
 use shim::{io, ioerr};
 use shim::path::{Component, Path};
@@ -313,12 +314,12 @@ impl<HANDLE: VFatHandle> io::Read for Chain<HANDLE> {
             let mut amount_read = 0;
 
             while !exhausted && amount_read < buf.len() {
-                let end_of_buffer = min(buf.len(), bytes_per_cluster - cluster_offset);
-                let mut buffer = &mut buf[amount_read..end_of_buffer];
+                let end_of_buffer = min(buf.len(), bytes_per_cluster - cluster_offset + amount_read);
+                let buffer = &mut buf[amount_read..end_of_buffer];
                 let read = vfat.read_cluster(current_cluster, cluster_offset as u64, buffer)?;
                 amount_read += read;
                 cluster_offset += read;
-                if read == bytes_per_cluster {
+                if cluster_offset == bytes_per_cluster {
                     cluster_offset = 0;
                     match vfat.next_cluster(current_cluster)? {
                         Some(next_cluster) => {

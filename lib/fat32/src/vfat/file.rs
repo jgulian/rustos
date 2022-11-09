@@ -8,11 +8,10 @@ use crate::vfat::vfat::{Chain, ChainOffset};
 
 #[derive(Debug)]
 pub struct File<HANDLE: VFatHandle> {
-    pub vfat: HANDLE,
     pub name: String,
     pub metadata: Metadata,
     pub file_size: u32,
-    pub(crate) offset: ChainOffset,
+    pub(crate) chain: Chain<HANDLE>,
 }
 
 impl<HANDLE: VFatHandle> File<HANDLE> {
@@ -24,11 +23,10 @@ impl<HANDLE: VFatHandle> File<HANDLE> {
         })?;
 
         Ok(File {
-            vfat: vfat.clone(),
             name,
             metadata: Default::default(),
             file_size: 0,
-            offset: ChainOffset::new(cluster),
+            chain: Chain::new_from_cluster(vfat.clone(), cluster)?,
         })
     }
 }
@@ -44,8 +42,8 @@ impl<HANDLE: VFatHandle> filesystem::File for File<HANDLE> {
 }
 
 impl<HANDLE: VFatHandle> io::Write for File<HANDLE> {
-    fn write(&mut self, _buf: &[u8]) -> io::Result<usize> {
-        unimplemented!("not required")
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.chain.write(buf)
     }
 
     fn flush(&mut self) -> io::Result<()> {
@@ -56,24 +54,7 @@ impl<HANDLE: VFatHandle> io::Write for File<HANDLE> {
 
 impl<HANDLE: VFatHandle> io::Read for File<HANDLE> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        if self.offset.exhausted {
-            return Ok(0);
-        }
-
-        let (buffer_to_read, exhausted) = if self.offset.total_bytes + buf.len() > self.file_size as usize {
-            (&mut buf[0..(self.file_size as usize - self.offset.total_bytes)], true)
-        } else {
-            (buf, false)
-        };
-
-
-        let (amount_read, new_offset) = self.vfat.lock(|file_system| {
-            file_system.read_chain_offset(buffer_to_read, self.offset.clone())
-        })?;
-
-        self.offset = new_offset;
-        self.offset.exhausted |= exhausted;
-        Ok(amount_read)
+        self.chain.read(buf)
     }
 }
 

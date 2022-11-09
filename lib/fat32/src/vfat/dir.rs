@@ -229,11 +229,17 @@ impl<HANDLE: VFatHandle> Iterator for DirIter<HANDLE> {
                 })
             } else {
                 Entry::File(File {
-                    vfat: self.vfat.clone(),
                     name,
                     metadata,
                     file_size: regular_dir.file_size,
-                    offset: ChainOffset::new(Cluster::from(starting_cluster)),
+                    chain: {
+                        let chain = Chain::new_from_cluster(self.vfat.clone(), first_cluster);
+                        if chain.is_err() {
+                            panic!("unable to find cluster start");
+                        }
+
+                        chain.unwrap()
+                    },
                 })
             };
 
