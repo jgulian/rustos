@@ -1,9 +1,10 @@
 use alloc::string::String;
 use filesystem;
 use crate::vfat::{Dir, File, Metadata, VFatHandle};
+use crate::vfat::vfat::Chain;
 
 // You can change this definition if you want
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Entry<HANDLE: VFatHandle> {
     File(File<HANDLE>),
     Dir(Dir<HANDLE>),
@@ -61,11 +62,21 @@ impl<HANDLE: VFatHandle> filesystem::Entry for Entry<HANDLE> {
 
 impl<HANDLE: VFatHandle> Entry<HANDLE> {
     pub fn root(vfat: HANDLE) -> Entry<HANDLE> {
+        let chain = {
+            let cluster = vfat.lock(|file_system| file_system.root_cluster());
+            let chain = Chain::new_from_cluster(vfat.clone(), cluster);
+            if chain.is_err() {
+                panic!("unable to find cluster start");
+            }
+
+            chain.unwrap()
+        };
+
         Entry::<HANDLE>::Dir(Dir::<HANDLE> {
             vfat: vfat.clone(),
-            first_cluster: vfat.lock(|file_system| file_system.root_cluster()),
             name: String::from("/"),
-            metadata: Default::default()
+            metadata: Default::default(),
+            chain,
         })
     }
 }

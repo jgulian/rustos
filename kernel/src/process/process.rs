@@ -83,9 +83,7 @@ impl Process {
         let user_image = process.vmap.alloc(Process::get_image_base(), PagePerm::RWX);
 
         let mut file = FILESYSTEM.open(pn)?.into_file().ok_or(OsError::IoError)?;
-        info!("here");
         let read = file.read(user_image)?;
-        info!("not here {}", read);
 
         Ok(process)
     }

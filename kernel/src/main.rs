@@ -67,7 +67,7 @@ unsafe fn kmain() -> ! {
 
     info!("root dir files");
     let root = PathBuf::from("/");
-    let root_dir = FILESYSTEM.open_dir(root).expect("root should exist");
+    let mut root_dir = FILESYSTEM.open_dir(root).expect("root should exist");
     for file in root_dir.entries().expect("should be good") {
         info!("{}", file.name());
     }

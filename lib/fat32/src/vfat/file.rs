@@ -4,9 +4,9 @@ use shim::io::{self, SeekFrom};
 
 use filesystem;
 use crate::vfat::{Cluster, Metadata, Status, VFatHandle};
-use crate::vfat::vfat::{Chain, ChainOffset};
+use crate::vfat::vfat::Chain;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct File<HANDLE: VFatHandle> {
     pub name: String,
     pub metadata: Metadata,

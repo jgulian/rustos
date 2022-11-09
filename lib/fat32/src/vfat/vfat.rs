@@ -4,9 +4,10 @@ use core::marker::PhantomData;
 use alloc::vec::Vec;
 use core::cmp::min;
 use core::{fmt, mem};
+use core::ops::DerefMut;
 use log::info;
 
-use shim::{io, ioerr};
+use shim::{io, ioerr, newioerr};
 use shim::path::{Component, Path};
 
 use crate::mbr::MasterBootRecord;
@@ -83,56 +84,6 @@ impl<HANDLE: VFatHandle> VFat<HANDLE> {
             root_cluster: Cluster::from(bios_parameter_block.root_cluster),
             empty_fat_pointer: 0,
         }))
-    }
-
-    pub fn read_chain(&mut self, start: Cluster, buf: &mut Vec<u8>) -> io::Result<usize> {
-        let mut chain_offset = ChainOffset::new(start);
-        let bytes_per_cluster = self.bytes_per_sector as usize * self.sectors_per_cluster as usize;
-        let mut total_amount_read = 0;
-        buf.resize(0, 0);
-        let mut i : usize = 0;
-
-        while !chain_offset.exhausted {
-            buf.resize(buf.len() + bytes_per_cluster, 0);
-            let slice = &mut buf.as_mut_slice()[(bytes_per_cluster * i)..(bytes_per_cluster * (i + 1))];
-            let (amount_read, new_offset) = self.read_chain_offset(slice, chain_offset)?;
-
-            chain_offset = new_offset;
-            total_amount_read += amount_read;
-            i += 1;
-        }
-
-        Ok(total_amount_read)
-    }
-
-    pub fn read_chain_offset(&mut self, buf: &mut [u8], start_offset: ChainOffset) -> io::Result<(usize, ChainOffset)> {
-        let mut amount_read = 0;
-        let bytes_per_cluster = self.bytes_per_sector as usize * self.sectors_per_cluster as usize;
-        let mut offset = start_offset.clone();
-
-        while !offset.exhausted && amount_read != buf.len() {
-            let sector = &mut buf[amount_read..];
-            let n = self.read_cluster(offset.current_cluster, offset.bytes_within_cluster as u64, sector)?;
-            amount_read += n;
-            offset.bytes_within_cluster = (n + offset.bytes_within_cluster) % bytes_per_cluster;
-
-            if offset.bytes_within_cluster == 0 {
-                match self.fat_entry(offset.current_cluster)?.status() {
-                    Status::Eoc(_status) => {
-                        offset.exhausted = true;
-                    }
-                    Status::Data(next_cluster) => {
-                        offset.current_cluster = next_cluster;
-                    }
-                    _ => {
-                        return Err(io::Error::from(io::ErrorKind::Other));
-                    }
-                }
-            }
-        }
-
-        offset.total_bytes += amount_read;
-        Ok((amount_read, offset))
     }
 
     fn update_sector(&mut self, sector: u64, offset: usize, buf: &[u8]) -> io::Result<()> {
@@ -266,6 +217,7 @@ impl<HANDLE: VFatHandle> VFat<HANDLE> {
     }
 }
 
+#[derive(Clone)]
 pub(crate) struct Chain<HANDLE: VFatHandle> {
     vfat: HANDLE,
     position: u64,
@@ -494,36 +446,13 @@ impl<'a, HANDLE: VFatHandle> FileSystem for HandleReference<'a, HANDLE> {
                 }
                 Component::Normal(name) => {
                     use filesystem::Entry;
-                    let top = path_stack.last().ok_or(io::Error::from(io::ErrorKind::InvalidInput))?;
-                    match top.as_dir() {
-                        Some(dir) => {
-                            path_stack.push(dir.find(name)?);
-                        }
-                        None => { return Err(io::Error::from(io::ErrorKind::InvalidInput)); }
-                    }
+                    let top = path_stack.last_mut().ok_or(newioerr!(InvalidInput))?.clone();
+                    let mut top_dir = top.into_dir().ok_or(newioerr!(InvalidInput))?;
+                    path_stack.push(top_dir.find(name)?);
                 }
             }
         }
 
         Ok(path_stack.pop().ok_or(io::Error::from(io::ErrorKind::InvalidInput))?)
-    }
-}
-
-#[derive(Copy, Clone, Debug)]
-pub struct ChainOffset {
-    pub total_bytes: usize,
-    pub bytes_within_cluster: usize,
-    pub current_cluster: Cluster,
-    pub exhausted: bool,
-}
-
-impl ChainOffset {
-    pub(crate) fn new(start: Cluster) -> Self {
-        ChainOffset {
-            total_bytes: 0,
-            bytes_within_cluster: 0,
-            current_cluster: start,
-            exhausted: false,
-        }
     }
 }

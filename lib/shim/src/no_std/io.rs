@@ -2,6 +2,7 @@ use core::{cmp, result};
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::fmt::Formatter;
+use crate::io;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum ErrorKind {
@@ -130,6 +131,18 @@ pub trait Read {
         }
 
         Ok(())
+    }
+
+    fn read_to_end(&mut self, buf: &mut Vec<u8>) -> Result<usize> {
+        let starting_size = buf.len();
+        while {
+            let mut buffer = [0u8; 256];
+            let amount_read = self.read(&mut buffer)?;
+            buf.extend_from_slice(&buffer);
+            amount_read != 0
+        } {}
+
+        Ok(buf.len() - starting_size)
     }
 }
 

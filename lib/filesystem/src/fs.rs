@@ -20,7 +20,7 @@ pub trait Dir: Sized {
     type Iter: Iterator<Item = Self::Entry>;
 
     /// Returns an interator over the entries in this directory.
-    fn entries(&self) -> io::Result<Self::Iter>;
+    fn entries(&mut self) -> io::Result<Self::Iter>;
 
     fn append(&mut self, entry: Self::Entry) -> io::Result<()>;
 

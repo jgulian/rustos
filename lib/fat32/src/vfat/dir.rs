@@ -1,15 +1,17 @@
 use alloc::string::String;
 use alloc::vec::Vec;
+use log::info;
 
 use shim::const_assert_size;
 use shim::ffi::OsStr;
 use shim::io;
 
 use filesystem;
+use shim::io::Read;
 use crate::util::VecExt;
 use crate::vfat::{Date, file, Metadata, Timestamp};
 use crate::vfat::{Cluster, Entry, File, VFatHandle};
-use crate::vfat::vfat::{Chain, ChainOffset};
+use crate::vfat::vfat::Chain;
 
 enum DirectoryAttribute {
     _ReadOnly = 0x01,
@@ -21,12 +23,12 @@ enum DirectoryAttribute {
     LongFileName = 0b1111,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Dir<HANDLE: VFatHandle> {
     pub vfat: HANDLE,
-    pub first_cluster: Cluster,
     pub name: String,
     pub metadata: Metadata,
+    pub(crate) chain: Chain<HANDLE>,
 }
 
 #[repr(C, packed)]
@@ -90,7 +92,7 @@ impl<HANDLE: VFatHandle> Dir<HANDLE> {
     ///
     /// If `name` contains invalid UTF-8 characters, an error of `InvalidInput`
     /// is returned.
-    pub fn find<P: AsRef<OsStr>>(&self, name: P) -> io::Result<Entry<HANDLE>> {
+    pub fn find<P: AsRef<OsStr>>(&mut self, name: P) -> io::Result<Entry<HANDLE>> {
         use filesystem::{Dir, Entry};
         let name = name.as_ref().to_str()
             .ok_or(io::Error::from(io::ErrorKind::InvalidInput))?;
@@ -109,11 +111,10 @@ impl<HANDLE: VFatHandle> filesystem::Dir for Dir<HANDLE> {
     type Entry = Entry<HANDLE>;
     type Iter = DirIter<HANDLE>;
 
-    fn entries(&self) -> io::Result<Self::Iter> {
+    fn entries(&mut self) -> io::Result<Self::Iter> {
         let mut data: Vec<u8> = Vec::new();
-        self.vfat.lock(|file_system|
-            file_system.read_chain(self.first_cluster, &mut data)
-        )?;
+        let read = self.chain.read_to_end(&mut data)?;
+        info!("read {}", read);
 
         Ok(DirIter {
             vfat: self.vfat.clone(),
@@ -146,6 +147,7 @@ impl<HANDLE: VFatHandle> Iterator for DirIter<HANDLE> {
         let mut long_file_names = Vec::<VFatLfnDirEntry>::new();
 
         loop {
+            info!("here");
             if self.done || self.i == self.data.len() {
                 return None;
             }
@@ -219,27 +221,28 @@ impl<HANDLE: VFatHandle> Iterator for DirIter<HANDLE> {
             };
 
             let first_cluster = Cluster::from(starting_cluster);
+            let chain = {
+                let chain = Chain::new_from_cluster(self.vfat.clone(), first_cluster);
+                if chain.is_err() {
+                    panic!("unable to find cluster start");
+                }
+
+                chain.unwrap()
+            };
 
             let entry = if regular_dir.attributes & (DirectoryAttribute::Directory as u8) > 0 {
                 Entry::Dir(Dir {
                     vfat: self.vfat.clone(),
-                    first_cluster,
                     name,
                     metadata,
+                    chain,
                 })
             } else {
                 Entry::File(File {
                     name,
                     metadata,
                     file_size: regular_dir.file_size,
-                    chain: {
-                        let chain = Chain::new_from_cluster(self.vfat.clone(), first_cluster);
-                        if chain.is_err() {
-                            panic!("unable to find cluster start");
-                        }
-
-                        chain.unwrap()
-                    },
+                    chain,
                 })
             };
 
