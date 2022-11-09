@@ -25,6 +25,8 @@ pub trait BlockDevice: Send {
     /// `self.sector_size()` bytes are appended to `vec`. The number of bytes
     /// read is returned.
     ///
+    /// FIXME: This can probably be deleted
+    ///
     /// # Errors
     ///
     /// Returns an error if seeking or reading from `self` fails.
@@ -56,6 +58,8 @@ pub trait BlockDevice: Send {
     /// error of `UnexpectedEof` if the length of `buf` is less than
     /// `self.sector_size()`.
     fn write_sector(&mut self, n: u64, buf: &[u8]) -> io::Result<usize>;
+
+    fn flush_sector(&mut self, n: u64) -> io::Result<()>;
 }
 
 impl<'a, T: BlockDevice> BlockDevice for &'a mut T {
@@ -66,8 +70,14 @@ impl<'a, T: BlockDevice> BlockDevice for &'a mut T {
     fn write_sector(&mut self, n: u64, buf: &[u8]) -> io::Result<usize> {
         (*self).write_sector(n, buf)
     }
+
+    fn flush_sector(&mut self, n: u64) -> io::Result<()> {
+        (*self).flush_sector(n)
+    }
 }
 
+
+//FIXME: this can probably be deleted
 macro impl_for_read_write_seek($(<$($gen:tt),*>)* $T:path) {
     impl $(<$($gen),*>)* BlockDevice for $T {
         fn read_sector(&mut self, n: u64, buf: &mut [u8]) -> io::Result<usize> {
@@ -86,6 +96,10 @@ macro impl_for_read_write_seek($(<$($gen:tt),*>)* $T:path) {
             self.seek(SeekFrom::Start(n * sector_size))?;
             self.write_all(&buf[..to_write])?;
             Ok(to_write)
+        }
+
+        fn flush_sector(&mut self, n: u64) -> io::Result<()> {
+            Ok(())
         }
     }
 }

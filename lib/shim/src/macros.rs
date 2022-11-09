@@ -34,14 +34,20 @@ macro_rules! const_assert_size {
 
 #[macro_export]
 macro_rules! newioerr {
-    ($kind:tt, $msg:tt) => {
+    ($kind:tt) => (
+        io::Error::from(io::ErrorKind::$kind);
+    );
+    ($kind:tt, $msg:tt) => (
         io::Error::new(io::ErrorKind::$kind, $msg);
-    }
+    )
 }
 
 #[macro_export]
 macro_rules! ioerr {
-    ($kind:tt, $msg:tt) => {
+    ($kind:tt) => (
+        Err(io::Error::from(io::ErrorKind::$kind));
+    );
+    ($kind:tt, $msg:tt) => (
         Err(io::Error::new(io::ErrorKind::$kind, $msg));
-    }
+    )
 }

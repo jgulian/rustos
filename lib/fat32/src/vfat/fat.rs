@@ -19,8 +19,26 @@ pub enum Status {
     Eoc(u32),
 }
 
+impl Status {
+    pub(crate) fn new_eoc() -> Self {
+        Eoc(0x0FFF_FFF8)
+    }
+}
+
 #[repr(C, packed)]
 pub struct FatEntry(pub u32);
+
+impl From<Status> for FatEntry {
+    fn from(value: Status) -> Self {
+        match value {
+            Free => FatEntry(0),
+            Reserved => FatEntry(0x0FFF_FFF6),
+            Data(cluster) => FatEntry(cluster.into()),
+            Bad => FatEntry(0x0FFF_FFF7),
+            Eoc(status_bits) => FatEntry(status_bits),
+        }
+    }
+}
 
 impl FatEntry {
     /// Returns the `Status` of the FAT entry `self`.
@@ -38,6 +56,10 @@ impl FatEntry {
         } else {
             Reserved
         }
+    }
+
+    pub(crate) fn is_free(&self) -> bool {
+        self.status() == Free
     }
 }
 

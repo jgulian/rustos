@@ -84,11 +84,11 @@ impl CachedPartition {
     ///
     /// Returns an error if there is an error reading the sector from the disk.
     pub fn get(&mut self, sector: u64) -> io::Result<Vec<u8>> {
-        let data = self.load_from_disk(sector)?;
+        let data = self.load(sector)?;
         Ok(data)
     }
 
-    fn load_from_disk(&mut self, virtual_sector: u64) -> io::Result<Vec<u8>> {
+    fn load(&mut self, virtual_sector: u64) -> io::Result<Vec<u8>> {
         let physical_sector = self.virtual_to_physical(virtual_sector)
             .ok_or(io::Error::from(io::ErrorKind::Other))?;
 
@@ -120,6 +120,10 @@ impl BlockDevice for CachedPartition {
     }
 
     fn write_sector(&mut self, sector: u64, buf: &[u8]) -> io::Result<usize> {
+        unimplemented!("this is not implemented")
+    }
+
+    fn flush_sector(&mut self, n: u64) -> io::Result<()> {
         unimplemented!("this is not implemented")
     }
 }

@@ -21,6 +21,10 @@ pub trait Dir: Sized {
 
     /// Returns an interator over the entries in this directory.
     fn entries(&self) -> io::Result<Self::Iter>;
+
+    fn append(&mut self, entry: Self::Entry) -> io::Result<()>;
+
+    fn remove(&mut self, entry: Self::Entry) -> io::Result<()>;
 }
 
 /// Trait implemented by directory entries in a file system.

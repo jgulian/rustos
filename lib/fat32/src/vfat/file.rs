@@ -3,8 +3,8 @@ use alloc::string::String;
 use shim::io::{self, SeekFrom};
 
 use filesystem;
-use crate::vfat::{Metadata, VFatHandle};
-use crate::vfat::vfat::ChainOffset;
+use crate::vfat::{Cluster, Metadata, Status, VFatHandle};
+use crate::vfat::vfat::{Chain, ChainOffset};
 
 #[derive(Debug)]
 pub struct File<HANDLE: VFatHandle> {
@@ -13,6 +13,24 @@ pub struct File<HANDLE: VFatHandle> {
     pub metadata: Metadata,
     pub file_size: u32,
     pub(crate) offset: ChainOffset,
+}
+
+impl<HANDLE: VFatHandle> File<HANDLE> {
+    fn new(vfat: HANDLE, name: String) -> io::Result<Self> {
+        let cluster = vfat.lock(|vfat| -> io::Result<Cluster> {
+            let cluster = vfat.next_free_cluster()?;
+            vfat.update_fat_entry(cluster, Status::new_eoc())?;
+            Ok(cluster)
+        })?;
+
+        Ok(File {
+            vfat: vfat.clone(),
+            name,
+            metadata: Default::default(),
+            file_size: 0,
+            offset: ChainOffset::new(cluster),
+        })
+    }
 }
 
 impl<HANDLE: VFatHandle> filesystem::File for File<HANDLE> {

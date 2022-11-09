@@ -7,6 +7,12 @@ impl From<u32> for Cluster {
     }
 }
 
+impl Into<u32> for Cluster {
+    fn into(self) -> u32 {
+        self.0
+    }
+}
+
 impl Cluster {
     pub fn fat_sector_number(&self, reserved_sector_count: u64, bytes_per_sector: u16) -> u64 {
         reserved_sector_count + (self.0 as u64 * 4 / bytes_per_sector as u64)
@@ -24,6 +30,3 @@ impl Cluster {
         self.0 * 4
     }
 }
-
-
-// TODO: Implement any useful helper methods on `Cluster`.

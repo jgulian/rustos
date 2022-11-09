@@ -9,7 +9,7 @@ use filesystem;
 use crate::util::VecExt;
 use crate::vfat::{Date, file, Metadata, Timestamp};
 use crate::vfat::{Cluster, Entry, File, VFatHandle};
-use crate::vfat::vfat::ChainOffset;
+use crate::vfat::vfat::{Chain, ChainOffset};
 
 enum DirectoryAttribute {
     _ReadOnly = 0x01,
@@ -122,6 +122,14 @@ impl<HANDLE: VFatHandle> filesystem::Dir for Dir<HANDLE> {
             done: false,
         })
     }
+
+    fn append(&mut self, entry: Self::Entry) -> io::Result<()> {
+        todo!()
+    }
+
+    fn remove(&mut self, _entry: Self::Entry) -> io::Result<()> {
+        unimplemented!("not implemented")
+    }
 }
 
 pub struct DirIter<HANDLE: VFatHandle> {
@@ -171,6 +179,7 @@ impl<HANDLE: VFatHandle> Iterator for DirIter<HANDLE> {
 
             let regular_dir = regular.unwrap();
 
+            //FIXME: This needs to be sorted by position
             let name = if long_file_names.is_empty() {
                 let mut result = String::new();
                 for c in regular_dir.name.iter() {
@@ -209,10 +218,12 @@ impl<HANDLE: VFatHandle> Iterator for DirIter<HANDLE> {
                 last_modification: regular_dir.last_modification,
             };
 
+            let first_cluster = Cluster::from(starting_cluster);
+
             let entry = if regular_dir.attributes & (DirectoryAttribute::Directory as u8) > 0 {
                 Entry::Dir(Dir {
                     vfat: self.vfat.clone(),
-                    first_cluster: Cluster::from(starting_cluster),
+                    first_cluster,
                     name,
                     metadata,
                 })
