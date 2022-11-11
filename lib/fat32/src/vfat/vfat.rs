@@ -1,3 +1,4 @@
+use alloc::string::String;
 use core::fmt::{Debug, Formatter};
 use core::marker::PhantomData;
 
@@ -114,7 +115,9 @@ impl<HANDLE: VFatHandle> VFat<HANDLE> {
         let mut sector_offset = offset as usize % self.bytes_per_sector as usize;
 
         while amount_read < buf.len() && sector_id < last_sector {
-            let buffer = self.device.get(sector_id)?;
+            //FIXME: clean this
+            let mut buffer = vec![0u8; self.device.sector_size() as usize];
+            self.device.read_sector(sector_id, buffer.as_mut_slice())?;
 
             let amount_to_copy = min(self.bytes_per_sector as usize - sector_offset, buf.len() - amount_read);
             for i in 0..amount_to_copy {
@@ -138,6 +141,7 @@ impl<HANDLE: VFatHandle> VFat<HANDLE> {
         current_sector += offset / sector_size;
 
         if offset % self.device.sector_size() != 0 {
+            info!("not here 1");
             let amount_to_write = (sector_size - (offset % sector_size)) as usize;
             let buffer = &buf[..amount_to_write];
             self.update_sector(current_sector, (offset % sector_size) as usize, buffer)?;
@@ -146,13 +150,15 @@ impl<HANDLE: VFatHandle> VFat<HANDLE> {
         }
 
         while (sector_size as usize) < buf.len() - amount_written {
+            info!("not here 2");
             let buffer = &buf[amount_written..(amount_written + sector_size as usize)];
             self.device.write_sector(current_sector, buffer)?;
             current_sector += 1;
             amount_written += sector_size as usize;
         }
 
-        if amount_written < buf.len() && (amount_written as u64 + offset) % self.device.sector_size() != 0 {
+        if amount_written < buf.len() {
+            info!("but here 3");
             let buffer = &buf[amount_written..];
             self.update_sector(current_sector, 0, buffer)?;
             amount_written += buffer.len();
@@ -163,7 +169,8 @@ impl<HANDLE: VFatHandle> VFat<HANDLE> {
 
     pub fn fat_entry(&mut self, cluster: Cluster) -> io::Result<&FatEntry> {
         let sector = self.fat_start_sector + (cluster.offset() / self.bytes_per_sector as u32) as u64;
-        let data = self.device.get(sector)?;
+        let mut data = vec![0u8; self.device.sector_size() as usize];
+        self.device.read_sector(sector, data.as_mut_slice())?;
         let offset = (cluster.offset() % self.bytes_per_sector as u32) as usize;
         let entry = &data[offset];
         Ok(unsafe { mem::transmute::<&u8, &FatEntry>(entry) })
@@ -201,7 +208,8 @@ impl<HANDLE: VFatHandle> VFat<HANDLE> {
 
     pub(crate) fn update_fat_entry(&mut self, cluster: Cluster, status: Status) -> io::Result<()> {
         let sector = self.fat_start_sector + (cluster.offset() / self.bytes_per_sector as u32) as u64;
-        let mut data = self.device.get(sector)?;
+        let mut data = vec![0u8; self.device.sector_size() as usize];
+        self.device.read_sector(sector, data.as_mut_slice())?;
 
         let offset = (cluster.offset() % self.bytes_per_sector as u32) as usize;
         let entry = &mut data[offset];
@@ -217,6 +225,8 @@ impl<HANDLE: VFatHandle> VFat<HANDLE> {
     }
 }
 
+
+//FIXME: remove exhuasted
 #[derive(Clone)]
 pub(crate) struct Chain<HANDLE: VFatHandle> {
     vfat: HANDLE,
@@ -251,6 +261,10 @@ impl<HANDLE: VFatHandle> Chain<HANDLE> {
             exhausted: false,
         })
     }
+
+    pub(crate) fn position(&self) -> u64 {
+        self.position
+    }
 }
 
 /// Read for ChainOffset
@@ -271,6 +285,7 @@ impl<HANDLE: VFatHandle> io::Read for Chain<HANDLE> {
                 let read = vfat.read_cluster(current_cluster, cluster_offset as u64, buffer)?;
                 amount_read += read;
                 cluster_offset += read;
+                //info!("in read info {} {} {}", amount_read, cluster_offset, read);
                 if cluster_offset == bytes_per_cluster {
                     cluster_offset = 0;
                     match vfat.next_cluster(current_cluster)? {
@@ -285,6 +300,8 @@ impl<HANDLE: VFatHandle> io::Read for Chain<HANDLE> {
                     panic!("read more bytes within cluster than exist within cluster");
                 }
             }
+
+            //info!("position updated by {}", amount_read);
 
             self.position += amount_read as u64;
             self.current_cluster = current_cluster;
@@ -305,9 +322,11 @@ impl<HANDLE: VFatHandle> io::Write for Chain<HANDLE> {
             let mut exhausted = self.exhausted;
             let mut amount_written = 0;
 
+            info!("amogus 1 {}", buf.len());
             while !exhausted && amount_written < buf.len() {
+                info!("amogus 2 {}", amount_written);
                 let end_of_buffer = min(buf.len(), bytes_per_cluster - cluster_offset);
-                let mut buffer = &buf[amount_written..end_of_buffer];
+                let buffer = &buf[amount_written..end_of_buffer];
                 let read = vfat.write_cluster(current_cluster, cluster_offset as u64, buffer)?;
                 amount_written += read;
                 cluster_offset += read;
@@ -325,6 +344,8 @@ impl<HANDLE: VFatHandle> io::Write for Chain<HANDLE> {
                     panic!("read more bytes within cluster than exist within cluster");
                 }
             }
+
+            info!("amogus 3 {}", amount_written);
 
             self.position += amount_written as u64;
             self.current_cluster = current_cluster;
@@ -347,7 +368,8 @@ impl<HANDLE: VFatHandle> io::Seek for Chain<HANDLE> {
 
         match pos {
             SeekFrom::Start(n) => {
-                self.position = n;
+                self.exhausted = false;
+                self.position = 0;
                 self.current_cluster = self.first_cluster;
                 self.seek(SeekFrom::Current(n as i64))
             }
@@ -454,5 +476,23 @@ impl<'a, HANDLE: VFatHandle> FileSystem for HandleReference<'a, HANDLE> {
         }
 
         Ok(path_stack.pop().ok_or(io::Error::from(io::ErrorKind::InvalidInput))?)
+    }
+
+    fn new_file(&mut self, name: String) -> io::Result<Self::File> {
+        Ok(File::<HANDLE> {
+            name,
+            metadata: Default::default(),
+            file_size: 0,
+            chain: Chain::new(self.0.clone())?
+        })
+    }
+
+    fn new_dir(&mut self, name: String) -> io::Result<Self::Dir> {
+        Ok(Dir::<HANDLE> {
+            vfat: self.0.clone(),
+            name,
+            metadata: Default::default(),
+            chain: Chain::new(self.0.clone())?
+        })
     }
 }

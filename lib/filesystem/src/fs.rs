@@ -1,3 +1,4 @@
+use alloc::string::String;
 use shim::{io, path::Path};
 
 use crate::Metadata;
@@ -117,4 +118,8 @@ pub trait FileSystem: Sized {
             .into_dir()
             .ok_or(io::Error::new(io::ErrorKind::Other, "not a directory"))
     }
+
+    fn new_file(&mut self, name: String) -> io::Result<Self::File>;
+
+    fn new_dir(&mut self, name: String) -> io::Result<Self::Dir>;
 }

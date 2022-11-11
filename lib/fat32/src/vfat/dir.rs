@@ -7,7 +7,7 @@ use shim::ffi::OsStr;
 use shim::io;
 
 use filesystem;
-use shim::io::Read;
+use shim::io::{Read, Seek, SeekFrom, Write};
 use crate::util::VecExt;
 use crate::vfat::{Date, file, Metadata, Timestamp};
 use crate::vfat::{Cluster, Entry, File, VFatHandle};
@@ -49,6 +49,7 @@ pub struct VFatRegularDirEntry {
 
 const_assert_size!(VFatRegularDirEntry, 32);
 
+//FIXME: use u16?
 #[repr(C, packed)]
 #[derive(Copy, Clone)]
 pub struct VFatLfnDirEntry {
@@ -60,6 +61,36 @@ pub struct VFatLfnDirEntry {
     name_two: [u8; 12],
     first_cluster_low: u16,
     name_three: [u8; 4],
+}
+
+impl VFatLfnDirEntry {
+    fn new(order: u8, name: &[u8]) -> Self {
+        // TODO: fill in these values
+        let mut result = VFatLfnDirEntry {
+            order,
+            name_one: [0u8; 10],
+            attributes: DirectoryAttribute::LongFileName as u8,
+            dir_type: 0,
+            checksum: 0,
+            name_two: [0u8; 12],
+            first_cluster_low: 0,
+            name_three: [0u8; 4],
+        };
+
+        let mut buffer = [0u8; 26];
+        (&mut buffer[..name.len()]).copy_from_slice(name);
+        let vec_u16: Vec<u16> = String::from_utf8_lossy(&buffer).encode_utf16().collect();
+        let vec_u8: Vec<u8> = vec_u16.iter()
+            .flat_map(|d| [(d & 0xFF) as u8, (d >> 8 & 0xFF) as u8])
+            .collect();
+        let slice = vec_u8.as_slice();
+
+        result.name_one.copy_from_slice(&slice[..10]);
+        result.name_two.copy_from_slice(&slice[10..22]);
+        result.name_three.copy_from_slice(&slice[22..26]);
+
+        result
+    }
 }
 
 const_assert_size!(VFatLfnDirEntry, 32);
@@ -114,7 +145,6 @@ impl<HANDLE: VFatHandle> filesystem::Dir for Dir<HANDLE> {
     fn entries(&mut self) -> io::Result<Self::Iter> {
         let mut data: Vec<u8> = Vec::new();
         let read = self.chain.read_to_end(&mut data)?;
-        info!("read {}", read);
 
         Ok(DirIter {
             vfat: self.vfat.clone(),
@@ -125,7 +155,55 @@ impl<HANDLE: VFatHandle> filesystem::Dir for Dir<HANDLE> {
     }
 
     fn append(&mut self, entry: Self::Entry) -> io::Result<()> {
-        todo!()
+        use filesystem::Entry;
+
+        let mut bytes: Vec<u8> = Vec::new();
+        self.chain.seek(SeekFrom::Start(0))?;
+        self.chain.read_to_end(&mut bytes)?;
+        let mut entries: Vec<VFatDirEntry> = unsafe { bytes.cast() };
+
+        let mut i = 0;
+        while unsafe { entries[i].unknown.named } != 0 {
+            i += 1;
+        }
+
+        info!("old bytes {}", (i * core::mem::size_of::<VFatDirEntry>()));
+
+        while i < entries.len() {
+            entries.remove(i);
+        }
+
+        for lfn in serialize_lfns(entry.name()) {
+            entries.push(VFatDirEntry { long_filename: lfn });
+        }
+
+        let mut regular_dir_entry = VFatRegularDirEntry {
+            name: [0; 8],
+            extension: [0; 3],
+            attributes: 0,
+            __nt_reserved: 0,
+            created_time_tenth: 0,
+            created_time: Default::default(),
+            last_access: Default::default(),
+            first_cluster_high: 0,
+            last_modification: Default::default(),
+            first_cluster_low: 0,
+            file_size: 0,
+        };
+
+        for (i, c) in entry.name().as_bytes().iter().take(8).enumerate() {
+            regular_dir_entry.name[i] = c.to_ascii_uppercase();
+        }
+        info!("actual name {:?}", regular_dir_entry.name);
+
+        entries.push(VFatDirEntry { regular: regular_dir_entry });
+
+        bytes = unsafe { entries.cast() };
+        info!("here 3 new bytes {} {}", bytes.len(), bytes[core::mem::size_of::<VFatDirEntry>() * 3]);
+        //TODO: we should be able to get away with seeking to new data.
+        self.chain.seek(SeekFrom::Start(0))?;
+        self.chain.write_all(bytes.as_slice())?;
+        Ok(())
     }
 
     fn remove(&mut self, _entry: Self::Entry) -> io::Result<()> {
@@ -147,7 +225,6 @@ impl<HANDLE: VFatHandle> Iterator for DirIter<HANDLE> {
         let mut long_file_names = Vec::<VFatLfnDirEntry>::new();
 
         loop {
-            info!("here");
             if self.done || self.i == self.data.len() {
                 return None;
             }
@@ -205,6 +282,8 @@ impl<HANDLE: VFatHandle> Iterator for DirIter<HANDLE> {
             } else {
                 parse_name(&mut long_file_names)
             };
+
+            //TODO: check the checksum?
 
             if name.len() == 0 {
                 panic!("entry must have name");
@@ -271,4 +350,10 @@ fn parse_name(long_file_names: &mut Vec<VFatLfnDirEntry>) -> String {
     }
 
     String::from_utf16_lossy(chars.as_slice())
+}
+
+fn serialize_lfns(name: &str) -> Vec<VFatLfnDirEntry> {
+    name.as_bytes().chunks(26).enumerate().map(|(i, chunk)| {
+        VFatLfnDirEntry::new(i as u8 + 1, chunk)
+    }).collect()
 }

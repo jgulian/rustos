@@ -60,6 +60,18 @@ impl<HANDLE: VFatHandle> filesystem::Entry for Entry<HANDLE> {
     }
 }
 
+impl<HANDLE: VFatHandle> From<File<HANDLE>> for Entry<HANDLE> {
+    fn from(file: File<HANDLE>) -> Self {
+        Entry::File(file)
+    }
+}
+
+impl<HANDLE: VFatHandle> From<Dir<HANDLE>> for Entry<HANDLE> {
+    fn from(dir: Dir<HANDLE>) -> Self {
+        Entry::Dir(dir)
+    }
+}
+
 impl<HANDLE: VFatHandle> Entry<HANDLE> {
     pub fn root(vfat: HANDLE) -> Entry<HANDLE> {
         let chain = {

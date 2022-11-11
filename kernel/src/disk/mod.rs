@@ -1,6 +1,7 @@
 pub mod sd;
 
 use alloc::rc::Rc;
+use alloc::string::String;
 use core::fmt::{self, Debug};
 use shim::io;
 use shim::path::Path;
@@ -35,6 +36,7 @@ impl VFatHandle for PiVFatHandle {
         f(&mut self.0.lock())
     }
 }
+
 pub struct FileSystem(Mutex<Option<PiVFatHandle>>);
 
 impl FileSystem {
@@ -58,6 +60,11 @@ impl FileSystem {
         let vfat = VFat::<PiVFatHandle>::from(sd).expect("failed to initialize vfat");
         self.0.lock().replace(vfat);
     }
+
+    pub fn create_file(self, name: String) -> io::Result<File<PiVFatHandle>> {
+        use filesystem::FileSystem;
+        HandleReference(self.0.lock().as_ref().unwrap()).new_file(name)
+    }
 }
 
 impl filesystem::FileSystem for &FileSystem {
@@ -67,5 +74,13 @@ impl filesystem::FileSystem for &FileSystem {
 
     fn open<P: AsRef<Path>>(self, path: P) -> io::Result<Self::Entry> {
         HandleReference(self.0.lock().as_ref().unwrap()).open(path)
+    }
+
+    fn new_file(&mut self, name: String) -> io::Result<Self::File> {
+        HandleReference(self.0.lock().as_ref().unwrap()).new_file(name)
+    }
+
+    fn new_dir(&mut self, name: String) -> io::Result<Self::Dir> {
+        HandleReference(self.0.lock().as_ref().unwrap()).new_dir(name)
     }
 }
