@@ -21,7 +21,7 @@ settings in the Makefile.
 * Allow processes to open files
 * Add more system calls read, write (beyond single characters), fork, exec, wait, and pipe (maybe more?)
 * Implement shell and have stdin, stdout, and stderr
-* Make the file system writable
+* Make the file system writable*
     * Move from the current c library to a rust library
 * Add page swapping mechanisms
 * Allow the stack to grow downwards (ie outside one page of memory)
@@ -33,3 +33,5 @@ settings in the Makefile.
 * Networking
 * Use cargo fuzz and miri to libraries for security.
 * Update bootloader
+
+\* Asterisks suggest features are in a partially complete state, but require more work or coverage testing.
