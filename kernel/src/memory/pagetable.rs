@@ -14,7 +14,7 @@ use crate::ALLOCATOR;
 
 use aarch64::vmsa::*;
 use allocator::util::{align_down, align_up};
-use shim::const_assert_size;
+use shim::{const_assert_size, io, ioerr};
 
 #[repr(C)]
 pub struct Page([u8; PAGE_SIZE]);
@@ -317,6 +317,17 @@ impl UserPageTable {
         self.0.set_entry(va, entry);
 
         return unsafe {core::slice::from_raw_parts_mut(page, PAGE_SIZE)};
+    }
+
+    pub fn translate(&self, virtual_address: VirtualAddr) -> io::Result<PhysicalAddr> {
+        let (l2_index, l3_index) = PageTable::locate(va);
+        let l3_entry = &self.l3[l2_index].entries[l3_index];
+        if l3_entry.is_valid() {
+            let page_address = l3_entry.0.get_value(RawL3Entry::ADDR) << PAGE_ALIGN;
+            Ok(PhysicalAddr::from(page_address + virtual_address.offset()))
+        } else {
+            ioerr!(AddrNotAvailable)
+        }
     }
 }
 

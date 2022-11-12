@@ -1,4 +1,5 @@
 use alloc::boxed::Box;
+use alloc::vec::Vec;
 use core::mem;
 use shim::io;
 use shim::path::Path;
@@ -7,7 +8,7 @@ use aarch64;
 use aarch64::SPSR_EL1;
 
 use crate::param::*;
-use crate::process::{Stack, State};
+use crate::process::{Resource, Stack, State};
 use crate::traps::TrapFrame;
 use crate::memory::*;
 use kernel_api::{OsError, OsResult};
@@ -23,12 +24,14 @@ pub struct Process {
     /// The saved trap frame of a process.
     pub context: Box<TrapFrame>,
     /// The memory allocation used for the process's stack.
-    /// TODO: remove this its not usefu;
+    /// TODO: remove this its not useful
     pub stack: Stack,
     /// The page table describing the Virtual Memory of the process
     pub vmap: Box<UserPageTable>,
     /// The scheduling state of the process.
     pub state: State,
+    /// The resources (files) open by a process
+    pub(crate) resources: Vec<Resource>,
 }
 
 impl Process {
@@ -44,7 +47,7 @@ impl Process {
             stack,
             vmap: Box::new(UserPageTable::new()),
             state: State::Ready,
-        //    sockets: Vec::new(),
+            resources: Vec::new(),
         })
     }
 
