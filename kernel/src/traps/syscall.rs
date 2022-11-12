@@ -70,7 +70,7 @@ pub fn sys_exit(tf: &mut TrapFrame) -> OsResult<()> {
     Ok(())
 }
 
-pub fn sys_open(_tf: &mut TrapFrame) {
+pub fn sys_open(_tf: &mut TrapFrame) -> OsResult<()> {
     //let file = tf.xs[0];
     //let ptr = tf.xs[1];
     //let len = tf.xs[2] as usize;
@@ -86,7 +86,7 @@ pub fn sys_open(_tf: &mut TrapFrame) {
     unimplemented!("amogus")
 }
 
-pub fn sys_read(_tf: &mut TrapFrame) {
+pub fn sys_read(_tf: &mut TrapFrame) -> OsResult<()> {
     //let file = tf.xs[0];
     //let ptr = tf.xs[1];
     //let len = tf.xs[2] as usize;
@@ -192,10 +192,15 @@ pub fn handle_syscall(num: u16, tf: &mut TrapFrame) {
         Syscall::GetPid => {
             sys_getpid(tf)
         }
-        Syscall::Sbrk => {}
-        Syscall::Unknown => {}
+        Syscall::Sbrk => {
+            Ok(())
+        }
+        Syscall::Unknown => {
+            Ok(())
+        }
     };
 
+    // TODO: this can be simplified with into/from?
     tf.xs[7] = match result {
         Ok(_) => 1,
         Err(err) => err as u64

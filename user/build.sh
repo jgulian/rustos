@@ -6,10 +6,6 @@ ROOT=$(git rev-parse --show-toplevel)
 
 PROGS=(fib)
 
-for d in ${PROGS[@]}; do
-    (cd $d; make build)
-done
-
 dd if=/dev/zero of=$IMG bs=1MB count=128
 echo -e "n\np\n1\n\n\nt\nc\nw\n" | fdisk $IMG
 
@@ -35,8 +31,8 @@ sudo mount $LOP1 $MNT
 trap "sudo umount $MNT; rmdir $MNT; sudo losetup -d $LO" EXIT
 
 for d in ${PROGS[@]}; do
-    sudo cp $ROOT/target/aarch64-unknown-none/release/$d/$d.bin $MNT/$d
+    sudo cp $ROOT/target/aarch64-unknown-none/release/$d.bin $MNT/$d
 done
 
 # TODO: find a general way to fix this
-qemu-img resize fs.img 256M
+qemu-img resize fs.img 128M

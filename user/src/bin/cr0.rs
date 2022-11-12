@@ -1,8 +1,12 @@
+use core::alloc::GlobalAlloc;
 use core::mem::zeroed;
 use core::panic::PanicInfo;
 use core::ptr::write_volatile;
-use kernel_api::syscall::exit;
-use kernel_api::user_alloc::UserAllocator;
+use core::alloc::Layout;
+use core::arch::asm;
+use core::prelude::rust_2024::global_allocator;
+
+use crate::exit;
 
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
@@ -10,7 +14,7 @@ fn panic(_info: &PanicInfo) -> ! {
 }
 
 #[alloc_error_handler]
-fn my_example_handler(layout: core::alloc::Layout) -> ! {
+fn my_example_handler(layout: Layout) -> ! {
     panic!("memory allocation of {} bytes failed", layout.size())
 }
 
@@ -31,6 +35,7 @@ unsafe fn zeros_bss() {
 
 #[no_mangle]
 pub unsafe extern "C" fn _start() -> ! {
+    asm!("svc 512");
     zeros_bss();
     crate::main();
     close();
@@ -42,5 +47,22 @@ fn close() -> ! {
     }
 }
 
+pub struct GlobalAllocator;
+
+impl GlobalAllocator {
+    const fn new() -> Self {
+        GlobalAllocator {}
+    }
+}
+
+unsafe impl GlobalAlloc for GlobalAllocator {
+    unsafe fn alloc(&self, _layout: Layout) -> *mut u8 {
+        asm!("svc 420");
+        core::ptr::null_mut()
+    }
+
+    unsafe fn dealloc(&self, _ptr: *mut u8, _layout: Layout) {}
+}
+
 #[global_allocator]
-pub static USER_ALLOCATOR: UserAllocator = UserAllocator::uninitialized();
+pub static ALLOCATOR: GlobalAllocator = GlobalAllocator::new();

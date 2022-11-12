@@ -8,12 +8,13 @@ use aarch64;
 use aarch64::SPSR_EL1;
 
 use crate::param::*;
-use crate::process::{Resource, Stack, State};
+use crate::process::{Stack, State};
 use crate::traps::TrapFrame;
 use crate::memory::*;
 use kernel_api::{OsError, OsResult};
 use filesystem::FileSystem;
 use crate::FILESYSTEM;
+use crate::process::resource::Resource;
 
 /// Type alias for the type of a process ID.
 pub type Id = u64;
@@ -85,8 +86,8 @@ impl Process {
         process.vmap.alloc(Process::get_stack_base(), PagePerm::RW);
         let user_image = process.vmap.alloc(Process::get_image_base(), PagePerm::RWX);
 
-        let mut file = FILESYSTEM.open(pn)?.into_file().ok_or(OsError::IoError)?;
-        let read = file.read(user_image)?;
+        let mut file = FILESYSTEM.open(pn).map_err(|e| OsError::IoError)?.into_file().ok_or(OsError::IoError)?;
+        let read = file.read(user_image).map_err(|e| OsError::IoError)?;
 
         Ok(process)
     }

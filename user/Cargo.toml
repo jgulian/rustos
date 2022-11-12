@@ -13,7 +13,7 @@ edition = "2021"
 
 [dependencies]
 aarch64 = { path = "../lib/aarch64/" }
-kernel_api = { path = "../lib/kernel_api" }
+#kernel_api = { path = "../lib/kernel_api" }
 
 
 [[bin]]

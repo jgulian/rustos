@@ -103,7 +103,6 @@ impl GlobalScheduler {
     /// preemptive scheduling. This method should not return under normal
     /// conditions.
     pub fn start(&self) -> ! {
-        self.initialize_global_timer_interrupt();
         self.initialize_local_timer_interrupt();
 
         let mut trap_frame: TrapFrame = Default::default();

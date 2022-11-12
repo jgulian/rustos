@@ -320,7 +320,7 @@ impl UserPageTable {
     }
 
     pub fn translate(&self, virtual_address: VirtualAddr) -> io::Result<PhysicalAddr> {
-        let (l2_index, l3_index) = PageTable::locate(va);
+        let (l2_index, l3_index) = PageTable::locate(virtual_address);
         let l3_entry = &self.l3[l2_index].entries[l3_index];
         if l3_entry.is_valid() {
             let page_address = l3_entry.0.get_value(RawL3Entry::ADDR) << PAGE_ALIGN;
