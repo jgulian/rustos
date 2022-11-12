@@ -31,24 +31,21 @@ pub fn exit() -> ! {
     loop {}
 }
 
-pub fn write(b: u8) {
+pub fn write(file: u64, ptr: usize, len: usize) {
     let mut ecode: u64;
 
     unsafe {
         asm!(
         "mov x0, {a}",
+        "mov x1, {b}",
+        "mov x2, {c}",
         "svc 5",
         "mov {e}, x7",
-        a = in(reg) (b as u64),
+        a = in(reg) (file),
+        b = in(reg) (ptr as u64),
+        c = in(reg) (len as u64),
         e = out(reg) ecode,
         );
-    }
-}
-
-pub fn write_str(msg: &str) {
-    let pad = [0; 64];
-    for c in msg.bytes() {
-        write(c);
     }
 }
 
@@ -69,11 +66,36 @@ pub fn getpid() -> u64 {
     pid
 }
 
+
+pub fn sbrk() -> (usize, usize) {
+    let mut ecode: u64;
+    let mut ptr: u64;
+    let mut len: u64;
+
+    unsafe {
+        asm!(
+        "svc 1",
+        "mov {x}, x0",
+        "mov {y}, x1",
+        "mov {e}, x7",
+        x = out(reg) ptr,
+        y = out(reg) len,
+        e = out(reg) ecode,
+        );
+    }
+
+    if ecode == 1 {
+        (ptr as usize, len as usize)
+    } else {
+        (0, 0)
+    }
+}
+
 struct Console;
 
 impl fmt::Write for Console {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        write_str(s);
+        write(0, s.as_ptr() as usize, s.len());
         Ok(())
     }
 }

@@ -35,7 +35,6 @@ unsafe fn zeros_bss() {
 
 #[no_mangle]
 pub unsafe extern "C" fn _start() -> ! {
-    asm!("svc 512");
     zeros_bss();
     crate::main();
     close();
@@ -47,11 +46,11 @@ fn close() -> ! {
     }
 }
 
-pub struct GlobalAllocator;
+pub struct GlobalAllocator(usize, usize);
 
 impl GlobalAllocator {
     const fn new() -> Self {
-        GlobalAllocator {}
+        GlobalAllocator(0, 0)
     }
 }
 

@@ -124,20 +124,25 @@ pub fn sys_write(tf: &mut TrapFrame) -> OsResult<()> {
 //TODO: make the functions work across page boundaries
 fn copy_from_userspace(tf: &TrapFrame, ptr: u64, buf: &mut [u8]) -> OsResult<()> {
     let virtual_address = VirtualAddr::from(ptr);
+
     if virtual_address.offset() as usize + buf.len() > PAGE_SIZE {
-        return Err(BadAddress);
+        Err(BadAddress)
+    } else {
+        buf.copy_from_slice(unsafe {core::slice::from_raw_parts(ptr as *const u8, buf.len())});
+        //kprintln!("copied {:?}", buf);
+        Ok(())
     }
 
-    SCHEDULER.on_process(tf, |process| -> OsResult<()> {
-        let address = process.vmap.translate(VirtualAddr::from(ptr))
-            .map_err(|_| BadAddress)?;
-        unsafe {
-            let real_ptr = address.as_u64() as *const u8;
-            buf.copy_from_slice(core::slice::from_raw_parts(real_ptr, buf.len()));
-        }
-
-        Ok(())
-    })
+    //SCHEDULER.on_process(tf, |process| -> OsResult<()> {
+    //    let address = process.vmap.translate(VirtualAddr::from(ptr))
+    //        .map_err(|_| BadAddress)?;
+    //    unsafe {
+    //        let real_ptr = address.as_u64() as *const u8;
+    //        buf.copy_from_slice(core::slice::from_raw_parts(real_ptr, buf.len()));
+    //    }
+    //
+    //    Ok(())
+    //})
 }
 
 fn copy_into_userspace(tf: &TrapFrame, ptr: u64, buf: &[u8]) -> OsResult<()> {

@@ -14,7 +14,13 @@ impl VirtualAddr {
         (self.as_u64() & ((1 << 29) - (1 << 16))) >> 16
     }
     
-    pub fn offset(&self) -> u64 {self.as_u64() & ((1 << 16) - 1)}
+    pub fn offset(&self) -> u64 {
+        self.as_u64() & ((1 << 16) - 1)
+    }
+
+    pub fn page_aligned(&self) -> u64 {
+        self.as_u64() & (!((1u64 << 16) - 1))
+    }
 }
 
 /// A physical address.

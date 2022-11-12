@@ -60,7 +60,7 @@ impl fmt::Display for Info {
 pub extern "C" fn handle_exception(info: Info, esr: u32, tf: &mut TrapFrame) {
     let syndrome = Syndrome::from(esr);
 
-    info!("handle_exception {}: {}", info, syndrome);
+    //info!("handle_exception {}: {}", info, syndrome);
 
     match info.kind {
         Kind::Synchronous => {
