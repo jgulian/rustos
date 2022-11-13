@@ -4,7 +4,7 @@ IMG=fs.img
 MNT=mnt
 ROOT=$(git rev-parse --show-toplevel)
 
-PROGS=(fib alloc)
+PROGS=(fib heap)
 
 dd if=/dev/zero of=$IMG bs=1MB count=128
 echo -e "n\np\n1\n\n\nt\nc\nw\n" | fdisk $IMG

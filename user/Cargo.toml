@@ -16,8 +16,8 @@ aarch64 = { path = "../lib/aarch64/" }
 #kernel_api = { path = "../lib/kernel_api" }
 
 [[bin]]
-name = "alloc"
-path = "src/bin/alloc.rs"
+name = "heap"
+path = "src/bin/heap.rs"
 
 [[bin]]
 name = "fib"

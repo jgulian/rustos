@@ -1,10 +1,9 @@
-use core::alloc::GlobalAlloc;
 use core::mem::zeroed;
 use core::panic::PanicInfo;
 use core::ptr::write_volatile;
-use core::alloc::Layout;
 use core::arch::asm;
 use core::prelude::rust_2024::global_allocator;
+use core::alloc::Layout;
 
 use crate::exit;
 
@@ -45,23 +44,3 @@ fn close() -> ! {
         let _ = exit();
     }
 }
-
-pub struct GlobalAllocator(usize, usize);
-
-impl GlobalAllocator {
-    const fn new() -> Self {
-        GlobalAllocator(0, 0)
-    }
-}
-
-unsafe impl GlobalAlloc for GlobalAllocator {
-    unsafe fn alloc(&self, _layout: Layout) -> *mut u8 {
-        asm!("svc 420");
-        core::ptr::null_mut()
-    }
-
-    unsafe fn dealloc(&self, _ptr: *mut u8, _layout: Layout) {}
-}
-
-#[global_allocator]
-pub static ALLOCATOR: GlobalAllocator = GlobalAllocator::new();
