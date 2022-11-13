@@ -4,10 +4,9 @@
 #![no_main]
 
 mod cr0;
-mod kernel_api;
 
-use kernel_api::{getpid, time};
-pub(crate) use kernel_api::exit;
+use kernel_api::syscall::{getpid, time};
+use kernel_api::println;
 
 fn fib(n: u64) -> u64 {
     match n {
@@ -18,14 +17,14 @@ fn fib(n: u64) -> u64 {
 }
 
 fn main() {
-    let pid: u64 = getpid();
-    let beg = time();
+    let pid: u64 = getpid().expect("unable to get pid");
+    let beg = time().expect("unable to get time");
     println!("test");
     println!("[{}] Started: {}", pid, beg.as_millis());
 
     let rtn = fib(40);
 
-    let end = time();
+    let end = time().expect("unable to get time");
     println!("[{}] Ended: {}", pid, end.as_millis());
     println!("[{}] Result: {} ({})", pid, rtn, (end - beg).as_millis());
 }

@@ -2,7 +2,7 @@
 
 #![no_std]
 
-//use shim::io;
+use shim::io;
 
 #[cfg(feature = "user-space")]
 pub mod syscall;
@@ -32,7 +32,7 @@ pub enum OsError {
     IllegalSocketOperation = 201,
 }
 
-impl core::convert::From<u64> for OsError {
+impl From<u64> for OsError {
     fn from(e: u64) -> Self {
         match e {
             1 => OsError::Ok,
@@ -58,18 +58,18 @@ impl core::convert::From<u64> for OsError {
     }
 }
 
-//impl From<io::Error> for OsError {
-//    fn from(e: io::Error) -> Self {
-//        match e.kind() {
-//            io::ErrorKind::UnexpectedEof => OsError::IoErrorEof,
-//            io::ErrorKind::InvalidData => OsError::IoErrorInvalidData,
-//            io::ErrorKind::InvalidInput => OsError::IoErrorInvalidInput,
-//            io::ErrorKind::TimedOut => OsError::IoErrorTimedOut,
-//            io::ErrorKind::NotFound => OsError::NoEntry,
-//            _ => OsError::IoError,
-//        }
-//    }
-//}
+impl From<io::Error> for OsError {
+    fn from(e: io::Error) -> Self {
+        match e.kind() {
+            io::ErrorKind::UnexpectedEof => OsError::IoErrorEof,
+            io::ErrorKind::InvalidData => OsError::IoErrorInvalidData,
+            io::ErrorKind::InvalidInput => OsError::IoErrorInvalidInput,
+            io::ErrorKind::TimedOut => OsError::IoErrorTimedOut,
+            io::ErrorKind::NotFound => OsError::NoEntry,
+            _ => OsError::IoError,
+        }
+    }
+}
 
 pub enum Syscall {
     Sleep = 0,

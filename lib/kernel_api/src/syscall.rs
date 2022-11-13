@@ -133,10 +133,11 @@ pub fn getpid() -> OsResult<u64> {
     }
 }
 
-pub fn sbrk() -> OsResult<usize> {
+pub fn sbrk() -> OsResult<(usize, usize)> {
     unsafe {
         syscall!(Syscall::Sbrk);
-        Ok(syscall_receive1!()? as usize)
+        let result = syscall_receive2!()?;
+        Ok((result.0 as usize, result.1 as usize))
     }
 }
 
