@@ -4,7 +4,7 @@ IMG=fs.img
 MNT=mnt
 ROOT=$(git rev-parse --show-toplevel)
 
-PROGS=(fib)
+PROGS=(fib alloc)
 
 dd if=/dev/zero of=$IMG bs=1MB count=128
 echo -e "n\np\n1\n\n\nt\nc\nw\n" | fdisk $IMG
@@ -35,4 +35,4 @@ for d in ${PROGS[@]}; do
 done
 
 # TODO: find a general way to fix this
-qemu-img resize fs.img 128M
+qemu-img resize fs.img 256M

@@ -14,8 +14,8 @@ use kernel_api::OsError::BadAddress;
 use pi::timer;
 use shim::{io, ioerr};
 use shim::io::{Read, Write};
-use crate::memory::VirtualAddr;
-use crate::param::PAGE_SIZE;
+use crate::memory::{PagePerm, VirtualAddr};
+use crate::param::{PAGE_SIZE, USER_IMG_BASE};
 
 /// Sleep for `ms` milliseconds.
 ///
@@ -121,6 +121,40 @@ pub fn sys_write(tf: &mut TrapFrame) -> OsResult<()> {
     }
 }
 
+/// Returns the current process's ID.
+///
+/// This system call does not take parameter.
+///
+/// In addition to the usual status value, this system call returns a
+/// parameter: the current process's ID.
+pub fn sys_getpid(tf: &mut TrapFrame) -> OsResult<()> {
+    tf.xs[0] = tf.tpidr;
+    Ok(())
+}
+
+/// Returns current time.
+///
+/// This system call does not take parameter.
+///
+/// In addition to the usual status value, this system call returns two
+/// parameter:
+///  - current time as seconds
+///  - fractional part of the current time, in nanoseconds.
+pub fn sys_sbrk(tf: &mut TrapFrame) -> OsResult<()> {
+    let result = SCHEDULER.on_process(tf, |process| -> OsResult<(u64, u64)> {
+        //TODO: pick a better heap base / allow more sbrks / something might be wrong with is_valid
+        let heap_base = USER_IMG_BASE + PAGE_SIZE;
+        process.vmap.alloc(VirtualAddr::from(heap_base), PagePerm::RW);
+        Ok((heap_base as u64, PAGE_SIZE as u64))
+    })?;
+
+    info!("allocated space for process {}", tf.tpidr);
+    tf.xs[0] = result.0;
+    tf.xs[1] = result.1;
+
+    Ok(())
+}
+
 //TODO: make the functions work across page boundaries
 fn copy_from_userspace(tf: &TrapFrame, ptr: u64, buf: &mut [u8]) -> OsResult<()> {
     let virtual_address = VirtualAddr::from(ptr);
@@ -163,17 +197,6 @@ fn copy_into_userspace(tf: &TrapFrame, ptr: u64, buf: &[u8]) -> OsResult<()> {
     })
 }
 
-/// Returns the current process's ID.
-///
-/// This system call does not take parameter.
-///
-/// In addition to the usual status value, this system call returns a
-/// parameter: the current process's ID.
-pub fn sys_getpid(tf: &mut TrapFrame) -> OsResult<()> {
-    tf.xs[0] = tf.tpidr;
-    Ok(())
-}
-
 pub fn handle_syscall(num: u16, tf: &mut TrapFrame) {
     let result = match Syscall::from(num) {
         Syscall::Sleep => {
@@ -198,7 +221,8 @@ pub fn handle_syscall(num: u16, tf: &mut TrapFrame) {
             sys_getpid(tf)
         }
         Syscall::Sbrk => {
-            Ok(())
+            info!("sbrk received");
+            sys_sbrk(tf)
         }
         Syscall::Unknown => {
             Ok(())

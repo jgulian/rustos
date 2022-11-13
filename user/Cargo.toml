@@ -15,6 +15,9 @@ edition = "2021"
 aarch64 = { path = "../lib/aarch64/" }
 #kernel_api = { path = "../lib/kernel_api" }
 
+[[bin]]
+name = "alloc"
+path = "src/bin/alloc.rs"
 
 [[bin]]
 name = "fib"

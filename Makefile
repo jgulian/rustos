@@ -41,6 +41,8 @@ clean:
 
 user:
 	@echo "+ Building user programs"
+	@cargo build --bin alloc --release
+	@llvm-objcopy -O binary $(TARGET_DIR)/alloc $(TARGET_DIR)/alloc.bin
 	@cargo build --bin fib --release
 	@llvm-objcopy -O binary $(TARGET_DIR)/fib $(TARGET_DIR)/fib.bin
 

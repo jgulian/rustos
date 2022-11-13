@@ -74,7 +74,7 @@ pub fn sbrk() -> (usize, usize) {
 
     unsafe {
         asm!(
-        "svc 1",
+        "svc 7",
         "mov {x}, x0",
         "mov {y}, x1",
         "mov {e}, x7",

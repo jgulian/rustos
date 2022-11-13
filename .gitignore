@@ -10,4 +10,6 @@ Cargo.lock
 */Cargo.lock
 */*/Cargo.lock
 
+user/fs.img
+
 ext/fat32-imgs/*.fat32.img
