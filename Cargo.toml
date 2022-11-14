@@ -9,6 +9,7 @@ members = [
 
     "lib/aarch64",
     "lib/allocator",
+    "lib/elf",
     "lib/fat32",
     "lib/filesystem",
     "lib/jlib",

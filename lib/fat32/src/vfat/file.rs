@@ -72,7 +72,14 @@ impl<HANDLE: VFatHandle> io::Seek for File<HANDLE> {
     ///
     /// Seeking before the start of a file or beyond the end of the file results
     /// in an `InvalidInput` error.
-    fn seek(&mut self, _pos: SeekFrom) -> io::Result<u64> {
-        unimplemented!("File::seek()")
+    fn seek(&mut self, position: SeekFrom) -> io::Result<u64> {
+        //FIXME: this is broken
+        let real_position = match position {
+            SeekFrom::Start(n) => SeekFrom::Start(n),
+            SeekFrom::End(n) => SeekFrom::Start((self.file_size as i64 - n) as u64),
+            SeekFrom::Current(n) => SeekFrom::Current(n),
+        };
+
+        self.chain.seek(real_position)
     }
 }

@@ -47,4 +47,5 @@ user:
 	@llvm-objcopy -O binary $(TARGET_DIR)/fib $(TARGET_DIR)/fib.bin
 
 image:
-	cd user; ./build.sh
+	@aarch64-linux-gnu-gcc -nostdlib -o $(TARGET_DIR)/test.bin user/test.c
+	@cd user; ./build.sh
