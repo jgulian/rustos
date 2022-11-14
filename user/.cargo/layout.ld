@@ -1,37 +1,28 @@
-SECTIONS {
-  . = 0xffffffffc0000000;
+ENTRY(_start)
 
-  /* start of the binary */
-  __text_beg = .;
+SECTIONS
+{
+  . = 0x0;
 
   .text : {
-        *(.text._start)
-        *(.text .text.* .gnu.linkonce.t*)
+    *(.text .text.*)
   }
 
   .rodata : {
-    *(.rodata .rodata.* .gnu.linkonce.r*)
+    . = ALIGN(16);
+    *(.rodata .rodata.*)
   }
 
   .data : {
-    *(.data .data.* .gnu.linkonce.d*)
+    . = ALIGN(16);
+    *(.data .data.*)
   }
 
   .bss (NOLOAD) : {
     . = ALIGN(32);
     __bss_beg = .;
     *(.bss .bss.*)
-    *(COMMON)
-    . = ALIGN(8);
     __bss_end = .;
+    . = ALIGN(32);
   }
-
-  /* end of the binary */
-  __text_end = ALIGN(8);
-
-  /* number of bytes in BSS section and complete binary */
-  __bss_len = (__bss_end - __bss_beg);
-  __text_len = (__text_end - __text_beg);
-
-  /DISCARD/ : { *(.comment) *(.gnu*) *(.note*) *(.eh_frame*) }
 }

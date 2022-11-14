@@ -6,6 +6,7 @@ use shim::path::Path;
 
 use aarch64;
 use aarch64::SPSR_EL1;
+use elf::Elf;
 
 use crate::param::*;
 use crate::process::{Stack, State};
@@ -73,6 +74,11 @@ impl Process {
         p.context.spsr = SPSR_EL1::F | SPSR_EL1::A | SPSR_EL1::D;
 
         Ok(p)
+    }
+
+    pub fn load_elf(elf: Elf) -> OsResult<Process> {
+        let mut process = Process::new()?;
+
     }
 
     /// Creates a process and open a file with given path.

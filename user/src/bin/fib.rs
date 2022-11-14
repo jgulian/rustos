@@ -1,10 +1,10 @@
 #![feature(alloc_error_handler)]
-#![feature(prelude_2024)]
 #![no_std]
 #![no_main]
 
 mod cr0;
 
+use core::panic::PanicInfo;
 use kernel_api::syscall::{getpid, time};
 use kernel_api::println;
 
