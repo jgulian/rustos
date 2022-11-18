@@ -71,6 +71,10 @@ unsafe fn kmain() -> ! {
 
     info!("cores initialized");
 
+    SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
+    //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
+    //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
+
     kprintln!("Welcome to cs3210!");
 
     SCHEDULER.start();
