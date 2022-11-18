@@ -25,11 +25,13 @@ pub mod traps;
 pub mod memory;
 pub mod multiprocessing;
 
+use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 use core::borrow::{Borrow, BorrowMut};
 use shim::path::PathBuf;
 use console::kprintln;
 use filesystem::Dir;
+use elf;
 
 use disk::FileSystem;
 use fat32::vfat::Entry;
@@ -57,49 +59,15 @@ unsafe fn kmain() -> ! {
     VMM.initialize();
     SCHEDULER.initialize();
 
-    //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
-    //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
-    //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
-    //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
-
-    //TODO: there's an issue with locking? wherein nothing will run unless the following is here
-    info!("any sussers");
-
     init::initialize_app_cores();
     VMM.wait();
 
-    use filesystem::FileSystem;
-
-    info!("root dir files");
-    let root = PathBuf::from("/");
-    let mut root_dir = FILESYSTEM.open_dir(root).expect("root should exist");
-    for file in root_dir.entries().expect("should be good") {
-        use filesystem::Entry;
-        info!("{}", file.name());
-    }
-
-    use fat32::vfat::Entry;
-    let mut new_file = FILESYSTEM.borrow().new_file("amogus".to_string()).expect("file could not be created");
-    new_file.write("sussy".as_bytes()).expect("unable to write to file");
-    let new_entry = Entry::File(new_file);
-    root_dir.append(new_entry).expect("failed to add file");
-    info!("file added?");
-
-    info!("root dir files again");
-    let root = PathBuf::from("/");
-    let mut root_dir = FILESYSTEM.open_dir(root).expect("root should exist");
-    for file in root_dir.entries().expect("should be good") {
-        use filesystem::Entry;
-        info!("{}", file.name());
-    }
-
-    use filesystem::File;
-    let mut added_file = FILESYSTEM.open_file(PathBuf::from("/amogus")).expect("amogus should exist");
-    let mut buf = [0u8; 256];
-    let read_amount = added_file.read(&mut buf).expect("should be readable");
-    // FIXME: amount read is not correct.
-    //assert_eq!(read_amount, "sussy".len());
-    info!("read from new file {}", String::from_utf8_lossy(&buf));
+    use filesystem::{FileSystem, File};
+    let elf_file_path = PathBuf::from("/test");
+    let mut elf_file = FILESYSTEM.open_file(elf_file_path).expect("amogus should exist");
+    let mut elf = elf::Elf::new(Box::new(elf_file)).expect("should parse");
+    info!("elf: {:?}", elf);
+    elf.read_headers().expect("unable to read headers");
 
     info!("cores initialized");
 
@@ -107,7 +75,7 @@ unsafe fn kmain() -> ! {
     //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
     //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
 
-    kprintln!("Welcome to rustos!");
+    kprintln!("Welcome to cs3210!");
 
     SCHEDULER.start();
 }

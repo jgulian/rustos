@@ -1,6 +1,6 @@
 [package]
 name = "kernel"
-version = "0.2.0"
+version = "0.2.3"
 authors = [
     "Sergio Benitez <sb@sergio.bz>",
     "Taesoo Kim <taesoo@gatech.edu>",
@@ -14,6 +14,7 @@ edition = "2021"
 [dependencies]
 aarch64 = { path = "../lib/aarch64/" }
 allocator = { path = "../lib/allocator" }
+elf = { path = "../lib/elf" }
 fat32 = { path = "../lib/fat32/", features = ["no_std"] }
 filesystem = { path = "../lib/filesystem/" }
 kernel_api = { path = "../lib/kernel_api", features = [] }

@@ -1,6 +1,6 @@
 [profile.release]
 debug = true
-lto = false
+lto = false # this can be deleted?
 strip = true
 
 [workspace]
@@ -9,6 +9,7 @@ members = [
 
     "lib/aarch64",
     "lib/allocator",
+    "lib/elf",
     "lib/fat32",
     "lib/filesystem",
     "lib/jlib",

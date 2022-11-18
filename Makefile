@@ -10,7 +10,7 @@ QEMU := qemu-system-aarch64
 QEMU_ARGS := -nographic -M raspi3b -serial null -serial mon:stdio \
 			 -drive file=$(SDCARD),format=raw,if=sd -kernel
 
-.PHONY: all build qemu transmit objdump nm check clean install test
+.PHONY: all build qemu transmit objdump nm check clean install test user image
 
 all: build
 
@@ -41,7 +41,11 @@ clean:
 
 user:
 	@echo "+ Building user programs"
-	cargo build --bin fib --release
-	llvm-objcopy -O binary $(TARGET_DIR)/fib $(TARGET_DIR)/fib.bin
+	@cargo build --bin heap --release
+	@llvm-objcopy -O binary $(TARGET_DIR)/heap $(TARGET_DIR)/heap.bin
+	@cargo build --bin fib --release
+	@llvm-objcopy -O binary $(TARGET_DIR)/fib $(TARGET_DIR)/fib.bin
 
-drive:
+image:
+	@aarch64-linux-gnu-gcc -nostdlib -o $(TARGET_DIR)/test.bin user/test.c
+	@cd user; ./build.sh

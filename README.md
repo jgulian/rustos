@@ -33,5 +33,7 @@ settings in the Makefile.
 * Networking
 * Use cargo fuzz and miri to libraries for security.
 * Update bootloader
+* Create a mkfs tool to make filesystem without needing to worry about OS/architecture (like xv6-riscv)
+* Use cargo clippy
 
 \* Asterisks suggest features are in a partially complete state, but require more work or coverage testing.

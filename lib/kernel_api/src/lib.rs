@@ -6,8 +6,6 @@ use shim::io;
 
 #[cfg(feature = "user-space")]
 pub mod syscall;
-#[cfg(feature = "user-space")]
-pub mod user_alloc;
 
 pub type OsResult<T> = Result<T, OsError>;
 
@@ -34,7 +32,7 @@ pub enum OsError {
     IllegalSocketOperation = 201,
 }
 
-impl core::convert::From<u64> for OsError {
+impl From<u64> for OsError {
     fn from(e: u64) -> Self {
         match e {
             1 => OsError::Ok,
@@ -60,7 +58,7 @@ impl core::convert::From<u64> for OsError {
     }
 }
 
-impl core::convert::From<io::Error> for OsError {
+impl From<io::Error> for OsError {
     fn from(e: io::Error) -> Self {
         match e.kind() {
             io::ErrorKind::UnexpectedEof => OsError::IoErrorEof,
@@ -77,9 +75,11 @@ pub enum Syscall {
     Sleep = 0,
     Time = 1,
     Exit = 2,
-    Write = 3,
-    GetPid = 4,
-    Sbrk = 5,
+    Open = 3,
+    Read = 4,
+    Write = 5,
+    GetPid = 6,
+    Sbrk = 7,
     Unknown = 256,
 }
 
@@ -89,9 +89,11 @@ impl From<u16> for Syscall {
             0 => Syscall::Sleep,
             1 => Syscall::Time,
             2 => Syscall::Exit,
-            3 => Syscall::Write,
-            4 => Syscall::GetPid,
-            5 => Syscall::Sbrk,
+            3 => Syscall::Open,
+            4 => Syscall::Read,
+            5 => Syscall::Write,
+            6 => Syscall::GetPid,
+            7 => Syscall::Sbrk,
             _ => Syscall::Unknown,
         }
     }

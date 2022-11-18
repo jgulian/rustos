@@ -58,8 +58,6 @@ impl From<u32> for Syndrome {
         let exception_class = (esr >> 26) as u16;
         let instruction_syndrome = esr & ((1 << 25) - 1);
 
-        //kprintln!("thing {}", exception_class);
-
         match exception_class {
             0b00_0000 => Unknown,
             0b00_0001 => WfiWfe,

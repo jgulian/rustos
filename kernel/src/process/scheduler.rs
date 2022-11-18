@@ -103,7 +103,6 @@ impl GlobalScheduler {
     /// preemptive scheduling. This method should not return under normal
     /// conditions.
     pub fn start(&self) -> ! {
-        self.initialize_global_timer_interrupt();
         self.initialize_local_timer_interrupt();
 
         let mut trap_frame: TrapFrame = Default::default();
@@ -123,19 +122,6 @@ impl GlobalScheduler {
         }
 
         loop {}
-    }
-
-    /// # Lab 4
-    /// Initializes the global timer interrupt with `pi::timer`. The timer
-    /// should be configured in a way that `Timer1` interrupt fires every
-    /// `TICK` duration, which is defined in `param.rs`.
-    ///
-    pub fn initialize_global_timer_interrupt(&self) {
-        if aarch64::affinity() != 0 {
-            return;
-        }
-
-
     }
 
     /// Initializes the per-core local timer interrupt with `pi::local_interrupt`.
@@ -159,6 +145,9 @@ impl GlobalScheduler {
         *self.0.lock() = Some(Scheduler::new());
     }
 
+    pub fn on_process<T: FnOnce(&mut Process) -> R, R>(&self, tf: &TrapFrame, on: T) -> R {
+        self.critical(|scheduler| on(scheduler.find_process(tf)))
+    }
 }
 
 /// Internal scheduler struct which is not thread-safe.

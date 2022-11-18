@@ -1,6 +1,7 @@
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use shim::io;
+use shim::io::{Read, Write};
 
 /// Trait implemented by devices that can be read/written in sector
 /// granularities.
@@ -109,3 +110,5 @@ impl_for_read_write_seek!(shim::io::Cursor<Vec<u8>>);
 impl_for_read_write_seek!(shim::io::Cursor<Box<[u8]>>);
 #[cfg(test)]
 impl_for_read_write_seek!(::std::fs::File);
+
+pub trait CharDevice: Send + Read + Write {}

@@ -101,17 +101,28 @@ pub fn exit() -> OsResult<()> {
     }
 }
 
-pub fn write(b: u8) -> OsResult<()> {
+pub fn open(file: &str) -> OsResult<u64> {
     unsafe {
-        syscall_args!(b as u64);
-        syscall!(Syscall::Write);
+        let slice = file.as_bytes();
+        syscall_args!((slice.as_ptr()) as u64, slice.len() as u64);
+        syscall!(Syscall::Read);
+        syscall_receive1!()
+    }
+}
+
+pub fn read(file: u64, bytes: &mut [u8]) -> OsResult<()> {
+    unsafe {
+        syscall_args!(file, (bytes.as_ptr()) as u64, bytes.len() as u64);
+        syscall!(Syscall::Read);
         syscall_receive0!()
     }
 }
 
-pub fn write_str(msg: &str) {
-    for c in msg.bytes() {
-        while write(c).is_err() {}
+pub fn write(file: u64, bytes: &[u8]) -> OsResult<()> {
+    unsafe {
+        syscall_args!(file, (bytes.as_ptr()) as u64, bytes.len() as u64);
+        syscall!(Syscall::Write);
+        syscall_receive0!()
     }
 }
 
@@ -122,10 +133,11 @@ pub fn getpid() -> OsResult<u64> {
     }
 }
 
-pub fn sbrk() -> OsResult<usize> {
+pub fn sbrk() -> OsResult<(usize, usize)> {
     unsafe {
         syscall!(Syscall::Sbrk);
-        Ok(syscall_receive1!()? as usize)
+        let result = syscall_receive2!()?;
+        Ok((result.0 as usize, result.1 as usize))
     }
 }
 
@@ -133,7 +145,7 @@ struct Console;
 
 impl Write for Console {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        write_str(s);
+        write(0, s.as_bytes()).expect("unable to write data");
         Ok(())
     }
 }

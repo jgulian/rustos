@@ -1,4 +1,5 @@
 use alloc::boxed::Box;
+use alloc::vec::Vec;
 use core::mem;
 use shim::io;
 use shim::path::Path;
@@ -13,6 +14,7 @@ use crate::memory::*;
 use kernel_api::{OsError, OsResult};
 use filesystem::FileSystem;
 use crate::FILESYSTEM;
+use crate::process::resource::Resource;
 
 /// Type alias for the type of a process ID.
 pub type Id = u64;
@@ -23,12 +25,14 @@ pub struct Process {
     /// The saved trap frame of a process.
     pub context: Box<TrapFrame>,
     /// The memory allocation used for the process's stack.
-    /// TODO: remove this its not usefu;
+    /// TODO: remove this its not useful
     pub stack: Stack,
     /// The page table describing the Virtual Memory of the process
     pub vmap: Box<UserPageTable>,
     /// The scheduling state of the process.
     pub state: State,
+    /// The resources (files) open by a process
+    pub(crate) resources: Vec<Resource>,
 }
 
 impl Process {
@@ -44,7 +48,7 @@ impl Process {
             stack,
             vmap: Box::new(UserPageTable::new()),
             state: State::Ready,
-        //    sockets: Vec::new(),
+            resources: Vec::new(),
         })
     }
 
@@ -82,8 +86,8 @@ impl Process {
         process.vmap.alloc(Process::get_stack_base(), PagePerm::RW);
         let user_image = process.vmap.alloc(Process::get_image_base(), PagePerm::RWX);
 
-        let mut file = FILESYSTEM.open(pn)?.into_file().ok_or(OsError::IoError)?;
-        let read = file.read(user_image)?;
+        let mut file = FILESYSTEM.open(pn).map_err(|e| OsError::IoError)?.into_file().ok_or(OsError::IoError)?;
+        let read = file.read(user_image).map_err(|e| OsError::IoError)?;
 
         Ok(process)
     }
