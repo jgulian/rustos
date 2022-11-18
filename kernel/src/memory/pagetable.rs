@@ -292,15 +292,15 @@ impl UserPageTable {
     ///
     /// TODO. use Result<T> and make it failurable
     /// TODO. use perm properly
-    pub fn alloc(&mut self, mut va: VirtualAddr, _perm: PagePerm) -> &mut [u8] {
+    pub fn alloc(&mut self, mut va: VirtualAddr, _perm: PagePerm) -> io::Result<()> {
         if (va.as_ptr() as usize) < USER_IMG_BASE {
-            panic!("invalid virtual address");
+            return ioerr!(InvalidInput);
         }
 
         va = va.sub(VirtualAddr::from(USER_IMG_BASE));
 
         if self.0.is_valid(va) {
-            panic!("entry has already been allocated");
+            return ioerr!(InvalidInput);
         }
 
         let page = unsafe { ALLOCATOR.alloc(Page::layout()) };
@@ -316,19 +316,15 @@ impl UserPageTable {
         entry.set_value(0b1_u64, RawL3Entry::AF);
         self.0.set_entry(va, entry);
 
-        return unsafe {core::slice::from_raw_parts_mut(page, PAGE_SIZE)};
+        Ok(())
     }
 
-    pub fn translate(&self, virtual_address: VirtualAddr) -> io::Result<PhysicalAddr> {
-        let page_aligned = VirtualAddr::from(virtual_address.page_aligned());
-        let (l2_index, l3_index) = PageTable::locate(page_aligned);
-        let l3_entry = &self.l3[l2_index].entries[l3_index];
-        if l3_entry.is_valid() {
-            let page_address = l3_entry.0.get_value(RawL3Entry::ADDR) << PAGE_ALIGN;
-            Ok(PhysicalAddr::from(page_address + virtual_address.offset()))
-        } else {
-            ioerr!(AddrNotAvailable)
-        }
+    pub fn read_into_user_mem(&mut self, va: VirtualAddr, reader: &dyn io::Read) -> io::Result<> {
+
+    }
+
+    pub fn write_to_user_memory(&mut self, va: VirtualAddr, writer: &dyn io::Write) {
+
     }
 }
 

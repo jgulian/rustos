@@ -1,15 +1,17 @@
 use alloc::boxed::Box;
+use alloc::vec;
 use alloc::vec::Vec;
 use core::mem;
 use shim::io;
 use shim::path::Path;
 
 use aarch64;
+use aarch64::EntryPerm::{USER_RO, USER_RW};
 use aarch64::SPSR_EL1;
-use elf::Elf;
+use elf::{Elf, ProgramHeader};
 
 use crate::param::*;
-use crate::process::{Stack, State};
+use crate::process::State;
 use crate::traps::TrapFrame;
 use crate::memory::*;
 use kernel_api::{OsError, OsResult};
@@ -76,9 +78,31 @@ impl Process {
         Ok(p)
     }
 
-    pub fn load_elf(elf: Elf) -> OsResult<Process> {
+    pub fn load_elf(elf: &mut Elf) -> OsResult<Process> {
         let mut process = Process::new()?;
 
+        //elf.headers()?.into_iter()
+        //    .fold(Vec::<Vec<ProgramHeader>>::new(), |headers, header| {
+        //
+        //    });
+        //
+        //
+        //
+        //elf.headers()?.iter()
+        //    .fold((None, None), |(mut last_page, mut last_buffer), header| {
+        //        let virtual_address = VirtualAddr::from(header.p_vaddr);
+        //        let page_start = VirtualAddr::from(virtual_address.page_aligned());
+        //        if last_page.is_none() || last_page.unwrap() != page_start {
+        //            last_page = Some(page_start);
+        //            last_buffer = Some(process.vmap.alloc(page_start, PagePerm::RWX));
+        //        }
+        //
+        //
+        //
+        //        (last_page, last_buffer)
+        //});
+
+        Ok(process)
     }
 
     /// Creates a process and open a file with given path.
@@ -89,10 +113,11 @@ impl Process {
         use io::Read;
 
         let mut process = Process::new()?;
-        process.vmap.alloc(Process::get_stack_base(), PagePerm::RW);
-        let user_image = process.vmap.alloc(Process::get_image_base(), PagePerm::RWX);
+        process.vmap.alloc(Process::get_stack_base(), PagePerm::RW)?;
+        process.vmap.alloc(Process::get_image_base(), PagePerm::RWX)?;
 
         let mut file = FILESYSTEM.open(pn).map_err(|e| OsError::IoError)?.into_file().ok_or(OsError::IoError)?;
+
         let read = file.read(user_image).map_err(|e| OsError::IoError)?;
 
         Ok(process)

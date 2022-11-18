@@ -5,7 +5,7 @@
 
 extern crate alloc;
 
-mod cr0;
+mod runtime;
 
 use alloc::string::ToString;
 use core::alloc::{GlobalAlloc, Layout};

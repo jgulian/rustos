@@ -62,18 +62,20 @@ unsafe fn kmain() -> ! {
     init::initialize_app_cores();
     VMM.wait();
 
-    use filesystem::{FileSystem, File};
-    let elf_file_path = PathBuf::from("/test");
-    let mut elf_file = FILESYSTEM.open_file(elf_file_path).expect("amogus should exist");
-    let mut elf = elf::Elf::new(Box::new(elf_file)).expect("should parse");
-    info!("elf: {:?}", elf);
-    elf.read_headers().expect("unable to read headers");
+    //use filesystem::{FileSystem, File};
+    //let elf_file_path = PathBuf::from("/test");
+    //let mut elf_file = FILESYSTEM.open_file(elf_file_path).expect("amogus should exist");
+    //let mut elf = elf::Elf::new(Box::new(elf_file)).expect("should parse");
+    //info!("elf: {:?}", elf);
+    //elf.read_headers().expect("unable to read headers");
 
     info!("cores initialized");
 
     SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
     //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
     //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
+
+    SCHEDULER.add(Process::load(PathBuf::from("/heap")).expect("should exist"));
 
     kprintln!("Welcome to cs3210!");
 

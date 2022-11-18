@@ -1,5 +1,3 @@
-#![no_main]
-
 use core::mem::zeroed;
 use core::panic::PanicInfo;
 use core::ptr::write_volatile;

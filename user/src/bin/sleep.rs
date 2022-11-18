@@ -2,7 +2,7 @@
 #![no_std]
 #![no_main]
 
-mod cr0;
+mod runtime;
 
 use core::time::Duration;
 use kernel_api::println;

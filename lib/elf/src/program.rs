@@ -47,12 +47,12 @@ impl From<u32> for ProgramHeaderType {
 
 #[derive(Debug)]
 pub struct ProgramHeader {
-    pub(crate) p_type: ProgramHeaderType,
-    pub(crate) p_flags: u32,
-    pub(crate) p_offset: u64,
-    pub(crate) p_vaddr: u64,
-    pub(crate) p_paddr: u64,
-    pub(crate) p_filesz: u64,
-    pub(crate) p_memsz: u64,
-    pub(crate) p_align: u64,
+    pub p_type: ProgramHeaderType,
+    pub p_flags: u32,
+    pub p_offset: u64,
+    pub p_vaddr: u64,
+    pub p_paddr: u64,
+    pub p_filesz: u64,
+    pub p_memsz: u64,
+    pub p_align: u64,
 }
