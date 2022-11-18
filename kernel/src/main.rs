@@ -113,7 +113,7 @@ unsafe fn kmain() -> ! {
     //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
     //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
 
-    kprintln!("Welcome to cs3210!");
+    kprintln!("Welcome to rustos!");
 
     SCHEDULER.start();
 }
