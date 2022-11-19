@@ -14,6 +14,7 @@ use shim::path::{Component, Path};
 use crate::mbr::MasterBootRecord;
 use crate::PartitionEntry;
 use filesystem::{BlockDevice, FileSystem};
+use shim::ffi::OsStr;
 use shim::io::SeekFrom;
 use crate::vfat::{BiosParameterBlock, CachedPartition, Partition};
 use crate::vfat::{Cluster, Dir, Entry, Error, FatEntry, File, Status};
@@ -476,7 +477,14 @@ impl<'a, HANDLE: VFatHandle> FileSystem for HandleReference<'a, HANDLE> {
         Ok(path_stack.pop().ok_or(io::Error::from(io::ErrorKind::InvalidInput))?)
     }
 
-    fn new_file(&mut self, name: String) -> io::Result<Self::File> {
+    fn new_file(&mut self, path: &Path) -> io::Result<Self::File> {
+        let name = match path.file_name() {
+            None => {
+                unimplemented!("this is not implemented")
+            }
+            Some(name) => {String::from(name.to_str().unwrap())}
+        };
+
         Ok(File::<HANDLE> {
             name,
             metadata: Default::default(),
@@ -485,7 +493,14 @@ impl<'a, HANDLE: VFatHandle> FileSystem for HandleReference<'a, HANDLE> {
         })
     }
 
-    fn new_dir(&mut self, name: String) -> io::Result<Self::Dir> {
+    fn new_dir(&mut self, path: &Path) -> io::Result<Self::Dir> {
+        let name = match path.file_name() {
+            None => {
+                unimplemented!("this is not implemented")
+            }
+            Some(name) => {String::from(name.to_str().unwrap())}
+        };
+
         Ok(Dir::<HANDLE> {
             vfat: self.0.clone(),
             name,

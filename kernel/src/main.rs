@@ -29,7 +29,7 @@ pub mod memory;
 pub mod multiprocessing;
 
 use alloc::string::{String, ToString};
-use core::borrow::{Borrow, BorrowMut};
+use core::borrow::Borrow;
 use shim::path::PathBuf;
 use console::kprintln;
 use filesystem::Dir;
@@ -40,7 +40,6 @@ use process::GlobalScheduler;
 use traps::irq::{Fiq, GlobalIrq};
 use memory::VMManager;
 use shim::io::{Read, Write};
-use crate::disk::PiVFatHandle;
 use crate::kalloc::KernelAllocator;
 use crate::process::Process;
 
@@ -52,7 +51,7 @@ pub static VMM: VMManager = VMManager::uninitialized();
 pub static GLOABAL_IRQ: GlobalIrq = GlobalIrq::new();
 pub static FIQ: Fiq = Fiq::new();
 
-unsafe fn kmain() -> ! {
+unsafe fn kernel_main() -> ! {
     logger::init_logger();
 
     ALLOCATOR.initialize();
@@ -82,8 +81,8 @@ unsafe fn kmain() -> ! {
         info!("{}", file.name());
     }
 
-    use fat32::vfat::Entry;
-    let mut new_file = FILESYSTEM.borrow().new_file("amogus".to_string()).expect("file could not be created");
+    let new_file_path = PathBuf::from("/amogus");
+    let mut new_file = FILESYSTEM.borrow().new_file(new_file_path.as_path()).expect("file could not be created");
     new_file.write("sussy".as_bytes()).expect("unable to write to file");
     let new_entry = Entry::File(new_file);
     root_dir.append(new_entry).expect("failed to add file");
@@ -96,12 +95,10 @@ unsafe fn kmain() -> ! {
         use filesystem::Entry;
         info!("{}", file.name());
     }
-
-    use filesystem::File;
-    let mut new_file_path = PathBuf::from("/amogus");
+    
     let mut added_file = FILESYSTEM.borrow().open_file(new_file_path.as_path()).expect("amogus should exist");
     let mut buf = [0u8; 256];
-    let read_amount = added_file.read(&mut buf).expect("should be readable");
+    let _read_amount = added_file.read(&mut buf).expect("should be readable");
     // FIXME: amount read is not correct.
     //assert_eq!(read_amount, "sussy".len());
     info!("read from new file {}", String::from_utf8_lossy(&buf));

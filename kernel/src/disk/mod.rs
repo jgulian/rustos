@@ -61,10 +61,6 @@ impl FileSystem {
         self.0.lock().replace(vfat);
     }
 
-    pub fn create_file(self, name: String) -> io::Result<File<PiVFatHandle>> {
-        use filesystem::FileSystem;
-        HandleReference(self.0.lock().as_ref().unwrap()).new_file(name)
-    }
 }
 
 impl filesystem::FileSystem for &FileSystem {
@@ -76,11 +72,11 @@ impl filesystem::FileSystem for &FileSystem {
         HandleReference(self.0.lock().as_ref().unwrap()).open(path)
     }
 
-    fn new_file(&mut self, name: String) -> io::Result<Self::File> {
-        HandleReference(self.0.lock().as_ref().unwrap()).new_file(name)
+    fn new_file(&mut self, path: &Path) -> io::Result<Self::File> {
+        HandleReference(self.0.lock().as_ref().unwrap()).new_file(path)
     }
 
-    fn new_dir(&mut self, name: String) -> io::Result<Self::Dir> {
-        HandleReference(self.0.lock().as_ref().unwrap()).new_dir(name)
+    fn new_dir(&mut self, path: &Path) -> io::Result<Self::Dir> {
+        HandleReference(self.0.lock().as_ref().unwrap()).new_dir(path)
     }
 }

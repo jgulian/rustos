@@ -72,7 +72,7 @@ pub trait Entry: Sized {
 }
 
 /// Trait implemented by file systems.
-pub trait FileSystem: Sized {
+pub trait FileSystem {
     /// The type of files in this file system.
     type File: File;
 
@@ -120,7 +120,7 @@ pub trait FileSystem: Sized {
             .ok_or(io::Error::new(io::ErrorKind::Other, "not a directory"))
     }
 
-    fn new_file(&mut self, name: String) -> io::Result<Self::File>;
+    fn new_file(&mut self, path: &Path) -> io::Result<Self::File>;
 
-    fn new_dir(&mut self, name: String) -> io::Result<Self::Dir>;
+    fn new_dir(&mut self, path: &Path) -> io::Result<Self::Dir>;
 }
