@@ -71,8 +71,9 @@ unsafe fn kmain() -> ! {
     use filesystem::FileSystem;
 
     info!("root dir files");
+
     let root = PathBuf::from("/");
-    let mut root_dir = FILESYSTEM.open_dir(root).expect("root should exist");
+    let mut root_dir = FILESYSTEM.borrow().open_dir(root.as_path()).expect("root should exist");
     for file in root_dir.entries().expect("should be good") {
         use filesystem::Entry;
         info!("{}", file.name());
@@ -87,14 +88,15 @@ unsafe fn kmain() -> ! {
 
     info!("root dir files again");
     let root = PathBuf::from("/");
-    let mut root_dir = FILESYSTEM.open_dir(root).expect("root should exist");
+    let mut root_dir = FILESYSTEM.borrow().open_dir(root.as_path()).expect("root should exist");
     for file in root_dir.entries().expect("should be good") {
         use filesystem::Entry;
         info!("{}", file.name());
     }
 
     use filesystem::File;
-    let mut added_file = FILESYSTEM.open_file(PathBuf::from("/amogus")).expect("amogus should exist");
+    let mut new_file_path = PathBuf::from("/amogus");
+    let mut added_file = FILESYSTEM.borrow().open_file(new_file_path.as_path()).expect("amogus should exist");
     let mut buf = [0u8; 256];
     let read_amount = added_file.read(&mut buf).expect("should be readable");
     // FIXME: amount read is not correct.
@@ -103,8 +105,11 @@ unsafe fn kmain() -> ! {
 
     info!("cores initialized");
 
-    SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
-    SCHEDULER.add(Process::load(PathBuf::from("/heap")).expect("should exist"));
+    let fib = PathBuf::from("/fib");
+    let heap = PathBuf::from("/heap");
+
+    SCHEDULER.add(Process::load(fib.as_path()).expect("should exist"));
+    SCHEDULER.add(Process::load(heap.as_path()).expect("should exist"));
     //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
     //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
 

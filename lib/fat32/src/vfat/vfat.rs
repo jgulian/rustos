@@ -322,9 +322,7 @@ impl<HANDLE: VFatHandle> io::Write for Chain<HANDLE> {
             let mut exhausted = self.exhausted;
             let mut amount_written = 0;
 
-            info!("amogus 1 {}", buf.len());
             while !exhausted && amount_written < buf.len() {
-                info!("amogus 2 {}", amount_written);
                 let end_of_buffer = min(buf.len(), bytes_per_cluster - cluster_offset);
                 let buffer = &buf[amount_written..end_of_buffer];
                 let read = vfat.write_cluster(current_cluster, cluster_offset as u64, buffer)?;
@@ -449,11 +447,11 @@ impl<'a, HANDLE: VFatHandle> FileSystem for HandleReference<'a, HANDLE> {
     type Dir = Dir<HANDLE>;
     type Entry = Entry<HANDLE>;
 
-    fn open<P: AsRef<Path>>(self, path: P) -> io::Result<Self::Entry> {
+    fn open(&mut self, path: &Path) -> io::Result<Self::Entry> {
         let mut path_stack = Vec::<Entry<HANDLE>>::new();
         path_stack.push(Entry::root(self.0.clone()));
 
-        for component in path.as_ref().components() {
+        for component in path.components() {
             match component {
                 Component::Prefix(_) => {
                     panic!("not implemented")

@@ -1,5 +1,6 @@
 use alloc::boxed::Box;
 use alloc::vec::Vec;
+use core::borrow::Borrow;
 use core::mem;
 use shim::io;
 use shim::path::Path;
@@ -61,7 +62,7 @@ impl Process {
     /// `spsr` - `F`, `A`, `D` bit should be set.
     ///
     /// Returns Os Error if do_load fails.
-    pub fn load<P: AsRef<Path>>(pn: P) -> OsResult<Process> {
+    pub fn load(pn: &Path) -> OsResult<Process> {
         use crate::VMM;
 
         let mut p = Process::do_load(pn)?;
@@ -78,7 +79,7 @@ impl Process {
     /// Creates a process and open a file with given path.
     /// Allocates one page for stack with read/write permission, and N pages with read/write/execute
     /// permission to load file's contents.
-    fn do_load<P: AsRef<Path>>(pn: P) -> OsResult<Process> {
+    fn do_load(pn: &Path) -> OsResult<Process> {
         use filesystem::Entry;
         use io::Read;
 
@@ -86,7 +87,7 @@ impl Process {
         process.vmap.alloc(Process::get_stack_base(), PagePerm::RW);
         let user_image = process.vmap.alloc(Process::get_image_base(), PagePerm::RWX);
 
-        let mut file = FILESYSTEM.open(pn).map_err(|e| OsError::IoError)?.into_file().ok_or(OsError::IoError)?;
+        let mut file = FILESYSTEM.borrow().open(pn).map_err(|e| OsError::IoError)?.into_file().ok_or(OsError::IoError)?;
         let read = file.read(user_image).map_err(|e| OsError::IoError)?;
 
         Ok(process)
