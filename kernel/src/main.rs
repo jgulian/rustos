@@ -5,10 +5,13 @@
 #![feature(negative_impls)]
 #![feature(raw_vec_internals)]
 #![feature(panic_info_message)]
-#![cfg_attr(not(test), no_std)]
-#![cfg_attr(not(test), no_main)]
 
-#[cfg(not(test))]
+#![no_std]
+#![no_main]
+// #![cfg_attr(not(test), no_std)]
+// #![cfg_attr(not(test), no_main)]
+
+// #[cfg(not(test))]
 mod init;
 
 extern crate alloc;
