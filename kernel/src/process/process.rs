@@ -13,7 +13,7 @@ use crate::process::{Stack, State};
 use crate::traps::TrapFrame;
 use crate::memory::*;
 use kernel_api::{OsError, OsResult};
-use filesystem::FileSystem;
+use filesystem::fs2::FileSystem2;
 use crate::FILESYSTEM;
 use crate::process::resource::Resource;
 
@@ -80,15 +80,14 @@ impl Process {
     /// Allocates one page for stack with read/write permission, and N pages with read/write/execute
     /// permission to load file's contents.
     fn do_load(pn: &Path) -> OsResult<Process> {
-        use filesystem::Entry;
-        use io::Read;
-
         let mut process = Process::new()?;
         process.vmap.alloc(Process::get_stack_base(), PagePerm::RW);
         let user_image = process.vmap.alloc(Process::get_image_base(), PagePerm::RWX);
 
-        let mut file = FILESYSTEM.borrow().open(pn).map_err(|e| OsError::IoError)?.into_file().ok_or(OsError::IoError)?;
-        let read = file.read(user_image).map_err(|e| OsError::IoError)?;
+        let mut file = FILESYSTEM.borrow().open(pn)
+            .map_err(|e| OsError::IoError)?
+            .into_file().ok_or(OsError::IoError)?;
+        file.read(user_image).map_err(|e| OsError::IoError)?;
 
         Ok(process)
     }

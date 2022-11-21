@@ -1,39 +1,83 @@
 use alloc::boxed::Box;
+use alloc::rc::Rc;
 use alloc::string::String;
+use alloc::vec;
 use alloc::vec::Vec;
 use core::borrow::Borrow;
 use shim::path::{Path, PathBuf};
-use shim::{io, newioerr};
-use crate::{Dir, Entry, File, FileSystem, Metadata, Timestamp};
+use shim::{io, ioerr, newioerr};
+use crate::fs2;
+use crate::fs2::{Directory2, Entry2, FileSystem2, Metadata2};
 
-//struct VFSEntry {
-//    prefix: PathBuf,
-//    filesystem: Box<dyn GenericFilesystem>,
-//}
-//
-//pub struct VirtualFileSystem {
-//    filesystems: Vec::<VFSEntry>,
-//}
-//
-//impl VirtualFileSystem {
-//    //pub fn register<T: FileSystem>(&mut self, prefix: PathBuf, filesystem: Box<dyn T>) {
-//    //    self.filesystems.push(VFSEntry {
-    //        prefix,
-    //        filesystem,
-    //    })
-    //}
+struct Mount {
+    mount_point: PathBuf,
+    filesystem: Box<dyn FileSystem2>,
+}
 
-    // fn find_filesystem<'a>(&'a mut self, path: &Path) -> io::Result<&'a mut Box<DynFilesystem>> {
-    //     self.filesystems.iter_mut().enumerate()
-    //         .filter_map(|(i, entry)| -> Option<&'a mut DynFilesystem> {
-    //             if path.starts_with(entry.prefix.as_path()) {
-    //                 Some(entry)
-    //             } else {
-    //                 None
-    //             }
-    //         }).next().ok_or(newioerr!(InvalidFilename))
-    // }
-//}
+//TODO: this is not thread safe
+struct Mounts(Rc<Vec::<Mount>>);
+
+pub struct VirtualFileSystem {
+    mounts: Mounts,
+}
+
+impl VirtualFileSystem {
+    pub fn new() -> Self {
+        VirtualFileSystem {
+            mounts: Mount(Rc::new(Vec::<Mount>::new())),
+        }
+    }
+
+    pub fn mount(&mut self, mount_point: PathBuf, filesystem: Box<dyn FileSystem2>) {
+        self.filesystems.push(VFSEntry {
+            mount_point,
+            filesystem,
+        })
+    }
+}
+
+impl FileSystem2 for VirtualFileSystem {
+    fn root(&mut self) -> io::Result<Box<dyn Directory2>> {
+        todo!()
+    }
+
+    fn copy_entry(&mut self, source: &Path, destination: &Path) -> io::Result<()> {
+        todo!()
+    }
+}
+
+struct VFSDirectory {
+    path: PathBuf,
+    mounts: Mounts,
+}
+
+impl Directory2 for VFSDirectory {
+    fn open_entry(&mut self, _: &str) -> io::Result<Entry2> {
+
+    }
+
+    fn create_file(&mut self, _: &str) -> io::Result<()> {
+        ioerr!(Unsupported)
+    }
+
+    fn create_directory(&mut self, _: &str) -> io::Result<()> {
+        ioerr!(Unsupported)
+    }
+
+    fn remove(&mut self, _: &str) -> io::Result<()> {
+        ioerr!(Unsupported)
+    }
+
+    fn list(&mut self) -> io::Result<Vec<String>> {
+        self.mounts.0.iter().map(|mount| {
+            mount.mount_point
+        })
+    }
+
+    fn metadata(&mut self, _: &str) -> io::Result<Box<dyn Metadata2>> {
+        ioerr!(Unsupported)
+    }
+}
 
 
 // impl FileSystem for VirtualFileSystem {

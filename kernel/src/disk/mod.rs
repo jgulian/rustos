@@ -1,13 +1,16 @@
 pub mod sd;
 
+use alloc::boxed::Box;
 use alloc::rc::Rc;
 use alloc::string::String;
 use core::fmt::{self, Debug};
 use shim::io;
-use shim::path::Path;
+use shim::path::{Path, PathBuf};
 use filesystem;
 
 use fat32::vfat::{Dir, Entry, File, HandleReference, VFat, VFatHandle};
+use filesystem::fs2::{Directory2, VFS};
+use filesystem::VirtualFileSystem;
 use crate::multiprocessing::mutex::Mutex;
 
 #[derive(Clone)]
@@ -37,7 +40,9 @@ impl VFatHandle for PiVFatHandle {
     }
 }
 
-pub struct FileSystem(Mutex<Option<PiVFatHandle>>);
+pub struct DiskFileSystem(PiVFatHandle);
+
+pub struct FileSystem(Mutex<Option<VirtualFileSystem>>);
 
 impl FileSystem {
     /// Returns an uninitialized `FileSystem`.
@@ -56,27 +61,21 @@ impl FileSystem {
     ///
     /// Panics if the underlying disk or file sytem failed to initialize.
     pub unsafe fn initialize(&self) {
+        self.0.lock().replace(VirtualFileSystem::new());
+
         let sd = sd::Sd::new().expect("filesystem failed to initialize");
         let vfat = VFat::<PiVFatHandle>::from(sd).expect("failed to initialize vfat");
-        self.0.lock().replace(vfat);
+        self.0.lock().unwrap().mount(PathBuf::new(), Box::new(vfat));
     }
 
 }
 
-impl filesystem::FileSystem for &FileSystem {
-    type File = File<PiVFatHandle>;
-    type Dir = Dir<PiVFatHandle>;
-    type Entry = Entry<PiVFatHandle>;
-
-    fn open(&mut self, path: &Path) -> io::Result<Self::Entry> {
-        HandleReference(self.0.lock().as_ref().unwrap()).open(path)
+impl filesystem::fs2::FileSystem2 for &FileSystem {
+    fn root(&mut self) -> io::Result<Box<dyn Directory2>> {
+        HandleReference(self.0.lock().as_ref().unwrap()).root()
     }
 
-    fn new_file(&mut self, path: &Path) -> io::Result<Self::File> {
-        HandleReference(self.0.lock().as_ref().unwrap()).new_file(path)
-    }
-
-    fn new_dir(&mut self, path: &Path) -> io::Result<Self::Dir> {
-        HandleReference(self.0.lock().as_ref().unwrap()).new_dir(path)
+    fn copy_entry(&mut self, source: &Path, destination: &Path) -> io::Result<()> {
+        todo!()
     }
 }

@@ -1,4 +1,5 @@
-use alloc::string::String;
+use alloc::boxed::Box;
+use alloc::string::{String, ToString};
 use core::fmt::{Debug, Formatter};
 use core::marker::PhantomData;
 
@@ -14,7 +15,10 @@ use shim::path::{Component, Path};
 use crate::mbr::MasterBootRecord;
 use crate::PartitionEntry;
 use filesystem::{BlockDevice, FileSystem};
+use filesystem::Dir as DirTrait;
+use filesystem::fs2::{Directory2, Entry2, File2, FileSystem2, Metadata2};
 use shim::ffi::OsStr;
+use shim::io::ErrorKind::InvalidFilename;
 use shim::io::SeekFrom;
 use crate::vfat::{BiosParameterBlock, CachedPartition, Partition};
 use crate::vfat::{Cluster, Dir, Entry, Error, FatEntry, File, Status};
@@ -507,5 +511,70 @@ impl<'a, HANDLE: VFatHandle> FileSystem for HandleReference<'a, HANDLE> {
             metadata: Default::default(),
             chain: Chain::new(self.0.clone())?
         })
+    }
+}
+
+impl<HANDLE: VFatHandle> File2 for File<HANDLE> {}
+
+impl <HANDLE: VFatHandle> Directory2 for Dir<HANDLE> where HANDLE: 'static {
+    fn open_entry(&mut self, name: &str) -> io::Result<Entry2> {
+        Ok(match self.find(Path::new(name))? {
+            Entry::File(file) => Entry2::File(Box::new(file)),
+            Entry::Dir(dir) => Entry2::Directory(Box::new(dir)),
+        })
+    }
+
+    fn create_file(&mut self, name: &str) -> io::Result<()> {
+        let file = File::<HANDLE> {
+            name: name.to_string(),
+            metadata: Default::default(),
+            file_size: 0,
+            chain: Chain::new(self.vfat.clone())?
+        };
+
+        DirTrait::append(self, Entry::File(file))
+    }
+
+    fn create_directory(&mut self, name: &str) -> io::Result<()> {
+        let dir = Dir::<HANDLE> {
+            vfat: self.vfat.clone(),
+            name: name.to_string(),
+            metadata: Default::default(),
+            chain: Chain::new(self.vfat.clone())?
+        };
+
+        DirTrait::append(self, Entry::Dir(dir))
+    }
+
+    fn remove(&mut self, _name: &str) -> io::Result<()> {
+        todo!()
+    }
+
+    fn list(&mut self) -> io::Result<Vec<String>> {
+        Ok(DirTrait::entries(self)?
+            .map(|entry| filesystem::Entry::name(&entry).to_string())
+            .collect())
+    }
+
+    fn metadata(&mut self, name: &str) -> io::Result<Box<dyn Metadata2>> {
+        todo!()
+    }
+}
+
+impl<'a, HANDLE: VFatHandle> FileSystem2 for HandleReference<'a, HANDLE> where HANDLE: 'static {
+    fn root(&mut self) -> io::Result<Box<dyn Directory2>> {
+        let root_cluster = self.0.lock(|vfat| vfat.root_cluster());
+        let chain = Chain::new_from_cluster(self.0.clone(), root_cluster)?;
+        let entry = Box::new(Dir::<HANDLE> {
+            vfat: self.0.clone(),
+            name: "/".to_string(),
+            metadata: Default::default(),
+            chain,
+        });
+        Ok(entry)
+    }
+
+    fn copy_entry(&mut self, _source: &Path, _destination: &Path) -> io::Result<()> {
+        todo!()
     }
 }

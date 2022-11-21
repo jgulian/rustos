@@ -32,10 +32,10 @@ use alloc::string::{String, ToString};
 use core::borrow::Borrow;
 use shim::path::PathBuf;
 use console::kprintln;
-use filesystem::Dir;
 
 use disk::FileSystem;
 use fat32::vfat::Entry;
+use filesystem::fs2::FileSystem2;
 use process::GlobalScheduler;
 use traps::irq::{Fiq, GlobalIrq};
 use memory::VMManager;
@@ -70,38 +70,34 @@ unsafe fn kernel_main() -> ! {
     init::initialize_app_cores();
     VMM.wait();
 
-    use filesystem::FileSystem;
+    use filesystem::fs2::{FileSystem2, Directory2};
 
     info!("root dir files");
 
-    let root = PathBuf::from("/");
-    let mut root_dir = FILESYSTEM.borrow().open_dir(root.as_path()).expect("root should exist");
-    for file in root_dir.entries().expect("should be good") {
-        use filesystem::Entry;
-        info!("{}", file.name());
+    let root_path = PathBuf::from("/");
+    let mut root = FILESYSTEM.borrow().root().expect("can't turn root into dir");
+    for entry in root.list().expect("can't list root") {
+        info!("{}", entry);
     }
 
-    let new_file_path = PathBuf::from("/amogus");
-    let mut new_file = FILESYSTEM.borrow().new_file(new_file_path.as_path()).expect("file could not be created");
-    new_file.write("sussy".as_bytes()).expect("unable to write to file");
-    let new_entry = Entry::File(new_file);
-    root_dir.append(new_entry).expect("failed to add file");
-    info!("file added?");
+    root.create_file("amogus").expect("should allow creating files");
+    //let new_file_path = PathBuf::from("/amogus");
+    //let new_entry = root.open_entry("amogus").expect("can't open new file");
+    //let mut new_file = new_entry.into_file().expect("can't turn new entry into file");
+    //new_file.write("sussy".as_bytes()).expect("unable to write to new file");
 
     info!("root dir files again");
-    let root = PathBuf::from("/");
-    let mut root_dir = FILESYSTEM.borrow().open_dir(root.as_path()).expect("root should exist");
-    for file in root_dir.entries().expect("should be good") {
-        use filesystem::Entry;
-        info!("{}", file.name());
+    let mut root_again = FILESYSTEM.borrow().root().expect("can't turn root into dir");
+    for entry in root_again.list().expect("can't list root") {
+        info!("{}", entry);
     }
-    
-    let mut added_file = FILESYSTEM.borrow().open_file(new_file_path.as_path()).expect("amogus should exist");
-    let mut buf = [0u8; 256];
-    let _read_amount = added_file.read(&mut buf).expect("should be readable");
+
+    //let mut added_file = FILESYSTEM.borrow().open_file(new_file_path.as_path()).expect("amogus should exist");
+    //let mut buf = [0u8; 256];
+    //let _read_amount = added_file.read(&mut buf).expect("should be readable");
     // FIXME: amount read is not correct.
     //assert_eq!(read_amount, "sussy".len());
-    info!("read from new file {}", String::from_utf8_lossy(&buf));
+    //info!("read from new file {}", String::from_utf8_lossy(&buf));
 
     info!("cores initialized");
 
