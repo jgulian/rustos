@@ -2,14 +2,15 @@ use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::borrow::{Borrow, BorrowMut};
+
 use shim::{io, ioerr, newioerr};
 use shim::ffi::OsString;
-use shim::path::{Component, Path, PathBuf};
+use shim::io::ErrorKind::NotFound;
+
 use crate::Metadata;
+use crate::path::{Component, Path};
 
-pub trait Metadata2 {
-
-}
+pub trait Metadata2 {}
 
 // For char devices, their seek just gives a NotSeekable error
 pub trait File2: io::Seek + io::Read + io::Write {}
@@ -38,51 +39,52 @@ pub trait FileSystem2 {
     fn root(&mut self) -> io::Result<Box<dyn Directory2>>;
 
     fn open(&mut self, path: &Path) -> io::Result<Entry2> {
-        let entry = Entry2::Directory(self.root()?);
-        path.components().fold(Ok(entry), |directory, component| {
-            let mut dir = directory?;
-
-            match component {
-                Component::Prefix(_) => {
-                    unimplemented!("not implemented yet")
-                }
-                Component::RootDir => Ok(Entry2::Directory(self.root()?)),
-                Component::CurDir => {
-                    unimplemented!("not implemented yet")
-                }
-                Component::ParentDir => {
-                    unimplemented!("not implemented yet")
-                }
-                Component::Normal(name) => {
-                    match dir.borrow_mut() {
-                        Entry2::File(_) => {
-                            ioerr!(InvalidFilename)
+        path.simplify()?.components().iter()
+            .fold(ioerr!(NotFound), |wrapped_entry, component| {
+                match component {
+                    Component::Root => {
+                        match wrapped_entry {
+                            Ok(entry) => {
+                                return ioerr!(InvalidFilename);
+                            }
+                            Err(ref err) => {
+                                if err.kind() != NotFound {
+                                    return ioerr!(InvalidFilename);
+                                }
+                            }
                         }
-                        Entry2::Directory(directory) => {
-                            let name_str = name.to_str().ok_or(newioerr!(InvalidFilename))?;
-                            Ok(directory.open_entry(name_str)?)
+
+                        Ok(Entry2::Directory(self.root()?))
+                    }
+                    Component::Current | Component::Parent => {
+                        ioerr!(InvalidFilename)
+                    }
+                    Component::Child(child) => {
+                        match wrapped_entry? {
+                            Entry2::File(_) => ioerr!(InvalidFilename),
+                            Entry2::Directory(mut dir) => {
+                                dir.open_entry(child.as_str())
+                            }
                         }
                     }
                 }
-            }
-
-
-        })
+            })
     }
 
     fn copy_entry(&mut self, source: &Path, destination: &Path) -> io::Result<()>;
 
     fn move_entry(&mut self, source: &Path, destination: &Path) -> io::Result<()> {
-        self.copy_entry(source, destination)?;
-        match self.open(source.parent().ok_or(newioerr!(InvalidFilename))?)?.borrow_mut() {
-            Entry2::File(_) => ioerr!(InvalidFilename),
-            Entry2::Directory(directory) => {
-                let file_name = source.file_name()
-                    .ok_or(newioerr!(InvalidFilename))?.to_str()
-                    .ok_or(newioerr!(InvalidFilename))?;
-                directory.remove(file_name)
-            }
-        }
+        //self.copy_entry(source, destination)?;
+        //match self.open(source.parent().ok_or(newioerr!(InvalidFilename))?)?.borrow_mut() {
+        //    Entry2::File(_) => ioerr!(InvalidFilename),
+        //    Entry2::Directory(directory) => {
+        //        let file_name = source.file_name()
+        //            .ok_or(newioerr!(InvalidFilename))?.to_str()
+        //            .ok_or(newioerr!(InvalidFilename))?;
+        //        directory.remove(file_name)
+        //    }
+        //}
+        todo!()
     }
 }
 

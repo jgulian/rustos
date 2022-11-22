@@ -4,18 +4,22 @@ use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::borrow::Borrow;
-use shim::path::{Path, PathBuf};
+use core::cell::RefCell;
+use core::ops::DerefMut;
+
 use shim::{io, ioerr, newioerr};
+
 use crate::fs2;
 use crate::fs2::{Directory2, Entry2, FileSystem2, Metadata2};
+use crate::path::Path;
 
 struct Mount {
-    mount_point: PathBuf,
+    mount_point: Path,
     filesystem: Box<dyn FileSystem2>,
 }
 
 //TODO: this is not thread safe
-struct Mounts(Rc<Vec::<Mount>>);
+struct Mounts(Rc<RefCell<Vec::<Mount>>>);
 
 pub struct VirtualFileSystem {
     mounts: Mounts,
@@ -24,12 +28,12 @@ pub struct VirtualFileSystem {
 impl VirtualFileSystem {
     pub fn new() -> Self {
         VirtualFileSystem {
-            mounts: Mount(Rc::new(Vec::<Mount>::new())),
+            mounts: Mounts(Rc::new(RefCell::new(Vec::new()))),
         }
     }
 
-    pub fn mount(&mut self, mount_point: PathBuf, filesystem: Box<dyn FileSystem2>) {
-        self.filesystems.push(VFSEntry {
+    pub fn mount(&mut self, mount_point: Path, filesystem: Box<dyn FileSystem2>) {
+        self.mounts.0.borrow_mut().push(Mount {
             mount_point,
             filesystem,
         })
@@ -47,13 +51,13 @@ impl FileSystem2 for VirtualFileSystem {
 }
 
 struct VFSDirectory {
-    path: PathBuf,
+    path: Path,
     mounts: Mounts,
 }
 
 impl Directory2 for VFSDirectory {
     fn open_entry(&mut self, _: &str) -> io::Result<Entry2> {
-
+        ioerr!(Unsupported)
     }
 
     fn create_file(&mut self, _: &str) -> io::Result<()> {
@@ -69,15 +73,18 @@ impl Directory2 for VFSDirectory {
     }
 
     fn list(&mut self) -> io::Result<Vec<String>> {
-        self.mounts.0.iter().map(|mount| {
-            mount.mount_point
-        })
+        ioerr!(Unsupported)
     }
 
     fn metadata(&mut self, _: &str) -> io::Result<Box<dyn Metadata2>> {
         ioerr!(Unsupported)
     }
 }
+
+//TOOD: remove
+unsafe impl Sync for VirtualFileSystem {}
+
+unsafe impl Send for VirtualFileSystem {}
 
 
 // impl FileSystem for VirtualFileSystem {

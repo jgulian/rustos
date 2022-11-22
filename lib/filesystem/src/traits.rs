@@ -1,8 +1,9 @@
 use alloc::string::String;
-use shim::{io, path::Path};
-use shim::path::PathBuf;
+
+use shim::io;
 
 use crate::Metadata;
+use crate::path::Path;
 
 /// Trait implemented by files in the file system.
 pub trait File: io::Read + io::Write + io::Seek + Sized {

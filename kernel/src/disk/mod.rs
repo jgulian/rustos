@@ -1,17 +1,19 @@
-pub mod sd;
-
 use alloc::boxed::Box;
 use alloc::rc::Rc;
 use alloc::string::String;
+use core::borrow::{Borrow, BorrowMut};
 use core::fmt::{self, Debug};
-use shim::io;
-use shim::path::{Path, PathBuf};
-use filesystem;
 
 use fat32::vfat::{Dir, Entry, File, HandleReference, VFat, VFatHandle};
-use filesystem::fs2::{Directory2, VFS};
+use filesystem;
+use filesystem::fs2::{Directory2, FileSystem2};
+use filesystem::path::Path;
 use filesystem::VirtualFileSystem;
+use shim::{io, newioerr};
+
 use crate::multiprocessing::mutex::Mutex;
+
+pub mod sd;
 
 #[derive(Clone)]
 pub struct PiVFatHandle(Rc<Mutex<VFat<Self>>>);
@@ -40,7 +42,40 @@ impl VFatHandle for PiVFatHandle {
     }
 }
 
-pub struct DiskFileSystem(PiVFatHandle);
+struct PiVFatWrapper(Option<PiVFatHandle>);
+
+impl PiVFatWrapper {
+    pub const fn uninitialized() -> Self {
+        PiVFatWrapper(None)
+    }
+
+    pub unsafe fn initialize(&self) {
+        let sd = sd::Sd::new().expect("filesystem failed to initialize");
+        let vfat = VFat::<PiVFatHandle>::from(sd).expect("failed to initialize vfat");
+        unsafe {
+            let ptr = (self as *const Self as *mut Self);
+            (*ptr).0.replace(vfat);
+        }
+    }
+
+    fn handle(&self) -> &PiVFatHandle {
+        self.0.as_ref().unwrap()
+    }
+}
+
+static PI_VFAT_HANDLE_WRAPPER: PiVFatWrapper = PiVFatWrapper::uninitialized();
+
+pub struct DiskFileSystem<'a>(&'a PiVFatHandle);
+
+impl<'a> FileSystem2 for DiskFileSystem<'a> {
+    fn root(&mut self) -> io::Result<Box<dyn Directory2>> {
+        HandleReference(self.0).root()
+    }
+
+    fn copy_entry(&mut self, source: &Path, destination: &Path) -> io::Result<()> {
+        HandleReference(self.0).copy_entry(source, destination)
+    }
+}
 
 pub struct FileSystem(Mutex<Option<VirtualFileSystem>>);
 
@@ -62,20 +97,23 @@ impl FileSystem {
     /// Panics if the underlying disk or file sytem failed to initialize.
     pub unsafe fn initialize(&self) {
         self.0.lock().replace(VirtualFileSystem::new());
+        PI_VFAT_HANDLE_WRAPPER.initialize();
 
-        let sd = sd::Sd::new().expect("filesystem failed to initialize");
-        let vfat = VFat::<PiVFatHandle>::from(sd).expect("failed to initialize vfat");
-        self.0.lock().unwrap().mount(PathBuf::new(), Box::new(vfat));
+        let disk_file_system = Box::new(DiskFileSystem(PI_VFAT_HANDLE_WRAPPER.handle()));
+
+
+        //DISK_FILE_SYSTEM.borrow_mut().0.replace(vfat);
+        //DISK_FILE_SYSTEM.0.replace(vfat);
+        //self.0.lock().unwrap().mount(Path::root(), disk_filesystem);
     }
-
 }
 
-impl filesystem::fs2::FileSystem2 for &FileSystem {
+impl FileSystem2 for &FileSystem {
     fn root(&mut self) -> io::Result<Box<dyn Directory2>> {
-        HandleReference(self.0.lock().as_ref().unwrap()).root()
+        self.0.lock().as_mut().ok_or(newioerr!(Unsupported))?.root()
     }
 
     fn copy_entry(&mut self, source: &Path, destination: &Path) -> io::Result<()> {
-        todo!()
+        self.0.lock().as_mut().ok_or(newioerr!(Unsupported))?.copy_entry(source, destination)
     }
 }

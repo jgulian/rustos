@@ -11,12 +11,28 @@
 // #![cfg_attr(not(test), no_std)]
 // #![cfg_attr(not(test), no_main)]
 
-// #[cfg(not(test))]
-mod init;
-
 extern crate alloc;
 #[macro_use]
 extern crate log;
+
+use alloc::string::{String, ToString};
+use core::borrow::Borrow;
+
+use console::kprintln;
+use disk::FileSystem;
+use fat32::vfat::Entry;
+use filesystem::fs2::FileSystem2;
+use filesystem::path::Path;
+use memory::VMManager;
+use process::GlobalScheduler;
+use shim::io::{Read, Write};
+use traps::irq::{Fiq, GlobalIrq};
+
+use crate::kalloc::KernelAllocator;
+use crate::process::Process;
+
+// #[cfg(not(test))]
+mod init;
 
 pub mod kalloc;
 pub mod console;
@@ -27,21 +43,6 @@ pub mod process;
 pub mod traps;
 pub mod memory;
 pub mod multiprocessing;
-
-use alloc::string::{String, ToString};
-use core::borrow::Borrow;
-use shim::path::PathBuf;
-use console::kprintln;
-
-use disk::FileSystem;
-use fat32::vfat::Entry;
-use filesystem::fs2::FileSystem2;
-use process::GlobalScheduler;
-use traps::irq::{Fiq, GlobalIrq};
-use memory::VMManager;
-use shim::io::{Read, Write};
-use crate::kalloc::KernelAllocator;
-use crate::process::Process;
 
 #[cfg_attr(not(test), global_allocator)]
 pub static ALLOCATOR: KernelAllocator = KernelAllocator::uninitialized();
@@ -74,7 +75,7 @@ unsafe fn kernel_main() -> ! {
 
     info!("root dir files");
 
-    let root_path = PathBuf::from("/");
+    let root_path = Path::root();
     let mut root = FILESYSTEM.borrow().root().expect("can't turn root into dir");
     for entry in root.list().expect("can't list root") {
         info!("{}", entry);
@@ -101,11 +102,11 @@ unsafe fn kernel_main() -> ! {
 
     info!("cores initialized");
 
-    let fib = PathBuf::from("/fib");
-    let heap = PathBuf::from("/heap");
+    let fib = Path::new("/fib").expect("path is valid");
+    let heap = Path::new("/heap").expect("path is valid");
 
-    SCHEDULER.add(Process::load(fib.as_path()).expect("should exist"));
-    SCHEDULER.add(Process::load(heap.as_path()).expect("should exist"));
+    SCHEDULER.add(Process::load(&fib).expect("should exist"));
+    SCHEDULER.add(Process::load(&heap).expect("should exist"));
     //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
     //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
 

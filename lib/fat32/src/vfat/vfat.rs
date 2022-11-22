@@ -1,25 +1,23 @@
 use alloc::boxed::Box;
 use alloc::string::{String, ToString};
+use alloc::vec::Vec;
+use core::{fmt, mem};
+use core::cmp::min;
 use core::fmt::{Debug, Formatter};
 use core::marker::PhantomData;
-
-use alloc::vec::Vec;
-use core::cmp::min;
-use core::{fmt, mem};
 use core::ops::DerefMut;
+
 use log::info;
 
-use shim::{io, ioerr, newioerr};
-use shim::path::{Component, Path};
-
-use crate::mbr::MasterBootRecord;
-use crate::PartitionEntry;
 use filesystem::{BlockDevice, FileSystem};
 use filesystem::Dir as DirTrait;
 use filesystem::fs2::{Directory2, Entry2, File2, FileSystem2, Metadata2};
-use shim::ffi::OsStr;
-use shim::io::ErrorKind::InvalidFilename;
+use filesystem::path::{Component, Path};
+use shim::{io, ioerr, newioerr};
 use shim::io::SeekFrom;
+
+use crate::mbr::MasterBootRecord;
+use crate::PartitionEntry;
 use crate::vfat::{BiosParameterBlock, CachedPartition, Partition};
 use crate::vfat::{Cluster, Dir, Entry, Error, FatEntry, File, Status};
 
@@ -456,24 +454,21 @@ impl<'a, HANDLE: VFatHandle> FileSystem for HandleReference<'a, HANDLE> {
         let mut path_stack = Vec::<Entry<HANDLE>>::new();
         path_stack.push(Entry::root(self.0.clone()));
 
-        for component in path.components() {
+        for component in path.simplify()?.components() {
             match component {
-                Component::Prefix(_) => {
-                    panic!("not implemented")
-                }
-                Component::RootDir => {
+                Component::Root => {
                     path_stack.clear();
                     path_stack.push(Entry::root(self.0.clone()));
                 }
-                Component::CurDir => {}
-                Component::ParentDir => {
+                Component::Current => {}
+                Component::Parent => {
                     path_stack.pop();
                 }
-                Component::Normal(name) => {
+                Component::Child(name) => {
                     use filesystem::Entry;
                     let top = path_stack.last_mut().ok_or(newioerr!(InvalidInput))?.clone();
                     let mut top_dir = top.into_dir().ok_or(newioerr!(InvalidInput))?;
-                    path_stack.push(top_dir.find(name)?);
+                    path_stack.push(top_dir.find(name.as_str())?);
                 }
             }
         }
@@ -482,35 +477,39 @@ impl<'a, HANDLE: VFatHandle> FileSystem for HandleReference<'a, HANDLE> {
     }
 
     fn new_file(&mut self, path: &Path) -> io::Result<Self::File> {
-        let name = match path.file_name() {
-            None => {
-                unimplemented!("this is not implemented")
-            }
-            Some(name) => {String::from(name.to_str().unwrap())}
-        };
+        unimplemented!("deprecated");
 
-        Ok(File::<HANDLE> {
-            name,
-            metadata: Default::default(),
-            file_size: 0,
-            chain: Chain::new(self.0.clone())?
-        })
+        //let name = match path.file_name() {
+        //    None => {
+        //        unimplemented!("this is not implemented")
+        //    }
+        //    Some(name) => {String::from(name.to_str().unwrap())}
+        //};
+        //
+        //Ok(File::<HANDLE> {
+        //    name,
+        //    metadata: Default::default(),
+        //    file_size: 0,
+        //    chain: Chain::new(self.0.clone())?
+        //})
     }
 
     fn new_dir(&mut self, path: &Path) -> io::Result<Self::Dir> {
-        let name = match path.file_name() {
-            None => {
-                unimplemented!("this is not implemented")
-            }
-            Some(name) => {String::from(name.to_str().unwrap())}
-        };
+        unimplemented!("deprecated");
 
-        Ok(Dir::<HANDLE> {
-            vfat: self.0.clone(),
-            name,
-            metadata: Default::default(),
-            chain: Chain::new(self.0.clone())?
-        })
+        //let name = match path.file_name() {
+        //    None => {
+        //        unimplemented!("this is not implemented")
+        //    }
+        //    Some(name) => {String::from(name.to_str().unwrap())}
+        //};
+        //
+        //Ok(Dir::<HANDLE> {
+        //    vfat: self.0.clone(),
+        //    name,
+        //    metadata: Default::default(),
+        //    chain: Chain::new(self.0.clone())?
+        //})
     }
 }
 
@@ -518,7 +517,7 @@ impl<HANDLE: VFatHandle> File2 for File<HANDLE> {}
 
 impl <HANDLE: VFatHandle> Directory2 for Dir<HANDLE> where HANDLE: 'static {
     fn open_entry(&mut self, name: &str) -> io::Result<Entry2> {
-        Ok(match self.find(Path::new(name))? {
+        Ok(match self.find(name)? {
             Entry::File(file) => Entry2::File(Box::new(file)),
             Entry::Dir(dir) => Entry2::Directory(Box::new(dir)),
         })
