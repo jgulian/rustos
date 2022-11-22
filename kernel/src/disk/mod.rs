@@ -2,6 +2,7 @@ use alloc::boxed::Box;
 use alloc::rc::Rc;
 use alloc::string::String;
 use core::borrow::{Borrow, BorrowMut};
+use core::cell::UnsafeCell;
 use core::fmt::{self, Debug};
 
 use fat32::vfat::{Dir, Entry, File, HandleReference, VFat, VFatHandle};
@@ -42,26 +43,38 @@ impl VFatHandle for PiVFatHandle {
     }
 }
 
-struct PiVFatWrapper(Option<PiVFatHandle>);
+struct PiVFatWrapper(UnsafeCell<Option<PiVFatHandle>>);
 
 impl PiVFatWrapper {
     pub const fn uninitialized() -> Self {
-        PiVFatWrapper(None)
+        PiVFatWrapper(UnsafeCell::new(None))
     }
 
     pub unsafe fn initialize(&self) {
         let sd = sd::Sd::new().expect("filesystem failed to initialize");
         let vfat = VFat::<PiVFatHandle>::from(sd).expect("failed to initialize vfat");
-        unsafe {
-            let ptr = (self as *const Self as *mut Self);
-            (*ptr).0.replace(vfat);
+        (&mut *self.0.get()).replace(vfat);
+
+        info!("initialize");
+        match *self.0.get() {
+            None => {
+                info!("none");
+            }
+            Some(_) => {
+                info!("some");
+            }
         }
     }
 
     fn handle(&self) -> &PiVFatHandle {
-        self.0.as_ref().unwrap()
+        info!("handle");
+        let cell = unsafe { self.0.get().as_ref() };
+
+        cell.unwrap().as_ref().unwrap()
     }
 }
+
+unsafe impl Sync for PiVFatWrapper {}
 
 static PI_VFAT_HANDLE_WRAPPER: PiVFatWrapper = PiVFatWrapper::uninitialized();
 

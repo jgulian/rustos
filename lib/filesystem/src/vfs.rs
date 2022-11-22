@@ -19,6 +19,7 @@ struct Mount {
 }
 
 //TODO: this is not thread safe
+#[derive(Clone)]
 struct Mounts(Rc<RefCell<Vec::<Mount>>>);
 
 pub struct VirtualFileSystem {
@@ -42,7 +43,10 @@ impl VirtualFileSystem {
 
 impl FileSystem2 for VirtualFileSystem {
     fn root(&mut self) -> io::Result<Box<dyn Directory2>> {
-        todo!()
+        Ok(Box::new(VFSDirectory {
+            path: Path::root(),
+            mounts: self.mounts.clone(),
+        }))
     }
 
     fn copy_entry(&mut self, source: &Path, destination: &Path) -> io::Result<()> {
