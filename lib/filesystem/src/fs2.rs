@@ -41,10 +41,8 @@ pub trait FileSystem2 {
     fn root(&mut self) -> io::Result<Box<dyn Directory2>>;
 
     fn open(&mut self, path: &Path) -> io::Result<Entry2> {
-        info!("amogus 1");
         path.simplify()?.components().iter()
             .fold(ioerr!(NotFound), |wrapped_entry, component| {
-                info!("amogus 2 {:?}", wrapped_entry.is_ok());
                 match component {
                     Component::Root => {
                         match wrapped_entry {

@@ -1,6 +1,7 @@
 use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::sync::Arc;
+use alloc::vec;
 use alloc::vec::Vec;
 use core::borrow::BorrowMut;
 use core::cell::RefCell;
@@ -177,7 +178,7 @@ impl<T: CharDevice + 'static> Directory2 for CharDeviceRootDirectory<T> {
     }
 
     fn list(&mut self) -> io::Result<Vec<String>> {
-        ioerr!(Unsupported)
+        Ok(vec![self.0.clone()])
     }
 
     fn metadata(&mut self, _: &str) -> io::Result<Box<dyn Metadata2>> {
