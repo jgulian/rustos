@@ -1,6 +1,6 @@
-#![feature(asm_const)]
-
 #![no_std]
+
+#![feature(asm_const)]
 
 use shim::io;
 
@@ -80,6 +80,10 @@ pub enum Syscall {
     Write = 5,
     GetPid = 6,
     Sbrk = 7,
+    Fork = 8,
+    Duplicate = 9,
+    Execute = 10,
+    Wait = 11,
     Unknown = 256,
 }
 

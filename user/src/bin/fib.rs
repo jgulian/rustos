@@ -3,10 +3,10 @@
 #![no_std]
 #![no_main]
 
-mod cr0;
-
-use kernel_api::syscall::{getpid, time};
 use kernel_api::println;
+use kernel_api::syscall::{getpid, time};
+
+mod user;
 
 fn fib(n: u64) -> u64 {
     match n {

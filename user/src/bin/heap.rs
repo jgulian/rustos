@@ -5,12 +5,13 @@
 
 extern crate alloc;
 
-mod cr0;
-
 use alloc::string::ToString;
 use core::alloc::{GlobalAlloc, Layout};
-use kernel_api::syscall::{sbrk, exit};
+
 use kernel_api::println;
+use kernel_api::syscall::{exit, sbrk};
+
+mod user;
 
 fn main() {
     println!("Alloc started");

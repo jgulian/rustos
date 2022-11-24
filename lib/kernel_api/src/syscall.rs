@@ -3,6 +3,8 @@ use core::fmt;
 use core::fmt::Write;
 use core::time::Duration;
 
+use shim::ioerr;
+
 use crate::*;
 
 macro_rules! err_or {
@@ -27,6 +29,10 @@ macro_rules! syscall_args {
     ($a:expr, $b:expr, $c:expr) => (
         syscall_args!($a, $b);
         asm!("mov x2, {}", in(reg) $c);
+    );
+    ($a:expr, $b:expr, $c:expr, $d:expr) => (
+        syscall_args!($a, $b, $c);
+        asm!("mov x3, {}", in(reg) $d);
     );
 }
 
@@ -138,6 +144,39 @@ pub fn sbrk() -> OsResult<(usize, usize)> {
         syscall!(Syscall::Sbrk);
         let result = syscall_receive2!()?;
         Ok((result.0 as usize, result.1 as usize))
+    }
+}
+
+pub fn fork() -> OsResult<u64> {
+    unsafe {
+        syscall!(Syscall::Fork);
+        syscall_receive1!()
+    }
+}
+
+pub fn duplicate(file: u64) -> OsResult<u64> {
+    unsafe {
+        syscall_args!(file);
+        syscall!(Syscall::Duplicate);
+        syscall_receive1!()
+    }
+}
+
+//TODO: this should not return on success; codify that
+pub fn execute(arguments: &[u8], environment: &[u8]) -> OsResult<(u64)> {
+    unsafe {
+        syscall_args!(arguments.as_ptr() as u64, arguments.len() as u64,
+            environment.as_ptr() as u64, environment.len() as u64);
+        syscall!(Syscall::Execute);
+        syscall_receive1!()
+    }
+}
+
+pub fn wait(process: u64) -> OsResult<u64> {
+    unsafe {
+        syscall_args!(process);
+        syscall!(Syscall::Wait);
+        syscall_receive1!()
     }
 }
 

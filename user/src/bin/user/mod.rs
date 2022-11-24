@@ -1,12 +1,10 @@
-#![no_main]
-
+use core::alloc::GlobalAlloc;
+use core::alloc::Layout;
+use core::arch::asm;
+use core::cell::UnsafeCell;
 use core::mem::zeroed;
 use core::panic::PanicInfo;
 use core::ptr::write_volatile;
-use core::arch::asm;
-use core::alloc::Layout;
-use core::alloc::GlobalAlloc;
-use core::cell::UnsafeCell;
 
 use kernel_api::syscall::{exit, sbrk};
 
@@ -47,7 +45,9 @@ fn close() -> ! {
 }
 
 struct InnerAlloc(UnsafeCell<(usize, usize)>);
+
 unsafe impl Send for InnerAlloc {}
+
 unsafe impl Sync for InnerAlloc {}
 
 pub struct GlobalAllocator(InnerAlloc);
@@ -72,7 +72,7 @@ unsafe impl GlobalAlloc for GlobalAllocator {
                 *beg = *beg & (!(layout.align() - 1)) + layout.align();
             }
 
-            let location = unsafe {*beg as *mut u8};
+            let location = unsafe { *beg as *mut u8 };
             *beg += layout.size();
 
             location
