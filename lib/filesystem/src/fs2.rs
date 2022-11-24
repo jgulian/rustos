@@ -6,7 +6,6 @@ use core::borrow::{Borrow, BorrowMut};
 use log::info;
 
 use shim::{io, ioerr, newioerr};
-use shim::ffi::OsString;
 use shim::io::ErrorKind::NotFound;
 
 use crate::Metadata;

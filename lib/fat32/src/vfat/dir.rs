@@ -6,7 +6,6 @@ use log::info;
 use filesystem;
 use filesystem::path::Path;
 use shim::const_assert_size;
-use shim::ffi::OsStr;
 use shim::io;
 use shim::io::{Read, Seek, SeekFrom, Write};
 
