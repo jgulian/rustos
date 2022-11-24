@@ -1,17 +1,21 @@
 use alloc::boxed::Box;
 use alloc::rc::Rc;
 use alloc::string::String;
+use alloc::string::ToString;
+use alloc::sync::Arc;
 use alloc::vec;
 use alloc::vec::Vec;
-use core::borrow::Borrow;
+use core::borrow::{Borrow, BorrowMut};
 use core::cell::RefCell;
-use core::ops::DerefMut;
+use core::ops::{Deref, DerefMut};
+
+use log::info;
 
 use shim::{io, ioerr, newioerr};
 
 use crate::fs2;
 use crate::fs2::{Directory2, Entry2, FileSystem2, Metadata2};
-use crate::path::Path;
+use crate::path::{Component, Path};
 
 struct Mount {
     mount_point: Path,
@@ -20,7 +24,7 @@ struct Mount {
 
 //TODO: this is not thread safe
 #[derive(Clone)]
-struct Mounts(Rc<RefCell<Vec::<Mount>>>);
+struct Mounts(Arc<RefCell<Vec::<Mount>>>);
 
 pub struct VirtualFileSystem {
     mounts: Mounts,
@@ -29,12 +33,13 @@ pub struct VirtualFileSystem {
 impl VirtualFileSystem {
     pub fn new() -> Self {
         VirtualFileSystem {
-            mounts: Mounts(Rc::new(RefCell::new(Vec::new()))),
+            mounts: Mounts(Arc::new(RefCell::new(Vec::new()))),
         }
     }
 
     pub fn mount(&mut self, mount_point: Path, filesystem: Box<dyn FileSystem2>) {
-        self.mounts.0.borrow_mut().push(Mount {
+        info!("mounting to {}", mount_point.to_string());
+        self.mounts.0.as_ref().borrow_mut().push(Mount {
             mount_point,
             filesystem,
         })
@@ -60,15 +65,35 @@ struct VFSDirectory {
 }
 
 impl Directory2 for VFSDirectory {
-    fn open_entry(&mut self, _: &str) -> io::Result<Entry2> {
-        ioerr!(Unsupported)
+    fn open_entry(&mut self, name: &str) -> io::Result<Entry2> {
+        let mut new_path = self.path.clone();
+        new_path.append_child(name.to_string());
+
+        let mounts = self.mounts.clone();
+        let result = mounts.0.as_ref().borrow_mut().iter_mut()
+            .filter(|mount| mount.mount_point.starts_with(&self.path))
+            .next().map(|mount| {
+            if mount.mount_point == self.path {
+                mount.filesystem.root()?.open_entry(name)
+            } else {
+                Ok(Entry2::Directory(Box::new(VFSDirectory {
+                    path: new_path,
+                    mounts: self.mounts.clone(),
+                })))
+            }
+        }).unwrap_or(ioerr!(NotFound));
+
+        result
     }
 
-    fn create_file(&mut self, _: &str) -> io::Result<()> {
-        ioerr!(Unsupported)
+    fn create_file(&mut self, name: &str) -> io::Result<()> {
+        self.mounts.0.as_ref().borrow_mut().iter_mut()
+            .filter(|mount| mount.mount_point == self.path)
+            .next().map(|mount| mount.filesystem.root()?.create_file(name))
+            .unwrap_or(ioerr!(Unsupported))
     }
 
-    fn create_directory(&mut self, _: &str) -> io::Result<()> {
+    fn create_directory(&mut self, name: &str) -> io::Result<()> {
         ioerr!(Unsupported)
     }
 
@@ -77,7 +102,26 @@ impl Directory2 for VFSDirectory {
     }
 
     fn list(&mut self) -> io::Result<Vec<String>> {
-        ioerr!(Unsupported)
+        self.mounts.0.as_ref().borrow_mut().iter_mut()
+            .filter(|mount| mount.mount_point.starts_with(&self.path))
+            .fold(Ok(Vec::new()), |wrapped_result, mount| {
+                let mut result = wrapped_result?;
+
+                if let Some(component) = mount.mount_point.at(self.path.len() + 1) {
+                    match component {
+                        Component::Child(child) => {
+                            result.push(child)
+                        }
+                        _ => {}
+                    }
+                } else {
+                    if let Ok(mut fs) = mount.filesystem.root() {
+                        result.extend(fs.list()?.iter().map(|s| s.clone()))
+                    }
+                }
+
+                Ok(result)
+            })
     }
 
     fn metadata(&mut self, _: &str) -> io::Result<Box<dyn Metadata2>> {
@@ -85,36 +129,7 @@ impl Directory2 for VFSDirectory {
     }
 }
 
-//TOOD: remove
+//TODO: remove
 unsafe impl Sync for VirtualFileSystem {}
 
 unsafe impl Send for VirtualFileSystem {}
-
-
-// impl FileSystem for VirtualFileSystem {
-//     type File = Box<DynFile>;
-//     type Dir = Box<DynDir>;
-//     type Entry = Box<DynEntry>;
-//
-//     fn open(&mut self, path: &Path) -> io::Result<Self::Entry> {}
-//
-//     fn new_file(&mut self, path: &Path) -> io::Result<Self::File> {
-//         todo!()
-//     }
-//
-//     fn new_dir(&mut self, path: &Path) -> io::Result<Self::Dir> {
-//         todo!()
-//     }
-// }
-
-//
-//trait GenericFilesystem {
-//    fn new_file2(&mut self, path: &Path) -> io::Result<Box<dyn File>>;
-//}
-//
-//impl<T: FileSystem> GenericFilesystem for Box<T> {
-//    fn new_file2(&mut self, path: &Path) -> io::Result<Box<dyn File>> {
-//        self.new_file(path).map(|file| Box::new(file))
-//    }
-//}
-//

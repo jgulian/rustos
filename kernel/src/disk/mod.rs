@@ -12,6 +12,7 @@ use filesystem::path::Path;
 use filesystem::VirtualFileSystem;
 use shim::{io, newioerr};
 
+use crate::FILESYSTEM;
 use crate::multiprocessing::mutex::Mutex;
 
 pub mod sd;
@@ -113,11 +114,7 @@ impl FileSystem {
         PI_VFAT_HANDLE_WRAPPER.initialize();
 
         let disk_file_system = Box::new(DiskFileSystem(PI_VFAT_HANDLE_WRAPPER.handle()));
-
-
-        //DISK_FILE_SYSTEM.borrow_mut().0.replace(vfat);
-        //DISK_FILE_SYSTEM.0.replace(vfat);
-        //self.0.lock().unwrap().mount(Path::root(), disk_filesystem);
+        FILESYSTEM.0.lock().as_mut().unwrap().mount(Path::root(), disk_file_system);
     }
 }
 

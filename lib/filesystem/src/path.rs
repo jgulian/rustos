@@ -3,11 +3,13 @@ use alloc::vec;
 use alloc::vec::Vec;
 use core::any::Any;
 use core::borrow::Borrow;
+use core::ops::Index;
 
 use shim::{io, ioerr};
 
 use crate::path::Component::Parent;
 
+#[derive(PartialEq)]
 pub struct Path(Vec<Component>);
 
 #[derive(Clone, PartialEq)]
@@ -31,8 +33,43 @@ impl Path {
         self.0.extend_from_slice(path.0.as_slice());
     }
 
-    pub fn components(&self) -> Vec<Component> {
-        self.0.clone()
+    pub fn append_child(&mut self, name: String) {
+        self.0.push(Component::Child(name))
+    }
+
+    pub fn starts_with(&self, path: &Path) -> bool {
+        self.components().starts_with(path.components())
+    }
+
+    pub fn split_from_start(&self, path: &Path) -> Option<Path> {
+        if !self.starts_with(path) {
+            None
+        } else {
+            self.suffix(path.0.len())
+        }
+    }
+
+    pub fn sub_path(&self, i: usize, j: usize) -> Option<Path> {
+        match self.0.get(i..j) {
+            None => None,
+            Some(slice) => Some(Path(Vec::from(slice))),
+        }
+    }
+
+    pub fn prefix(&self, i: usize) -> Option<Path> {
+        self.sub_path(0, i)
+    }
+
+    pub fn suffix(&self, i: usize) -> Option<Path> {
+        self.sub_path(i, self.0.len())
+    }
+
+    pub fn at(&self, i: usize) -> Option<Component> {
+        self.0.get(i).map(|component| component.clone())
+    }
+
+    pub fn components(&self) -> &Vec<Component> {
+        &self.0
     }
 
     pub fn simplify(&self) -> io::Result<Path> {
@@ -62,6 +99,10 @@ impl Path {
         }
 
         Ok(Path(simplified))
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
     }
 }
 
@@ -137,6 +178,12 @@ impl ToString for Path {
         }
 
         result
+    }
+}
+
+impl Clone for Path {
+    fn clone(&self) -> Self {
+        Path(self.0.clone())
     }
 }
 

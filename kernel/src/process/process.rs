@@ -63,9 +63,11 @@ impl Process {
     ///
     /// Returns Os Error if do_load fails.
     pub fn load(pn: &Path) -> OsResult<Process> {
+        info!("load 1");
         use crate::VMM;
 
         let mut p = Process::do_load(pn)?;
+        info!("load 2");
 
         p.context.sp = Process::get_stack_top().as_u64();
         p.context.elr = Process::get_image_base().as_u64();
@@ -80,13 +82,20 @@ impl Process {
     /// Allocates one page for stack with read/write permission, and N pages with read/write/execute
     /// permission to load file's contents.
     fn do_load(pn: &Path) -> OsResult<Process> {
+        info!("here 1");
         let mut process = Process::new()?;
         process.vmap.alloc(Process::get_stack_base(), PagePerm::RW);
         let user_image = process.vmap.alloc(Process::get_image_base(), PagePerm::RWX);
 
-        let mut file = FILESYSTEM.borrow().open(pn)
-            .map_err(|e| OsError::IoError)?
-            .into_file().ok_or(OsError::IoError)?;
+        info!("here 2");
+        let mut open = FILESYSTEM.borrow().open(pn);
+        info!("here 5 {}", open.is_ok());
+        let mut mapped = open.map_err(|e| OsError::IoError)?;
+        info!("here 3");
+        let mut file = mapped.into_file().ok_or(OsError::IoError)?;
+        info!("here 4");
+
+
         file.read(user_image).map_err(|e| OsError::IoError)?;
 
         Ok(process)

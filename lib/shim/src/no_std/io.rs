@@ -1,8 +1,7 @@
-use core::{cmp, result};
 use alloc::boxed::Box;
 use alloc::vec::Vec;
-use core::fmt::Formatter;
-use crate::io;
+use core::{cmp, result};
+use core::fmt::{Debug, Formatter};
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum ErrorKind {
