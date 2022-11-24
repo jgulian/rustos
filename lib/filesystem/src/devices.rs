@@ -1,7 +1,17 @@
 use alloc::boxed::Box;
+use alloc::string::String;
+use alloc::sync::Arc;
 use alloc::vec::Vec;
-use shim::io;
-use shim::io::{Read, Write};
+use core::borrow::BorrowMut;
+use core::cell::RefCell;
+use core::ops::DerefMut;
+
+use shim::{io, ioerr};
+use shim::io::{Read, Seek, SeekFrom, Write};
+
+use crate::{File, FileSystem};
+use crate::fs2::{Directory2, Entry2, File2, FileSystem2, Metadata2};
+use crate::path::Path;
 
 /// Trait implemented by devices that can be read/written in sector
 /// granularities.
@@ -112,3 +122,101 @@ impl_for_read_write_seek!(shim::io::Cursor<Box<[u8]>>);
 impl_for_read_write_seek!(::std::fs::File);
 
 pub trait CharDevice: Send + Read + Write {}
+
+pub struct CharDeviceFileSystem<T: CharDevice + 'static>(String, Arc<RefCell<(T, bool)>>);
+
+pub struct CharDeviceRootDirectory<T: CharDevice + 'static>(String, Arc<RefCell<(T, bool)>>);
+
+pub struct CharDeviceFile<T: CharDevice + 'static>(Arc<RefCell<(T, bool)>>);
+
+impl<T: CharDevice + 'static> CharDeviceFileSystem<T> {
+    pub fn new(name: String, device: T) -> Self {
+        CharDeviceFileSystem {
+            0: name,
+            1: Arc::new(RefCell::new((device, false))),
+        }
+    }
+}
+
+impl<T: CharDevice + 'static> FileSystem2 for CharDeviceFileSystem<T> {
+    fn root(&mut self) -> io::Result<Box<dyn Directory2>> {
+        Ok(Box::new(CharDeviceRootDirectory(self.0.clone(), self.1.clone())))
+    }
+
+    fn copy_entry(&mut self, _: &Path, _: &Path) -> io::Result<()> {
+        ioerr!(Unsupported)
+    }
+}
+
+impl<T: CharDevice + 'static> Directory2 for CharDeviceRootDirectory<T> {
+    fn open_entry(&mut self, name: &str) -> io::Result<Entry2> {
+        if self.0.eq(name) {
+            let mut binding = self.1.as_ref().borrow_mut();
+            let (_, busy) = binding.deref_mut();
+            if !*busy {
+                *busy = true;
+                Ok(Entry2::File(Box::new(CharDeviceFile(self.1.clone()))))
+            } else {
+                ioerr!(ResourceBusy)
+            }
+        } else {
+            ioerr!(NotFound)
+        }
+    }
+
+    fn create_file(&mut self, _: &str) -> io::Result<()> {
+        ioerr!(Unsupported)
+    }
+
+    fn create_directory(&mut self, _: &str) -> io::Result<()> {
+        ioerr!(Unsupported)
+    }
+
+    fn remove(&mut self, _: &str) -> io::Result<()> {
+        ioerr!(Unsupported)
+    }
+
+    fn list(&mut self) -> io::Result<Vec<String>> {
+        ioerr!(Unsupported)
+    }
+
+    fn metadata(&mut self, _: &str) -> io::Result<Box<dyn Metadata2>> {
+        ioerr!(Unsupported)
+    }
+}
+
+impl<T: CharDevice + 'static> Seek for CharDeviceFile<T> {
+    fn seek(&mut self, _: SeekFrom) -> io::Result<u64> {
+        ioerr!(NotSeekable)
+    }
+}
+
+impl<T: CharDevice + 'static> Read for CharDeviceFile<T> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        let mut binding = self.0.as_ref().borrow_mut();
+        let (device, _) = binding.deref_mut();
+        device.read(buf)
+    }
+}
+
+impl<T: CharDevice + 'static> Write for CharDeviceFile<T> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        let mut binding = self.0.as_ref().borrow_mut();
+        let (device, _) = binding.deref_mut();
+        device.write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+impl<T: CharDevice + 'static> File2 for CharDeviceFile<T> {}
+
+impl<T: CharDevice + 'static> Drop for CharDeviceFile<T> {
+    fn drop(&mut self) {
+        let mut binding = self.0.as_ref().borrow_mut();
+        let (_, busy) = binding.deref_mut();
+        *busy = true;
+    }
+}

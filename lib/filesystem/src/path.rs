@@ -33,8 +33,8 @@ impl Path {
         self.0.extend_from_slice(path.0.as_slice());
     }
 
-    pub fn append_child(&mut self, name: String) {
-        self.0.push(Component::Child(name))
+    pub fn append_child<T>(&mut self, name: T) where T: ToString {
+        self.0.push(Component::Child(name.to_string()))
     }
 
     pub fn starts_with(&self, path: &Path) -> bool {

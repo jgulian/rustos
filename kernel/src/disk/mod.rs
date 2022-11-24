@@ -1,15 +1,17 @@
 use alloc::boxed::Box;
 use alloc::rc::Rc;
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use core::borrow::{Borrow, BorrowMut};
 use core::cell::UnsafeCell;
 use core::fmt::{self, Debug};
 
 use fat32::vfat::{Dir, Entry, File, HandleReference, VFat, VFatHandle};
 use filesystem;
+use filesystem::devices::CharDeviceFileSystem;
 use filesystem::fs2::{Directory2, FileSystem2};
 use filesystem::path::Path;
 use filesystem::VirtualFileSystem;
+use pi::uart::MiniUart;
 use shim::{io, newioerr};
 
 use crate::FILESYSTEM;
@@ -115,6 +117,13 @@ impl FileSystem {
 
         let disk_file_system = Box::new(DiskFileSystem(PI_VFAT_HANDLE_WRAPPER.handle()));
         FILESYSTEM.0.lock().as_mut().unwrap().mount(Path::root(), disk_file_system);
+
+        let mut console_path = Path::root();
+        console_path.append_child("console");
+        let console_filesystem = Box::new(CharDeviceFileSystem::new(
+            "console".to_string(), MiniUart::new())
+        );
+        FILESYSTEM.0.lock().as_mut().unwrap().mount(console_path, console_filesystem);
     }
 }
 
