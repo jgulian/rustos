@@ -6,7 +6,6 @@ strip = true
 [workspace]
 members = [
     "kernel",
-
     "lib/aarch64",
     "lib/allocator",
     "lib/fat32",
@@ -17,6 +16,5 @@ members = [
     "lib/shim",
     "lib/volatile",
     "lib/xmodem",
-
     "user",
 ]

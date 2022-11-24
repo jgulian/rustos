@@ -1,20 +1,19 @@
-use core::iter::Chain;
-use core::ops::{Deref, DerefMut, Sub};
-use core::slice::Iter;
-
 use alloc::boxed::Box;
 use alloc::fmt;
 use core::alloc::{GlobalAlloc, Layout};
 use core::fmt::Formatter;
+use core::iter::Chain;
+use core::ops::{Deref, DerefMut, Sub};
+use core::slice::Iter;
+
 use aarch64::EntryPerm::{KERN_RW, USER_RW};
-
-use crate::param::*;
-use crate::memory::{PhysicalAddr, VirtualAddr};
-use crate::ALLOCATOR;
-
 use aarch64::vmsa::*;
 use allocator::util::{align_down, align_up};
 use shim::{const_assert_size, io, ioerr};
+
+use crate::ALLOCATOR;
+use crate::memory::{PhysicalAddr, VirtualAddr};
+use crate::param::*;
 
 #[repr(C)]
 pub struct Page([u8; PAGE_SIZE]);
@@ -131,7 +130,7 @@ impl PageTable {
     /// Returns a new `Box` containing `PageTable`.
     /// Entries in L2PageTable should be initialized properly before return.
     fn new(perm: u64) -> Box<PageTable> {
-        let mut page_table = Box::new(PageTable{
+        let mut page_table = Box::new(PageTable {
             l2: L2PageTable::new(),
             l3: [L3PageTable::new(), L3PageTable::new(), L3PageTable::new()],
         });
@@ -199,7 +198,6 @@ impl PageTable {
     pub fn get_baddr(&self) -> PhysicalAddr {
         self.l2.as_ptr()
     }
-
 }
 
 impl<'a> IntoIterator for &'a PageTable {
@@ -277,7 +275,7 @@ impl UserPageTable {
     /// Returns a new `UserPageTable` containing a `PageTable` created with
     /// `USER_RW` permission.
     pub fn new() -> UserPageTable {
-        UserPageTable{
+        UserPageTable {
             0: PageTable::new(USER_RW)
         }
     }
@@ -316,7 +314,7 @@ impl UserPageTable {
         entry.set_value(0b1_u64, RawL3Entry::AF);
         self.0.set_entry(va, entry);
 
-        return unsafe {core::slice::from_raw_parts_mut(page, PAGE_SIZE)};
+        return unsafe { core::slice::from_raw_parts_mut(page, PAGE_SIZE) };
     }
 
     pub fn translate(&self, virtual_address: VirtualAddr) -> io::Result<PhysicalAddr> {

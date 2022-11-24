@@ -3,11 +3,11 @@
 
 #![no_std]
 
+use macros::*;
+pub use traits::*;
+
 mod traits;
 mod macros;
-
-pub use traits::*;
-use macros::*;
 
 /// Reexports all of the traits in this crate.
 ///
@@ -19,7 +19,7 @@ use macros::*;
 /// ```
 pub mod prelude {
     #[doc(no_inline)]
-    pub use super::{Readable, Writeable, ReadableWriteable, Wrapper};
+    pub use super::{Readable, ReadableWriteable, Wrapper, Writeable};
 }
 
 /// A wrapper type that enforces **read-only** _volatile_ accesses to a raw
@@ -55,29 +55,33 @@ pub struct Unique<T>(T);
 // Implementations for `ReadVolatile`.
 ptr!(ReadVolatile, |self| &self.0);
 readable!(ReadVolatile, |self| &self.0);
-unsafe impl<T: Send> Send for ReadVolatile<T> {  }
-impl<T> !Sync for ReadVolatile<T> {  }
+unsafe impl<T: Send> Send for ReadVolatile<T> {}
+
+impl<T> ! Sync for ReadVolatile<T> {}
 
 // Implementations for `Volatile`.
 ptr!(Volatile, |self| &self.0);
 readable!(Volatile, |self| &self.0);
 writeable!(Volatile, |self| &mut self.0);
 readable_writeable!(Volatile);
-unsafe impl<T: Send> Send for Volatile<T> {  }
-impl<T> !Sync for Volatile<T> {  }
+unsafe impl<T: Send> Send for Volatile<T> {}
+
+impl<T> ! Sync for Volatile<T> {}
 
 // Implementations for `WriteVolatile`.
 writeable!(WriteVolatile, |self| &mut self.0);
 ptr!(WriteVolatile, |self| &self.0);
-unsafe impl<T: Send> Send for WriteVolatile<T> {  }
-impl<T> !Sync for WriteVolatile<T> {  }
+unsafe impl<T: Send> Send for WriteVolatile<T> {}
+
+impl<T> ! Sync for WriteVolatile<T> {}
 
 // Implementations for `Reserved`.
 ptr!(Reserved, |self| &self.0);
 
 // Implementations for `Unique`.
-unsafe impl<R: Wrapper> Send for Unique<R> where <R as Wrapper>::Inner: Send {  }
-unsafe impl<R: Wrapper> Sync for Unique<R> where <R as Wrapper>::Inner: Sync {  }
+unsafe impl<R: Wrapper> Send for Unique<R> where <R as Wrapper>::Inner: Send {}
+
+unsafe impl<R: Wrapper> Sync for Unique<R> where <R as Wrapper>::Inner: Sync {}
 
 impl<T, R: Readable<T>> Readable<T> for Unique<R> {
     #[inline(always)]
@@ -94,4 +98,4 @@ impl<T, R: Writeable<T>> Writeable<T> for Unique<R> {
 }
 
 impl<T, R: ReadableWriteable<T>> ReadableWriteable<T> for Unique<R>
-    where T: ::core::ops::BitAnd<Output = T>, T: ::core::ops::BitOr<Output = T> { }
+    where T: ::core::ops::BitAnd<Output=T>, T: ::core::ops::BitOr<Output=T> {}

@@ -20,7 +20,7 @@ pub trait Dir: Sized {
     type Entry: Entry;
 
     /// An type that is an iterator over the entries in this directory.
-    type Iter: Iterator<Item = Self::Entry>;
+    type Iter: Iterator<Item=Self::Entry>;
 
     /// Returns an interator over the entries in this directory.
     fn entries(&mut self) -> io::Result<Self::Iter>;
@@ -78,10 +78,10 @@ pub trait FileSystem {
     type File: File;
 
     /// The type of directories in this file system.
-    type Dir: Dir<Entry = Self::Entry>;
+    type Dir: Dir<Entry=Self::Entry>;
 
     /// The type of directory entries in this file system.
-    type Entry: Entry<File = Self::File, Dir = Self::Dir>;
+    type Entry: Entry<File=Self::File, Dir=Self::Dir>;
 
     /// Opens the entry at `path`. `path` must be absolute.
     ///

@@ -13,7 +13,7 @@ pub const SPINNING_BASE: *mut usize = 0xd8 as *mut usize;
 
 /// Generates `pub enums` with no variants for each `ident` passed in.
 pub macro states($($name:ident),*) {
-    $(
+$(
         /// A possible state.
         #[doc(hidden)]
         pub enum $name {  }

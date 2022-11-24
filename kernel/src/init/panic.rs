@@ -1,4 +1,5 @@
 use core::panic::PanicInfo;
+
 use crate::kprintln;
 
 #[panic_handler]
@@ -22,7 +23,7 @@ fn panic(panic_info: &PanicInfo) -> ! {
             kprintln!("FILE: {}", location.file());
             kprintln!("LINE: {}", location.line());
             kprintln!("COL: {}", location.column());
-        },
+        }
         None => { kprintln!("unknown location"); }
     }
 
@@ -31,10 +32,9 @@ fn panic(panic_info: &PanicInfo) -> ! {
     match panic_info.message() {
         Some(message) => {
             kprintln!("{}", message);
-        },
+        }
         None => {}
     }
-
 
 
     loop {}

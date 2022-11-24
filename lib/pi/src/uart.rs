@@ -1,16 +1,15 @@
 use core::fmt;
 use core::time::Duration;
 
+use filesystem::CharDevice;
 use shim::io;
 use shim::ioerr;
-
+use volatile::{Reserved, Volatile};
 use volatile::prelude::*;
-use volatile::{Volatile, Reserved};
-use filesystem::CharDevice;
 
-use crate::timer;
 use crate::common::IO_BASE;
-use crate::gpio::{Gpio, Function};
+use crate::gpio::{Function, Gpio};
+use crate::timer;
 
 /// The base address for the `MU` registers.
 const MU_REG_BASE: usize = IO_BASE + 0x215040;
@@ -165,7 +164,7 @@ impl io::Read for MiniUart {
             Ok(_) => {
                 for i in 0..buf.len() {
                     if !self.has_byte() {
-                        return Ok(i)
+                        return Ok(i);
                     }
                     buf[i] = self.read_byte();
                 }

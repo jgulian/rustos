@@ -1,7 +1,7 @@
+pub use self::atag::*;
+
 mod atag;
 mod raw;
-
-pub use self::atag::*;
 
 /// The address at which the firmware loads the ATAGS.
 const ATAG_BASE: usize = 0x100;
@@ -38,7 +38,7 @@ impl Iterator for Atags {
 
 #[cfg(test)]
 mod test {
-    use super::{raw, Atag, Atags};
+    use super::{Atag, Atags, raw};
 
     const MEM: [u32; 23] = [
         // CORE
@@ -83,7 +83,7 @@ mod test {
             Some(Atag::Core(raw::Core {
                 flags: 1,
                 page_size: 2,
-                root_dev: 3
+                root_dev: 3,
             }))
         );
 

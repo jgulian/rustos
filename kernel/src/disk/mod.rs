@@ -28,6 +28,7 @@ pub struct PiVFatHandle(Rc<Mutex<VFat<Self>>>);
 // have enabled only one core of the board, these unsound impls will not cause
 // any immediate harm for now. We will fix this in the future.
 unsafe impl Send for PiVFatHandle {}
+
 unsafe impl Sync for PiVFatHandle {}
 
 impl Debug for PiVFatHandle {

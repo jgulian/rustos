@@ -7,13 +7,13 @@ use aarch64;
 use aarch64::SP;
 use pi::local_interrupt::{local_tick_in, LocalController, LocalInterrupt};
 
-use crate::param::*;
-use crate::process::{Id, Process, State};
-use crate::traps::TrapFrame;
 use crate::{SCHEDULER, VMM};
 use crate::multiprocessing::mutex::Mutex;
 use crate::multiprocessing::per_core::local_irq;
+use crate::param::*;
+use crate::process::{Id, Process, State};
 use crate::traps::irq::IrqHandlerRegistry;
+use crate::traps::TrapFrame;
 
 extern "C" {
     fn _start();
@@ -161,7 +161,7 @@ impl Scheduler {
     fn new() -> Box<Scheduler> {
         Box::new(Scheduler {
             processes: VecDeque::new(),
-            last_id: None
+            last_id: None,
         })
     }
 
@@ -180,7 +180,7 @@ impl Scheduler {
                     return None;
                 }
                 Id::from(pid + 1)
-            },
+            }
         };
 
         (*process.context).tpidr = new_pid;

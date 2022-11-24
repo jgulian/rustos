@@ -1,5 +1,6 @@
 use core::fmt;
 use core::fmt::Formatter;
+
 use crate::traps::syndrome::Fault::{AccessFlag, AddressSize, Alignment, Permission, TlbConflict, Translation};
 
 #[derive(Debug, PartialEq, Copy, Clone)]

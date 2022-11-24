@@ -44,7 +44,7 @@ impl Process {
     /// `None`. Otherwise returns `Some` of the new `Process`.
     pub fn new() -> OsResult<Process> {
         let stack = Stack::new().ok_or(OsError::NoMemory)?;
-        Ok(Process{
+        Ok(Process {
             context: Box::new(Default::default()),
             stack,
             vmap: Box::new(UserPageTable::new()),
@@ -92,7 +92,7 @@ impl Process {
         Ok(process)
     }
 
-    pub fn load_from_kernel(_function: fn ()) -> OsResult<Process> {
+    pub fn load_from_kernel(_function: fn()) -> OsResult<Process> {
         unimplemented!("need to fix text");
         //let mut process = Process::new()?;
         //

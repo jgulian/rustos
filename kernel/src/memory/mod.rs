@@ -1,16 +1,17 @@
-mod address;
-mod pagetable;
-
 use core::arch::asm;
+use core::sync::atomic::{AtomicUsize, Ordering};
+
+use aarch64::*;
+
+use crate::multiprocessing::mutex::Mutex;
+use crate::multiprocessing::per_core::{is_mmu_ready, set_mmu_ready};
+use crate::param::{KERNEL_MASK_BITS, USER_MASK_BITS};
+
 pub use self::address::{PhysicalAddr, VirtualAddr};
 pub use self::pagetable::*;
 
-use aarch64::*;
-use core::sync::atomic::{AtomicUsize, Ordering};
-use crate::multiprocessing::mutex::Mutex;
-use crate::multiprocessing::per_core::{is_mmu_ready, set_mmu_ready};
-
-use crate::param::{KERNEL_MASK_BITS, USER_MASK_BITS};
+mod address;
+mod pagetable;
 
 pub struct VMManager {
     kern_pt: Mutex<Option<KernPageTable>>,
@@ -58,26 +59,26 @@ impl VMManager {
 
         // (ref. D7.2.70: Memory Attribute Indirection Register)
         MAIR_EL1.set(
-            (0xFF <<  0) |// AttrIdx=0: normal, IWBWA, OWBWA, NTR
-                (0x04 <<  8) |// AttrIdx=1: device, nGnRE (must be OSH too)
+            (0xFF << 0) |// AttrIdx=0: normal, IWBWA, OWBWA, NTR
+                (0x04 << 8) |// AttrIdx=1: device, nGnRE (must be OSH too)
                 (0x44 << 16), // AttrIdx=2: non cacheable
         );
 
         // (ref. D7.2.91: Translation Control Register)
         TCR_EL1.set(
             (0b00 << 37) | // TBI=0, no tagging
-                (ips  << 32) | // IPS
+                (ips << 32) | // IPS
                 (0b11 << 30) | // TG1=64k
                 (0b11 << 28) | // SH1=3 inner
                 (0b01 << 26) | // ORGN1=1 write back
                 (0b01 << 24) | // IRGN1=1 write back
-                (0b0  << 23) | // EPD1 enables higher half
+                (0b0 << 23) | // EPD1 enables higher half
                 ((USER_MASK_BITS as u64) << 16) | // T1SZ=34 (1GB)
                 (0b01 << 14) | // TG0=64k
                 (0b11 << 12) | // SH0=3 inner
                 (0b01 << 10) | // ORGN0=1 write back
-                (0b01 <<  8) | // IRGN0=1 write back
-                (0b0  <<  7) | // EPD0 enables lower half
+                (0b01 << 8) | // IRGN0=1 write back
+                (0b0 << 7) | // EPD0 enables lower half
                 ((KERNEL_MASK_BITS as u64) << 0), // T0SZ=31 (8GB)
         );
         isb();

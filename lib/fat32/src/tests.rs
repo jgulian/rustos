@@ -1,19 +1,19 @@
 extern crate rand;
 
 use alloc::string::ToString;
+
+use mbr::{CHS, MasterBootRecord, PartitionEntry};
 use std::fmt::{self, Debug};
 use std::io;
-use std::io::prelude::*;
 use std::io::Cursor;
+use std::io::prelude::*;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
+use vfat::{BiosParameterBlock, VFat, VFatHandle};
 
 use crate::mbr;
 use crate::traits::*;
 use crate::vfat;
-
-use mbr::{MasterBootRecord, PartitionEntry, CHS};
-use vfat::{BiosParameterBlock, VFat, VFatHandle};
 
 #[derive(Clone)]
 struct StdVFatHandle(Arc<Mutex<VFat<Self>>>);
@@ -35,7 +35,7 @@ impl VFatHandle for StdVFatHandle {
 }
 
 macro check_size($T:ty, $size:expr) {
-    assert_eq!(
+assert_eq!(
         ::std::mem::size_of::<$T>(),
         $size,
         "'{}' does not have the expected size of {}",
@@ -45,7 +45,7 @@ macro check_size($T:ty, $size:expr) {
 }
 
 macro expect_variant($e:expr, $variant:pat $(if $($cond:tt)*)*) {
-    match $e {
+match $e {
         $variant $(if $($cond)*)* => {  },
         o => panic!("expected '{}' but found '{:?}'", stringify!($variant), o)
     }
@@ -67,7 +67,7 @@ macro resource($name:expr) {{
 }}
 
 macro assert_hash_eq($name:expr, $actual:expr, $expected:expr) {
-    let (actual, expected) = ($actual, $expected);
+let (actual, expected) = ($actual, $expected);
     let (actual, expected) = (actual.trim(), expected.trim());
     if actual != expected {
         eprintln!("\nFile system hash failed for {}!\n", $name);
@@ -89,7 +89,7 @@ macro hash_for($name:expr) {{
 }}
 
 macro vfat_from_resource($name:expr) {
-    VFat::<StdVFatHandle>::from(resource!($name)).expect("failed to initialize VFAT from image")
+VFat::<StdVFatHandle>::from(resource!($name)).expect("failed to initialize VFAT from image")
 }
 
 #[test]

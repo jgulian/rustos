@@ -1,10 +1,10 @@
+use core::time::Duration;
+
+pub use pi::common::*;
 use shim::{const_assert_eq, const_assert_size};
 
 // we only support 64-bit
 const_assert_size!(usize, 64 / 8);
-
-use core::time::Duration;
-pub use pi::common::*;
 
 pub const PAGE_ALIGN: usize = 16;
 pub const PAGE_SIZE: usize = 64 * 1024;
@@ -18,7 +18,8 @@ const_assert_eq!(
     USER_IMG_BASE,
     ((1 << USER_MASK_BITS) - 1) << (64 - USER_MASK_BITS)
 );
-pub const USER_STACK_BASE: usize = core::usize::MAX & PAGE_MASK; //0xffff_ffff_ffff_0000
+pub const USER_STACK_BASE: usize = core::usize::MAX & PAGE_MASK;
+//0xffff_ffff_ffff_0000
 pub const USER_MAX_VM_SIZE: usize = 0x4000_0000;
 const_assert_eq!(USER_IMG_BASE.wrapping_add(USER_MAX_VM_SIZE), 0);
 

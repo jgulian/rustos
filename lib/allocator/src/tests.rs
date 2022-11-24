@@ -53,16 +53,19 @@ mod align_util {
     fn test_panics_1() {
         align_down(0xFFFF0000, 7);
     }
+
     #[test]
     #[should_panic]
     fn test_panics_2() {
         align_down(0xFFFF0000, 123);
     }
+
     #[test]
     #[should_panic]
     fn test_panics_3() {
         align_up(0xFFFF0000, 7);
     }
+
     #[test]
     #[should_panic]
     fn test_panics_4() {
@@ -72,8 +75,8 @@ mod align_util {
 
 mod allocator {
     extern crate alloc;
-    use alloc::raw_vec::RawVec;
 
+    use alloc::raw_vec::RawVec;
     use core::alloc::Layout;
 
     use crate::allocator::{bin, bump, LocalAlloc};
@@ -103,11 +106,11 @@ mod allocator {
     }
 
     macro layout($size:expr, $align:expr) {
-        Layout::from_size_align($size, $align).unwrap()
+    Layout::from_size_align($size, $align).unwrap()
     }
 
     macro test_layouts($layouts:expr, $start:expr, $end:expr, $a:expr) {
-        let (layouts, start, end, mut a) = ($layouts, $start, $end, $a);
+    let (layouts, start, end, mut a) = ($layouts, $start, $end, $a);
 
         let mut pointers: Vec<(usize, Layout)> = vec![];
         for layout in &layouts {

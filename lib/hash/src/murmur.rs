@@ -65,7 +65,7 @@ impl Hasher for Murmur64 {
         }
 
         while consumed + 8 < bytes.len() {
-            let slice = &bytes[consumed.. consumed + 8];
+            let slice = &bytes[consumed..consumed + 8];
             let data = u64::from_ne_bytes(slice.try_into().unwrap());
             self.append(data);
         }

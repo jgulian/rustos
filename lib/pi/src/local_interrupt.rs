@@ -1,6 +1,6 @@
 use core::time::Duration;
-use shim::const_assert_size;
 
+use shim::const_assert_size;
 use volatile::prelude::*;
 use volatile::Volatile;
 
@@ -108,7 +108,7 @@ impl LocalController {
     }
 
     pub fn tick_in(&mut self, t: Duration) {
-        let additional_time = (t.as_nanos() * unsafe {aarch64::CNTFRQ_EL0.get() as u128} / 1_000_000_000u128) as u64;
+        let additional_time = (t.as_nanos() * unsafe { aarch64::CNTFRQ_EL0.get() as u128 } / 1_000_000_000u128) as u64;
         unsafe {
             aarch64::CNTP_TVAL_EL0.set(additional_time);
             aarch64::CNTP_CTL_EL0.set(aarch64::CNTP_CTL_EL0.get() & (!aarch64::CNTP_CTL_EL0::IMASK));

@@ -91,7 +91,7 @@ impl<'a, T: BlockDevice> BlockDevice for &'a mut T {
 
 //FIXME: this can probably be deleted
 macro impl_for_read_write_seek($(<$($gen:tt),*>)* $T:path) {
-    impl $(<$($gen),*>)* BlockDevice for $T {
+impl $(<$($gen),*>)* BlockDevice for $T {
         fn read_sector(&mut self, n: u64, buf: &mut [u8]) -> io::Result<usize> {
             use shim::io::{Read, Seek, SeekFrom};
             let sector_size = self.sector_size();

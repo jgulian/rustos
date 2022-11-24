@@ -515,7 +515,7 @@ impl<'a, HANDLE: VFatHandle> FileSystem for HandleReference<'a, HANDLE> {
 
 impl<HANDLE: VFatHandle> File2 for File<HANDLE> {}
 
-impl <HANDLE: VFatHandle> Directory2 for Dir<HANDLE> where HANDLE: 'static {
+impl<HANDLE: VFatHandle> Directory2 for Dir<HANDLE> where HANDLE: 'static {
     fn open_entry(&mut self, name: &str) -> io::Result<Entry2> {
         Ok(match self.find(name)? {
             Entry::File(file) => Entry2::File(Box::new(file)),
@@ -528,7 +528,7 @@ impl <HANDLE: VFatHandle> Directory2 for Dir<HANDLE> where HANDLE: 'static {
             name: name.to_string(),
             metadata: Default::default(),
             file_size: 0,
-            chain: Chain::new(self.vfat.clone())?
+            chain: Chain::new(self.vfat.clone())?,
         };
 
         DirTrait::append(self, Entry::File(file))
@@ -539,7 +539,7 @@ impl <HANDLE: VFatHandle> Directory2 for Dir<HANDLE> where HANDLE: 'static {
             vfat: self.vfat.clone(),
             name: name.to_string(),
             metadata: Default::default(),
-            chain: Chain::new(self.vfat.clone())?
+            chain: Chain::new(self.vfat.clone())?,
         };
 
         DirTrait::append(self, Entry::Dir(dir))

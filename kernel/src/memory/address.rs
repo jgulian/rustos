@@ -13,7 +13,7 @@ impl VirtualAddr {
     pub fn level3_index(&self) -> u64 {
         (self.as_u64() & ((1 << 29) - (1 << 16))) >> 16
     }
-    
+
     pub fn offset(&self) -> u64 {
         self.as_u64() & ((1 << 16) - 1)
     }

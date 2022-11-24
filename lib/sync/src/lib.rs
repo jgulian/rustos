@@ -1,7 +1,7 @@
 #![no_std]
 
 use core::marker::Sized;
-use core::ops::{Drop, FnOnce, Deref, DerefMut};
+use core::ops::{Deref, DerefMut, Drop, FnOnce};
 
 pub trait Mutex: Sized {
     fn new() -> Self;

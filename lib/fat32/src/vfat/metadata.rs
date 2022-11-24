@@ -1,6 +1,6 @@
 use core::fmt;
-
 use core::fmt::Formatter;
+
 use filesystem;
 
 /// A date as represented in FAT32 on-disk structures.
@@ -55,7 +55,9 @@ pub struct Timestamp {
 
 impl From<Date> for Timestamp {
     fn from(date: Date) -> Self {
-        Timestamp{date, time: Time(0)
+        Timestamp {
+            date,
+            time: Time(0),
         }
     }
 }

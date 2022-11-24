@@ -3,19 +3,18 @@ use alloc::string::String;
 use alloc::vec;
 use core::time::Duration;
 
-use crate::console::{CONSOLE, kprint};
-
-use crate::process::State;
-use crate::traps::TrapFrame;
-use crate::{kprintln, Process, SCHEDULER};
-
 use kernel_api::*;
 use kernel_api::OsError::BadAddress;
 use pi::timer;
 use shim::{io, ioerr};
 use shim::io::{Read, Write};
+
+use crate::{kprintln, Process, SCHEDULER};
+use crate::console::{CONSOLE, kprint};
 use crate::memory::{PagePerm, VirtualAddr};
 use crate::param::{PAGE_SIZE, USER_IMG_BASE};
+use crate::process::State;
+use crate::traps::TrapFrame;
 
 /// Sleep for `ms` milliseconds.
 ///
@@ -162,7 +161,7 @@ fn copy_from_userspace(tf: &TrapFrame, ptr: u64, buf: &mut [u8]) -> OsResult<()>
     if virtual_address.offset() as usize + buf.len() > PAGE_SIZE {
         Err(BadAddress)
     } else {
-        buf.copy_from_slice(unsafe {core::slice::from_raw_parts(ptr as *const u8, buf.len())});
+        buf.copy_from_slice(unsafe { core::slice::from_raw_parts(ptr as *const u8, buf.len()) });
         //kprintln!("copied {:?}", buf);
         Ok(())
     }
@@ -227,6 +226,7 @@ pub fn handle_syscall(num: u16, tf: &mut TrapFrame) {
         Syscall::Unknown => {
             Ok(())
         }
+        _ => { Ok(()) }
     };
 
     // TODO: this can be simplified with into/from?

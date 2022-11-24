@@ -1,7 +1,7 @@
-use crate::common::IO_BASE;
-
 use volatile::prelude::*;
 use volatile::Volatile;
+
+use crate::common::IO_BASE;
 
 const INT_BASE: usize = IO_BASE + 0xB000 + 0x200;
 
@@ -20,7 +20,7 @@ pub enum Interrupt {
 impl Interrupt {
     pub const MAX: usize = 8;
 
-    pub fn iter() -> impl Iterator<Item = Interrupt> {
+    pub fn iter() -> impl Iterator<Item=Interrupt> {
         use Interrupt::*;
         [Timer1, Timer3, Usb, Gpio0, Gpio1, Gpio2, Gpio3, Uart]
             .iter()

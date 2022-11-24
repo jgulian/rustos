@@ -1,5 +1,2 @@
-
 #[derive(Debug)]
-pub(crate) struct Resource {
-
-}
+pub(crate) struct Resource {}

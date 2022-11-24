@@ -1,5 +1,10 @@
 #![cfg_attr(not(test), no_std)]
 
+pub use asm::*;
+pub use regs::*;
+pub use sp::SP;
+pub use vmsa::*;
+
 #[macro_use]
 pub mod macros;
 
@@ -7,11 +12,6 @@ pub mod asm;
 pub mod regs;
 pub mod sp;
 pub mod vmsa;
-
-pub use asm::*;
-pub use regs::*;
-pub use sp::SP;
-pub use vmsa::*;
 
 /// Returns the current exception level.
 /// This is a privileged operation and will abort in EL0.

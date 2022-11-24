@@ -1,10 +1,11 @@
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::fmt;
+
 use log::info;
-use shim::io;
 
 use filesystem::BlockDevice;
+use shim::io;
 
 #[derive(Debug)]
 struct CacheEntry {
@@ -46,8 +47,8 @@ impl CachedPartition {
     ///
     /// Panics if the partition's sector size is < the device's sector size.
     pub fn new<T>(device: T, partition: Partition) -> CachedPartition
-    where
-        T: BlockDevice + 'static,
+        where
+            T: BlockDevice + 'static,
     {
         assert!(partition.sector_size >= device.sector_size());
 
@@ -88,7 +89,7 @@ impl CachedPartition {
         let mut new_cache_entry = CacheEntry {
             data: vec![0; self.sector_size() as usize],
             virtual_sector,
-            dirty: false
+            dirty: false,
         };
 
         let physical_sector = self.virtual_to_physical(virtual_sector)

@@ -879,9 +879,9 @@ impl AsRef<OsStr> for String {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     use alloc::rc::Rc;
+
+    use super::*;
 
     #[test]
     fn test_os_string_reserve() {

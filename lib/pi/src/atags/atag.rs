@@ -1,5 +1,4 @@
 use crate::atags::raw;
-
 pub use crate::atags::raw::{Core, Mem};
 
 /// An ATAG.

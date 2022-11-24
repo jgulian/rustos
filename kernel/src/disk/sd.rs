@@ -1,7 +1,7 @@
 use core::time::Duration;
-use shim::io;
 
 use filesystem::BlockDevice;
+use shim::io;
 
 extern "C" {
     /// A global representing the last SD controller error that occured.

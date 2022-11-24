@@ -26,7 +26,7 @@ pub trait Readable<T> {
     /// This is equivalent to `(self.read() & mask) == mask`.
     #[inline(always)]
     fn has_mask(&self, mask: T) -> bool
-        where T: ::core::ops::BitAnd<Output = T>,
+        where T: ::core::ops::BitAnd<Output=T>,
               T: PartialEq + Copy
     {
         (self.read() & mask) == mask
@@ -48,8 +48,8 @@ pub trait Writeable<T> {
 
 /// Trait implemented by **readable _and_ writeable** volatile wrappers.
 pub trait ReadableWriteable<T>: Readable<T> + Writeable<T>
-    where T: ::core::ops::BitAnd<Output = T>,
-          T: ::core::ops::BitOr<Output = T>
+    where T: ::core::ops::BitAnd<Output=T>,
+          T: ::core::ops::BitOr<Output=T>
 {
     /// Applies the mask `mask` using `&` to the value referred to by `self`.
     /// This is equivalent to `self.write(self.read() & mask)`.
