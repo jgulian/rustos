@@ -62,6 +62,10 @@ impl L3Entry {
     fn is_valid(&self) -> bool {
         self.0.get_value(RawL3Entry::VALID) > 0
     }
+
+    pub fn address(&self) -> usize {
+        (self.0.get_value(RawL3Entry::ADDR) as usize) << PAGE_ALIGN
+    }
 }
 
 impl From<u64> for L3Entry {
@@ -327,6 +331,22 @@ impl UserPageTable {
         } else {
             ioerr!(AddrNotAvailable)
         }
+    }
+
+    pub fn allocated_iter(&mut self) -> impl Iterator<Item=(VirtualAddr, &L3Entry)> {
+        self.allocated_l3_table(0)
+            .chain(self.allocated_l3_table(1))
+            .chain(self.allocated_l3_table(2))
+            .filter(|(_, entry)| entry.is_valid())
+    }
+
+    fn allocated_l3_table(&self, table: usize) -> impl Iterator<Item=(VirtualAddr, &L3Entry)> {
+        self.l3[table].entries.iter().enumerate().map(move |(i, entry)| {
+            let address = USER_IMG_BASE +
+                ((table & ((1 << 14) - 1)) << 29 | (i & ((1 << 14) - 1)) << 16);
+            let va = VirtualAddr::from(address);
+            (va, entry)
+        })
     }
 }
 

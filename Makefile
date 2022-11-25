@@ -5,6 +5,7 @@ TARGET_DIR := target/aarch64-unknown-none/release/
 TARGET := $(TARGET_DIR)/$(KERN)
 BINARY := $(TARGET).bin
 SDCARD ?= $(ROOT)/user/fs.img
+USER_PROGRAMS := cat fib heap init shell
 
 QEMU := qemu-system-aarch64
 QEMU_ARGS := -nographic -M raspi3b -serial null -serial mon:stdio \
@@ -41,10 +42,10 @@ clean:
 
 user:
 	@echo "+ Building user programs"
-	@cargo build --bin heap --release
-	@llvm-objcopy -O binary $(TARGET_DIR)/heap $(TARGET_DIR)/heap.bin
-	@cargo build --bin fib --release
-	@llvm-objcopy -O binary $(TARGET_DIR)/fib $(TARGET_DIR)/fib.bin
+	@for program in $(USER_PROGRAMS) ; do 											\
+		cargo build --bin $$program --release;											\
+		llvm-objcopy -O binary $(TARGET_DIR)/$$program $(TARGET_DIR)/$$program.bin;		\
+    done
 
 image:
 	cd user; ./build.sh

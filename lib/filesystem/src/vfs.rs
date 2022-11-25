@@ -38,7 +38,6 @@ impl VirtualFileSystem {
     }
 
     pub fn mount(&mut self, mount_point: Path, filesystem: Box<dyn FileSystem2>) {
-        info!("mounting to {}", mount_point.to_string());
         self.mounts.0.as_ref().borrow_mut().push(Mount {
             mount_point,
             filesystem,
@@ -72,17 +71,19 @@ impl Directory2 for VFSDirectory {
         let mounts = self.mounts.clone();
         let result = mounts.0.as_ref().borrow_mut().iter_mut()
             .filter(|mount| mount.mount_point.starts_with(&self.path))
-            .next().map(|mount| {
-            if mount.mount_point == self.path {
-                mount.filesystem.root()?.open_entry(name)
-            } else {
-                Ok(Entry2::Directory(Box::new(VFSDirectory {
-                    path: new_path,
-                    mounts: self.mounts.clone(),
-                })))
-            }
-        }).unwrap_or(ioerr!(NotFound));
-
+            .find_map(|mount| -> Option<Entry2> {
+                if mount.mount_point == self.path {
+                    let mut thing = mount.filesystem.root().ok()?;
+                    thing.open_entry(name).ok()
+                } else if mount.mount_point.starts_with(&new_path) {
+                    Some(Entry2::Directory(Box::new(VFSDirectory {
+                        path: new_path.clone(),
+                        mounts: self.mounts.clone(),
+                    })))
+                } else {
+                    None
+                }
+            }).ok_or(newioerr!(NotFound));
         result
     }
 

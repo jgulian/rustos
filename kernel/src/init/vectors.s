@@ -52,11 +52,6 @@ context_save:
     mrs x1, SP_EL0
     PUSH16 x0, x1
 
-    //dsb     ishst
-    //tlbi    vmalle1
-    //dsb     ish
-    //isb
-
     mrs x0, SPSR_EL1
     mrs x1, ELR_EL1
     PUSH16 x0, x1

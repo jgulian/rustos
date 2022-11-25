@@ -58,23 +58,10 @@ impl PiVFatWrapper {
         let sd = sd::Sd::new().expect("filesystem failed to initialize");
         let vfat = VFat::<PiVFatHandle>::from(sd).expect("failed to initialize vfat");
         (&mut *self.0.get()).replace(vfat);
-
-        info!("initialize");
-        match *self.0.get() {
-            None => {
-                info!("none");
-            }
-            Some(_) => {
-                info!("some");
-            }
-        }
     }
 
     fn handle(&self) -> &PiVFatHandle {
-        info!("handle");
-        let cell = unsafe { self.0.get().as_ref() };
-
-        cell.unwrap().as_ref().unwrap()
+        unsafe { self.0.get().as_ref() }.unwrap().as_ref().unwrap()
     }
 }
 
@@ -120,7 +107,6 @@ impl FileSystem {
         FILESYSTEM.0.lock().as_mut().unwrap().mount(Path::root(), disk_file_system);
 
         let mut console_path = Path::root();
-        console_path.append_child("console");
         let console_filesystem = Box::new(CharDeviceFileSystem::new(
             "console".to_string(), MiniUart::new())
         );

@@ -144,7 +144,6 @@ impl<HANDLE: VFatHandle> VFat<HANDLE> {
         current_sector += offset / sector_size;
 
         if offset % self.device.sector_size() != 0 {
-            info!("not here 1");
             let amount_to_write = (sector_size - (offset % sector_size)) as usize;
             let buffer = &buf[..amount_to_write];
             self.update_sector(current_sector, (offset % sector_size) as usize, buffer)?;
@@ -153,7 +152,6 @@ impl<HANDLE: VFatHandle> VFat<HANDLE> {
         }
 
         while (sector_size as usize) < buf.len() - amount_written {
-            info!("not here 2");
             let buffer = &buf[amount_written..(amount_written + sector_size as usize)];
             self.device.write_sector(current_sector, buffer)?;
             current_sector += 1;
@@ -345,8 +343,6 @@ impl<HANDLE: VFatHandle> io::Write for Chain<HANDLE> {
                     panic!("read more bytes within cluster than exist within cluster");
                 }
             }
-
-            info!("amogus 3 {}", amount_written);
 
             self.position += amount_written as u64;
             self.current_cluster = current_cluster;

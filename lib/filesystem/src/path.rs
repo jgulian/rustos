@@ -3,6 +3,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 use core::any::Any;
 use core::borrow::Borrow;
+use core::fmt::{Display, Formatter, Write};
 use core::ops::Index;
 
 use shim::{io, ioerr};
@@ -153,34 +154,6 @@ impl From<&[Component]> for Path {
     }
 }
 
-impl ToString for Path {
-    fn to_string(&self) -> String {
-        let mut result = String::new();
-        let mut components = self.0.iter().peekable();
-        while let Some(component) = components.next() {
-            match component {
-                Component::Root => {
-                    result.push('/');
-                }
-                Component::Current => {
-                    result.push_str("./");
-                }
-                Parent => {
-                    result.push_str("./");
-                }
-                Component::Child(child) => {
-                    result.push_str(child.as_str());
-                    if components.peek().is_some() {
-                        result.push('/');
-                    }
-                }
-            }
-        }
-
-        result
-    }
-}
-
 impl Clone for Path {
     fn clone(&self) -> Self {
         Path(self.0.clone())
@@ -194,4 +167,31 @@ fn is_valid_entry(name: &str) -> bool {
             _ => false,
         }
     })
+}
+
+impl Display for Path {
+    fn fmt(&self, f: &mut Formatter) -> core::fmt::Result {
+        let mut components = self.0.iter().peekable();
+        while let Some(component) = components.next() {
+            match component {
+                Component::Root => {
+                    f.write_char('/')?;
+                }
+                Component::Current => {
+                    f.write_str("./")?;
+                }
+                Parent => {
+                    f.write_str("../")?;
+                }
+                Component::Child(child) => {
+                    f.write_str(child.as_str())?;
+                    if components.peek().is_some() {
+                        f.write_char('/')?;
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
 }

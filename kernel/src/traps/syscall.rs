@@ -1,8 +1,9 @@
 use alloc::boxed::Box;
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use alloc::vec;
 use core::time::Duration;
 
+use filesystem::path::Path;
 use kernel_api::*;
 use kernel_api::OsError::BadAddress;
 use pi::timer;
@@ -69,55 +70,52 @@ pub fn sys_exit(tf: &mut TrapFrame) -> OsResult<()> {
     Ok(())
 }
 
-pub fn sys_open(_tf: &mut TrapFrame) -> OsResult<()> {
-    //let file = tf.xs[0];
-    //let ptr = tf.xs[1];
-    //let len = tf.xs[2] as usize;
-    //
-    //let mut buffer = vec![0u8; len];
-    //
-    //if file == 0 {
-    //    if CONSOLE.lock().read_exact(buffer.as_mut_slice()) {
-    //        tf.xs[7] = OsError::IoErrorTimedOut as u64;
-    //    }
-    //}
-    //copy_into_userspace(tf, ptr, buffer.as_slice());
-    unimplemented!("amogus")
+pub fn sys_open(tf: &mut TrapFrame) -> OsResult<()> {
+    let ptr = tf.xs[0];
+    let len = tf.xs[1] as usize;
+
+    let mut buffer = vec![0u8; len];
+    copy_from_userspace(tf, ptr, buffer.as_mut_slice())?;
+    let path = String::from_utf8_lossy(buffer.as_slice()).to_string();
+
+    tf.xs[0] = SCHEDULER.on_process(tf, |process| {
+        process.open(path)
+    })??;
+
+    Ok(())
 }
 
-pub fn sys_read(_tf: &mut TrapFrame) -> OsResult<()> {
-    //let file = tf.xs[0];
-    //let ptr = tf.xs[1];
-    //let len = tf.xs[2] as usize;
-    //
-    //let mut buffer = vec![0u8; len];
-    //
-    //if file == 0 {
-    //    if CONSOLE.lock().read_exact(buffer.as_mut_slice()) {
-    //        tf.xs[7] = OsError::IoErrorTimedOut as u64;
-    //    }
-    //}
-    //copy_into_userspace(tf, ptr, buffer.as_slice());
-    unimplemented!("amogus")
+pub fn sys_read(tf: &mut TrapFrame) -> OsResult<()> {
+    let descriptor = tf.xs[0];
+    let ptr = tf.xs[1];
+    let len = tf.xs[2] as usize;
+
+    let mut buffer = vec![0u8; len];
+
+    let amount_read = SCHEDULER.on_process(tf, |process| {
+        process.read(descriptor, buffer.as_mut_slice())
+    })??;
+
+    copy_into_userspace(tf, ptr, &buffer[0..amount_read])?;
+    tf.xs[0] = amount_read as u64;
+
+    Ok(())
 }
 
 pub fn sys_write(tf: &mut TrapFrame) -> OsResult<()> {
-    let file = tf.xs[0];
+    let descriptor = tf.xs[0];
     let ptr = tf.xs[1];
     let len = tf.xs[2] as usize;
 
     let mut buffer = vec![0u8; len];
     copy_from_userspace(tf, ptr, buffer.as_mut_slice())?;
 
-    if file == 0 {
-        if CONSOLE.lock().write(buffer.as_slice()).is_err() {
-            Err(OsError::IoErrorTimedOut)
-        } else {
-            Ok(())
-        }
-    } else {
-        Ok(())
-    }
+    let amount_written = SCHEDULER.on_process(tf, |process| {
+        process.write(descriptor, buffer.as_slice())
+    })??;
+    tf.xs[0] = amount_written as u64;
+
+    Ok(())
 }
 
 /// Returns the current process's ID.
@@ -145,7 +143,7 @@ pub fn sys_sbrk(tf: &mut TrapFrame) -> OsResult<()> {
         let heap_base = USER_IMG_BASE + PAGE_SIZE;
         process.vmap.alloc(VirtualAddr::from(heap_base), PagePerm::RW);
         Ok((heap_base as u64, PAGE_SIZE as u64))
-    })?;
+    })??;
 
     info!("allocated space for process {}", tf.tpidr);
     tf.xs[0] = result.0;
@@ -154,46 +152,57 @@ pub fn sys_sbrk(tf: &mut TrapFrame) -> OsResult<()> {
     Ok(())
 }
 
+fn sys_fork(tf: &mut TrapFrame) -> OsResult<()> {
+    tf.xs[0] = SCHEDULER.fork(tf).ok_or(OsError::NoVmSpace)?;
+    Ok(())
+}
+
+fn sys_wait(tf: &mut TrapFrame) -> OsResult<()> {
+    SCHEDULER.switch(State::Waiting(Box::new(|process| {
+        if let Some(id) = process.dead_children.pop() {
+            process.context.xs[0] = id;
+            true
+        } else {
+            false
+        }
+    })), tf);
+    Ok(())
+}
+
+fn sys_duplicate(tf: &mut TrapFrame) -> OsResult<()> {
+    let descriptor = tf.xs[0];
+    tf.xs[0] = SCHEDULER.on_process(tf, |process| {
+        process.duplicate(descriptor)
+    })??;
+
+    Ok(())
+}
+
 //TODO: make the functions work across page boundaries
-fn copy_from_userspace(tf: &TrapFrame, ptr: u64, buf: &mut [u8]) -> OsResult<()> {
+fn copy_from_userspace(_: &TrapFrame, ptr: u64, buf: &mut [u8]) -> OsResult<()> {
     let virtual_address = VirtualAddr::from(ptr);
 
     if virtual_address.offset() as usize + buf.len() > PAGE_SIZE {
         Err(BadAddress)
     } else {
         buf.copy_from_slice(unsafe { core::slice::from_raw_parts(ptr as *const u8, buf.len()) });
-        //kprintln!("copied {:?}", buf);
         Ok(())
     }
-
-    //SCHEDULER.on_process(tf, |process| -> OsResult<()> {
-    //    let address = process.vmap.translate(VirtualAddr::from(ptr))
-    //        .map_err(|_| BadAddress)?;
-    //    unsafe {
-    //        let real_ptr = address.as_u64() as *const u8;
-    //        buf.copy_from_slice(core::slice::from_raw_parts(real_ptr, buf.len()));
-    //    }
-    //
-    //    Ok(())
-    //})
 }
 
-fn copy_into_userspace(tf: &TrapFrame, ptr: u64, buf: &[u8]) -> OsResult<()> {
+fn copy_into_userspace(_: &TrapFrame, ptr: u64, buf: &[u8]) -> OsResult<()> {
     let virtual_address = VirtualAddr::from(ptr);
     if virtual_address.offset() as usize + buf.len() > PAGE_SIZE {
         return Err(BadAddress);
     }
 
-    SCHEDULER.on_process(tf, |process| -> OsResult<()> {
-        let address = process.vmap.translate(VirtualAddr::from(ptr))
-            .map_err(|_| BadAddress)?;
-        unsafe {
-            let real_ptr = address.as_u64() as *mut u8;
-            core::slice::from_raw_parts_mut(real_ptr, buf.len()).copy_from_slice(buf);
-        }
-
+    if virtual_address.offset() as usize + buf.len() > PAGE_SIZE {
+        Err(BadAddress)
+    } else {
+        let user_slice = unsafe { core::slice::from_raw_parts_mut(ptr as *mut u8, buf.len()) };
+        user_slice.copy_from_slice(buf);
         Ok(())
-    })
+    }
 }
 
 pub fn handle_syscall(num: u16, tf: &mut TrapFrame) {
@@ -223,15 +232,31 @@ pub fn handle_syscall(num: u16, tf: &mut TrapFrame) {
             info!("sbrk received");
             sys_sbrk(tf)
         }
-        Syscall::Unknown => {
-            Ok(())
+        Syscall::Fork => {
+            info!("elr fork {:x?}", tf.elr);
+            sys_fork(tf)
         }
-        _ => { Ok(()) }
+        Syscall::Duplicate => {
+            sys_duplicate(tf)
+        }
+        Syscall::Execute => {
+            info!("needs to implement {:?}", Syscall::from(num));
+            panic!("called unimplemented syscall");
+            Err(OsError::Unknown)
+        }
+        Syscall::Wait => {
+            sys_wait(tf)
+        }
+        Syscall::Unknown => {
+            Err(OsError::Unknown)
+        }
     };
 
     // TODO: this can be simplified with into/from?
     tf.xs[7] = match result {
         Ok(_) => 1,
-        Err(err) => err as u64
-    }
+        Err(err) => {
+            err as u64
+        }
+    };
 }

@@ -3,8 +3,6 @@ use core::fmt;
 use core::fmt::Write;
 use core::time::Duration;
 
-use shim::ioerr;
-
 use crate::*;
 
 macro_rules! err_or {
@@ -111,7 +109,7 @@ pub fn open(file: &str) -> OsResult<u64> {
     unsafe {
         let slice = file.as_bytes();
         syscall_args!((slice.as_ptr()) as u64, slice.len() as u64);
-        syscall!(Syscall::Read);
+        syscall!(Syscall::Open);
         syscall_receive1!()
     }
 }
@@ -163,7 +161,7 @@ pub fn duplicate(file: u64) -> OsResult<u64> {
 }
 
 //TODO: this should not return on success; codify that
-pub fn execute(arguments: &[u8], environment: &[u8]) -> OsResult<(u64)> {
+pub fn execute(arguments: &[u8], environment: &[u8]) -> OsResult<u64> {
     unsafe {
         syscall_args!(arguments.as_ptr() as u64, arguments.len() as u64,
             environment.as_ptr() as u64, environment.len() as u64);

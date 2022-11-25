@@ -1,6 +1,7 @@
 use core::fmt;
 use core::ops::{Add, AddAssign, BitAnd, BitOr, Sub, SubAssign};
 
+//TODO: this should probably just be usize since 64 bit is only supported
 /// A virtual address.
 #[derive(Copy, Clone, PartialEq)]
 pub struct VirtualAddr(usize);

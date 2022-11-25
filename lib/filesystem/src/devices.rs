@@ -7,6 +7,8 @@ use core::borrow::BorrowMut;
 use core::cell::RefCell;
 use core::ops::DerefMut;
 
+use log::info;
+
 use shim::{io, ioerr};
 use shim::io::{Read, Seek, SeekFrom, Write};
 
@@ -218,6 +220,6 @@ impl<T: CharDevice + 'static> Drop for CharDeviceFile<T> {
     fn drop(&mut self) {
         let mut binding = self.0.as_ref().borrow_mut();
         let (_, busy) = binding.deref_mut();
-        *busy = true;
+        *busy = false;
     }
 }

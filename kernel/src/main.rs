@@ -60,57 +60,11 @@ unsafe fn kernel_main() -> ! {
     VMM.initialize();
     SCHEDULER.initialize();
 
-    //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
-    //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
-    //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
-    //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
-
-    //TODO: there's an issue with locking? wherein nothing will run unless the following is here
-    info!("any sussers");
-
     init::initialize_app_cores();
     VMM.wait();
 
-    use filesystem::fs2::{FileSystem2, Directory2};
-
-    info!("root dir files");
-
-    let root_path = Path::root();
-    let mut root = FILESYSTEM.borrow().root().expect("can't turn root into dir");
-    for entry in root.list().expect("can't list root") {
-        info!("{}", entry);
-    }
-
-    root.create_file("amogus").expect("should allow creating files");
-    //let new_file_path = PathBuf::from("/amogus");
-    //let new_entry = root.open_entry("amogus").expect("can't open new file");
-    //let mut new_file = new_entry.into_file().expect("can't turn new entry into file");
-    //new_file.write("sussy".as_bytes()).expect("unable to write to new file");
-
-    info!("root dir files again");
-    let mut root_again = FILESYSTEM.borrow().root().expect("can't turn root into dir");
-    for entry in root_again.list().expect("can't list root") {
-        info!("{}", entry);
-    }
-
-    //let mut added_file = FILESYSTEM.borrow().open_file(new_file_path.as_path()).expect("amogus should exist");
-    //let mut buf = [0u8; 256];
-    //let _read_amount = added_file.read(&mut buf).expect("should be readable");
-    // FIXME: amount read is not correct.
-    //assert_eq!(read_amount, "sussy".len());
-    //info!("read from new file {}", String::from_utf8_lossy(&buf));
-
-    info!("cores initialized");
-
-    let fib = Path::new("/fib").expect("path is valid");
-    let heap = Path::new("/heap").expect("path is valid");
-
-    SCHEDULER.add(Process::load(&fib).expect("should exist"));
-    SCHEDULER.add(Process::load(&heap).expect("should exist"));
-    //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
-    //SCHEDULER.add(Process::load(PathBuf::from("/fib")).expect("should exist"));
-
-    kprintln!("Welcome to rustos!");
+    let init = Path::new("/init").expect("unable to open init");
+    SCHEDULER.add(Process::load(&init).expect("unable to run init"));
 
     SCHEDULER.start();
 }

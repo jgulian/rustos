@@ -71,6 +71,7 @@ impl From<io::Error> for OsError {
     }
 }
 
+#[derive(Debug)]
 pub enum Syscall {
     Sleep = 0,
     Time = 1,
@@ -98,6 +99,10 @@ impl From<u16> for Syscall {
             5 => Syscall::Write,
             6 => Syscall::GetPid,
             7 => Syscall::Sbrk,
+            8 => Syscall::Fork,
+            9 => Syscall::Duplicate,
+            10 => Syscall::Execute,
+            11 => Syscall::Wait,
             _ => Syscall::Unknown,
         }
     }

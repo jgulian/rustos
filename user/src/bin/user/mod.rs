@@ -1,6 +1,5 @@
 use core::alloc::GlobalAlloc;
 use core::alloc::Layout;
-use core::arch::asm;
 use core::cell::UnsafeCell;
 use core::mem::zeroed;
 use core::panic::PanicInfo;
@@ -72,7 +71,7 @@ unsafe impl GlobalAlloc for GlobalAllocator {
                 *beg = *beg & (!(layout.align() - 1)) + layout.align();
             }
 
-            let location = unsafe { *beg as *mut u8 };
+            let location = *beg as *mut u8;
             *beg += layout.size();
 
             location

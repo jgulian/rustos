@@ -1,14 +1,17 @@
 use alloc::boxed::Box;
+use alloc::string::String;
 use alloc::vec::Vec;
 use core::borrow::Borrow;
 use core::mem;
+use core::slice::from_raw_parts;
 
 use aarch64;
+use aarch64::EntryPerm::USER_RW;
 use aarch64::SPSR_EL1;
 use filesystem::fs2::FileSystem2;
 use filesystem::path::Path;
 use kernel_api::{OsError, OsResult};
-use shim::io;
+use shim::{io, ioerr, newioerr};
 
 use crate::FILESYSTEM;
 use crate::memory::*;
@@ -34,6 +37,10 @@ pub struct Process {
     pub state: State,
     /// The resources (files) open by a process
     pub(crate) resources: Vec<Resource>,
+    /// Parent process
+    pub(crate) parent: Option<Id>,
+    /// Last dead process
+    pub(crate) dead_children: Vec<Id>,
 }
 
 impl Process {
@@ -50,6 +57,8 @@ impl Process {
             vmap: Box::new(UserPageTable::new()),
             state: State::Ready,
             resources: Vec::new(),
+            parent: None,
+            dead_children: Vec::new(),
         })
     }
 
@@ -109,7 +118,7 @@ impl Process {
 
     /// Returns the highest `VirtualAddr` that is supported by this system.
     pub fn get_max_va() -> VirtualAddr {
-        VirtualAddr::from(u64::max_value())
+        VirtualAddr::from(u64::MAX)
     }
 
     /// Returns the `VirtualAddr` represents the base address of the user
@@ -121,7 +130,7 @@ impl Process {
     /// Returns the `VirtualAddr` represents the base address of the user
     /// process's stack.
     pub fn get_stack_base() -> VirtualAddr {
-        VirtualAddr::from(u64::max_value() & PAGE_MASK as u64)
+        VirtualAddr::from(u64::MAX & PAGE_MASK as u64)
     }
 
     /// Returns the `VirtualAddr` represents the top of the user process's
@@ -162,5 +171,76 @@ impl Process {
             State::Ready => true,
             _ => false,
         }
+    }
+
+    //TODO: limit number of open files
+    pub fn open(&mut self, path: String) -> io::Result<u64> {
+        let mut descriptor = 0;
+        while let Some(_) = self.find_resource(descriptor) {
+            descriptor += 1;
+        }
+
+        self.resources.push(Resource {
+            descriptor,
+            path,
+        });
+
+        Ok(descriptor)
+    }
+
+    fn find_resource(&self, descriptor: u64) -> Option<&Resource> {
+        self.resources.iter()
+            .filter(|resource| resource.descriptor == descriptor)
+            .next()
+    }
+
+    pub fn read(&self, descriptor: u64, buffer: &mut [u8]) -> io::Result<usize> {
+        let path = Path::try_from(self.find_resource(descriptor)
+            .ok_or(newioerr!(NotFound))?.path.as_str())?;
+        let mut file = FILESYSTEM.borrow().open(&path)?
+            .into_file().ok_or(newioerr!(NotFound))?;
+        file.read(buffer)
+    }
+
+    pub fn write(&self, descriptor: u64, buffer: &[u8]) -> io::Result<usize> {
+        let path = Path::try_from(self.find_resource(descriptor)
+            .ok_or(newioerr!(NotFound))?.path.as_str())?;
+        use alloc::string::ToString;
+        let mut file = FILESYSTEM.borrow().open(&path)?
+            .into_file().ok_or(newioerr!(NotFound))?;
+        file.write(buffer)
+    }
+
+    pub fn duplicate(&mut self, descriptor: u64) -> io::Result<u64> {
+        let path = self.find_resource(descriptor)
+            .ok_or(newioerr!(NotFound))?.path.clone();
+        self.open(path)
+    }
+
+    pub fn fork(&mut self, id: Id) -> io::Result<Process> {
+        let stack = Stack::new().ok_or(newioerr!(OutOfMemory))?;
+        let mut new_process = Process {
+            context: Box::new(*self.context),
+            stack,
+            vmap: Box::new(UserPageTable::new()),
+            state: State::Ready,
+            resources: self.resources.clone(),
+            parent: Some(self.context.tpidr),
+            dead_children: Vec::new(),
+        };
+
+        info!("LULW {}", new_process.context.xs[7]);
+        new_process.context.xs[0] = 0;
+        new_process.context.xs[7] = OsError::Ok as u64;
+        new_process.context.tpidr = id;
+        new_process.context.elr = self.context.elr + 4;
+
+        for (va, entry) in self.vmap.allocated_iter() {
+            let page = new_process.vmap.alloc(va, PagePerm::RWX);
+            let source = unsafe { from_raw_parts(entry.address() as *const u8, PAGE_SIZE) };
+            page.copy_from_slice(source);
+        }
+
+        Ok(new_process)
     }
 }

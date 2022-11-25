@@ -1,17 +1,21 @@
 use alloc::boxed::Box;
 use alloc::collections::vec_deque::VecDeque;
+use alloc::vec;
 use core::arch::asm;
 use core::fmt;
+use core::time::Duration;
 
 use aarch64;
 use aarch64::SP;
+use kernel_api::syscall::sleep;
 use pi::local_interrupt::{local_tick_in, LocalController, LocalInterrupt};
+use shim::{io, newioerr};
 
 use crate::{SCHEDULER, VMM};
 use crate::multiprocessing::mutex::Mutex;
 use crate::multiprocessing::per_core::local_irq;
 use crate::param::*;
-use crate::process::{Id, Process, State};
+use crate::process::{Id, Process, Stack, State};
 use crate::traps::irq::IrqHandlerRegistry;
 use crate::traps::TrapFrame;
 
@@ -50,6 +54,18 @@ impl GlobalScheduler {
         let id = self.critical(move |scheduler| scheduler.add(process));
         aarch64::sev();
         id
+    }
+
+    pub fn fork(&self, tf: &mut TrapFrame) -> Option<Id> {
+        let id = self.critical(|scheduler| {
+            *scheduler.find_process(tf.tpidr)?.context = *tf;
+            let id = scheduler.fork(tf.tpidr)?;
+            *tf = *scheduler.find_process(tf.tpidr)?.context;
+            Some(id)
+        })?;
+
+        aarch64::sev();
+        Some(id)
     }
 
     /// Performs a context switch using `tf` by setting the state of the current
@@ -145,8 +161,16 @@ impl GlobalScheduler {
         *self.0.lock() = Some(Scheduler::new());
     }
 
-    pub fn on_process<T: FnOnce(&mut Process) -> R, R>(&self, tf: &TrapFrame, on: T) -> R {
-        self.critical(|scheduler| on(scheduler.find_process(tf)))
+    pub fn on_process<T: FnOnce(&mut Process) -> R, R>(&self, tf: &mut TrapFrame, on: T) -> io::Result<R> {
+        self.critical(|scheduler| -> io::Result<R> {
+            let process = scheduler.find_process(tf.tpidr)
+                .ok_or(newioerr!(NotFound))?;
+            *process.context = *tf;
+            let result = on(process);
+            *tf = *process.context;
+
+            Ok(result)
+        })
     }
 }
 
@@ -173,21 +197,39 @@ impl Scheduler {
     /// It is the caller's responsibility to ensure that the first time `switch`
     /// is called, that process is executing on the CPU.
     fn add(&mut self, mut process: Process) -> Option<Id> {
-        let new_pid = match self.last_id {
-            None => Id::from(0u64),
-            Some(pid) => {
-                if pid == u64::max_value() {
-                    return None;
-                }
-                Id::from(pid + 1)
-            }
-        };
+        let new_pid = self.new_pid()?;
 
         (*process.context).tpidr = new_pid;
         self.processes.push_back(process);
 
         self.last_id = Some(new_pid);
         Some(new_pid)
+    }
+
+    fn fork(&mut self, process_id: Id) -> Option<Id> {
+        let new_pid = self.new_pid()?;
+
+        let mut new_process = self.processes.iter_mut()
+            .find(|process| process.context.tpidr == process_id)?
+            .fork(new_pid).ok()?;
+
+        new_process.context.tpidr = new_pid;
+        self.processes.push_back(new_process);
+        Some(new_pid)
+    }
+
+    fn new_pid(&mut self) -> Option<Id> {
+        self.last_id = match self.last_id {
+            None => Some(Id::from(0u64)),
+            Some(pid) => {
+                if pid == u64::MAX {
+                    return None;
+                }
+                Some(Id::from(pid + 1))
+            }
+        };
+
+        self.last_id
     }
 
     /// Finds the currently running process, sets the current process's state
@@ -251,18 +293,19 @@ impl Scheduler {
         let process = self.processes.pop_back()?;
         let pid = process.context.tpidr;
 
+        if let Some(parent_id) = process.parent {
+            if let Some(parent) = self.find_process(parent_id) {
+                parent.dead_children.push(process.context.tpidr);
+            }
+        }
+
         Some(pid)
     }
 
     /// Finds a process corresponding with tpidr saved in a trap frame.
     /// Panics if the search fails.
-    pub fn find_process(&mut self, tf: &TrapFrame) -> &mut Process {
-        for i in 0..self.processes.len() {
-            if self.processes[i].context.tpidr == tf.tpidr {
-                return &mut self.processes[i];
-            }
-        }
-        panic!("Invalid TrapFrame");
+    pub fn find_process(&mut self, id: Id) -> Option<&mut Process> {
+        self.processes.iter_mut().find(|process| process.context.tpidr == id)
     }
 }
 
