@@ -27,6 +27,6 @@ pub const KERN_STACK_BASE: usize = 0x80_000;
 pub const KERN_STACK_ALIGN: usize = PAGE_ALIGN;
 pub const KERN_STACK_SIZE: usize = PAGE_SIZE;
 
-/// The `tick` time.
+/// The `tick` time. TODO: relower
 pub const TICK: Duration = Duration::from_secs(1);
 

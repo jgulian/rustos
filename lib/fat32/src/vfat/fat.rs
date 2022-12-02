@@ -27,6 +27,7 @@ impl Status {
 }
 
 #[repr(C, packed)]
+#[derive(Default, Copy, Clone)]
 pub struct FatEntry(pub u32);
 
 impl From<Status> for FatEntry {

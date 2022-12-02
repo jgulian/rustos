@@ -6,10 +6,8 @@
 extern crate alloc;
 
 use alloc::string::ToString;
-use core::alloc::{GlobalAlloc, Layout};
 
 use kernel_api::println;
-use kernel_api::syscall::{exit, sbrk};
 
 mod user;
 

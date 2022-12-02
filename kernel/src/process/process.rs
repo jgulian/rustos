@@ -1,19 +1,20 @@
 use alloc::boxed::Box;
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::borrow::Borrow;
 use core::mem;
+use core::mem::zeroed;
+use core::ptr::write_volatile;
 use core::slice::from_raw_parts;
 
 use aarch64;
-use aarch64::EntryPerm::USER_RW;
 use aarch64::SPSR_EL1;
 use filesystem::fs2::FileSystem2;
 use filesystem::path::Path;
 use kernel_api::{OsError, OsResult};
-use shim::{io, ioerr, newioerr};
+use shim::{io, newioerr};
 
-use crate::FILESYSTEM;
+use crate::{FILESYSTEM, VMM};
 use crate::memory::*;
 use crate::param::*;
 use crate::process::{Stack, State};
@@ -229,12 +230,12 @@ impl Process {
             dead_children: Vec::new(),
         };
 
-        info!("LULW {}", new_process.context.xs[7]);
         new_process.context.xs[0] = 0;
+        new_process.context.xs[1] = 1;
         new_process.context.xs[7] = OsError::Ok as u64;
+        new_process.context.ttbr0 = VMM.get_baddr().as_u64();
+        new_process.context.ttbr1 = new_process.vmap.get_baddr().as_u64();
         new_process.context.tpidr = id;
-        new_process.context.elr = self.context.elr + 4;
-
         for (va, entry) in self.vmap.allocated_iter() {
             let page = new_process.vmap.alloc(va, PagePerm::RWX);
             let source = unsafe { from_raw_parts(entry.address() as *const u8, PAGE_SIZE) };
@@ -242,5 +243,59 @@ impl Process {
         }
 
         Ok(new_process)
+    }
+
+    pub fn execute(&mut self, arguments: &[u8], environment: &[u8]) -> OsResult<()> {
+        let argument_vec = parse_execute(arguments);
+        let _environment_vec = parse_execute(environment);
+
+        let path = Path::try_from(argument_vec.first()
+            .ok_or(newioerr!(InvalidFilename))?
+            .clone())?;
+        let mut absolute_path = Path::root();
+        absolute_path.append(&path);
+
+        let mut program_file = FILESYSTEM.borrow().open(&absolute_path)?
+            .into_file().ok_or(newioerr!(InvalidFilename))?;
+
+        self.vmap = Box::new(UserPageTable::new());
+        self.vmap.alloc(Process::get_stack_base(), PagePerm::RW);
+        let user_image = self.vmap.alloc(Process::get_image_base(), PagePerm::RWX);
+        program_file.read(user_image)?;
+
+        self.context.sp = Process::get_stack_top().as_u64();
+        self.context.elr = Process::get_image_base().as_u64();
+        self.context.ttbr0 = VMM.get_baddr().as_u64();
+        self.context.ttbr1 = self.vmap.get_baddr().as_u64();
+        self.context.spsr = SPSR_EL1::F | SPSR_EL1::A | SPSR_EL1::D;
+
+        Ok(())
+    }
+}
+
+fn parse_execute(data: &[u8]) -> Vec<String> {
+    let mut result = Vec::new();
+    let mut last_start = 0;
+    for (i, c) in data.iter().enumerate() {
+        if *c == 0 {
+            result.push(String::from_utf8_lossy(&data[last_start..i]).to_string());
+            last_start = i + 1;
+        }
+    }
+
+    if last_start != data.len() {
+        result.push(String::from_utf8_lossy(&data[last_start..]).to_string());
+    }
+
+    result
+}
+
+unsafe fn zero_page(va: VirtualAddr) {
+    let mut iter: *mut u64 = va.as_ptr() as *mut u64;
+    let end: *mut u64 = iter.add(PAGE_ALIGN / core::mem::size_of::<u64>() - 1);
+
+    while iter < end {
+        write_volatile(iter, zeroed());
+        iter = iter.add(1);
     }
 }

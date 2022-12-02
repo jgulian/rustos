@@ -6,7 +6,6 @@ use core::iter::Chain;
 use core::ops::{Deref, DerefMut, Sub};
 use core::slice::Iter;
 
-use aarch64::EntryPerm::{KERN_RW, USER_RW};
 use aarch64::vmsa::*;
 use allocator::util::{align_down, align_up};
 use shim::{const_assert_size, io, ioerr};
@@ -227,7 +226,7 @@ impl KernPageTable {
     /// as address[47:16]. Refer to the definition of `RawL3Entry` in `vmsa.rs` for
     /// more details.
     pub fn new() -> KernPageTable {
-        let mut page_table = PageTable::new(KERN_RW);
+        let mut page_table = PageTable::new(EntryPerm::KERN_RW);
 
         let page_start = 0;
         let page_end = align_down(0x3c000000, PAGE_ALIGN);
@@ -238,7 +237,7 @@ impl KernPageTable {
             let mut entry = RawL3Entry::new(0);
             entry.set_value(address as u64 >> PAGE_ALIGN, RawL3Entry::ADDR);
             entry.set_value(EntrySh::ISh as u64, RawL3Entry::SH);
-            entry.set_value(KERN_RW as u64, RawL3Entry::AP);
+            entry.set_value(EntryPerm::KERN_RW as u64, RawL3Entry::AP);
             entry.set_value(EntryAttr::Mem, RawL3Entry::ATTR);
             entry.set_value(EntryType::Table, RawL3Entry::TYPE);
             entry.set_value(EntryValid::Valid, RawL3Entry::VALID);
@@ -255,7 +254,7 @@ impl KernPageTable {
             let mut entry = RawL3Entry::new(0);
             entry.set_value(address as u64 >> PAGE_ALIGN, RawL3Entry::ADDR);
             entry.set_value(EntrySh::OSh as u64, RawL3Entry::SH);
-            entry.set_value(KERN_RW as u64, RawL3Entry::AP);
+            entry.set_value(EntryPerm::KERN_RW as u64, RawL3Entry::AP);
             entry.set_value(EntryAttr::Dev, RawL3Entry::ATTR);
             entry.set_value(EntryType::Table, RawL3Entry::TYPE);
             entry.set_value(EntryValid::Valid, RawL3Entry::VALID);
@@ -280,7 +279,7 @@ impl UserPageTable {
     /// `USER_RW` permission.
     pub fn new() -> UserPageTable {
         UserPageTable {
-            0: PageTable::new(USER_RW)
+            0: PageTable::new(EntryPerm::USER_RW)
         }
     }
 
@@ -311,7 +310,7 @@ impl UserPageTable {
         let mut entry = RawL3Entry::new(0);
         entry.set_value(address >> PAGE_ALIGN, RawL3Entry::ADDR);
         entry.set_value(EntrySh::ISh as u64, RawL3Entry::SH);
-        entry.set_value(USER_RW, RawL3Entry::AP);
+        entry.set_value(EntryPerm::USER_RW, RawL3Entry::AP);
         entry.set_value(EntryAttr::Mem, RawL3Entry::ATTR);
         entry.set_value(EntryType::Table, RawL3Entry::TYPE);
         entry.set_value(EntryValid::Valid, RawL3Entry::VALID);

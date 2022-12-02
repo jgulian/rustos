@@ -5,13 +5,19 @@ use core::mem::zeroed;
 use core::panic::PanicInfo;
 use core::ptr::write_volatile;
 
-use kernel_api::syscall::{exit, sbrk};
+use kernel_api::println;
+use kernel_api::syscall::{exit, sbrk, write};
 
 #[panic_handler]
-fn panic(_info: &PanicInfo) -> ! { close(); }
+fn panic(info: &PanicInfo) -> ! {
+    let _ = write(1, "panicked\n".as_bytes());
+    //TODO: remove
+    println!("{:?}", info);
+    close();
+}
 
 #[alloc_error_handler]
-fn my_example_handler(layout: Layout) -> ! {
+fn alloc_error_handler(layout: Layout) -> ! {
     panic!("memory allocation of {} bytes failed", layout.size())
 }
 

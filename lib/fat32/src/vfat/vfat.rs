@@ -168,13 +168,13 @@ impl<HANDLE: VFatHandle> VFat<HANDLE> {
         Ok(amount_written)
     }
 
-    pub fn fat_entry(&mut self, cluster: Cluster) -> io::Result<&FatEntry> {
+    pub fn fat_entry(&mut self, cluster: Cluster) -> io::Result<FatEntry> {
         let sector = self.fat_start_sector + (cluster.offset() / self.bytes_per_sector as u32) as u64;
         let mut data = vec![0u8; self.device.sector_size() as usize];
         self.device.read_sector(sector, data.as_mut_slice())?;
         let offset = (cluster.offset() % self.bytes_per_sector as u32) as usize;
         let entry = &data[offset];
-        Ok(unsafe { mem::transmute::<&u8, &FatEntry>(entry) })
+        Ok(*unsafe { mem::transmute::<&u8, &FatEntry>(entry) })
     }
 
     pub(crate) fn next_cluster(&mut self, cluster: Cluster) -> io::Result<Option<Cluster>> {
@@ -286,7 +286,7 @@ impl<HANDLE: VFatHandle> io::Read for Chain<HANDLE> {
                 let read = vfat.read_cluster(current_cluster, cluster_offset as u64, buffer)?;
                 amount_read += read;
                 cluster_offset += read;
-                //info!("in read info {} {} {}", amount_read, cluster_offset, read);
+
                 if cluster_offset == bytes_per_cluster {
                     cluster_offset = 0;
                     match vfat.next_cluster(current_cluster)? {
@@ -301,8 +301,6 @@ impl<HANDLE: VFatHandle> io::Read for Chain<HANDLE> {
                     panic!("read more bytes within cluster than exist within cluster");
                 }
             }
-
-            //info!("position updated by {}", amount_read);
 
             self.position += amount_read as u64;
             self.current_cluster = current_cluster;

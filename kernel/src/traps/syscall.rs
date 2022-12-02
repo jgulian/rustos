@@ -3,15 +3,11 @@ use alloc::string::{String, ToString};
 use alloc::vec;
 use core::time::Duration;
 
-use filesystem::path::Path;
 use kernel_api::*;
 use kernel_api::OsError::BadAddress;
 use pi::timer;
-use shim::{io, ioerr};
-use shim::io::{Read, Write};
 
-use crate::{kprintln, Process, SCHEDULER};
-use crate::console::{CONSOLE, kprint};
+use crate::{kprintln, SCHEDULER};
 use crate::memory::{PagePerm, VirtualAddr};
 use crate::param::{PAGE_SIZE, USER_IMG_BASE};
 use crate::process::State;
@@ -145,15 +141,37 @@ pub fn sys_sbrk(tf: &mut TrapFrame) -> OsResult<()> {
         Ok((heap_base as u64, PAGE_SIZE as u64))
     })??;
 
-    info!("allocated space for process {}", tf.tpidr);
     tf.xs[0] = result.0;
     tf.xs[1] = result.1;
 
     Ok(())
 }
 
+fn sys_duplicate(tf: &mut TrapFrame) -> OsResult<()> {
+    let descriptor = tf.xs[0];
+    tf.xs[0] = SCHEDULER.on_process(tf, |process| {
+        process.duplicate(descriptor)
+    })??;
+
+    Ok(())
+}
+
 fn sys_fork(tf: &mut TrapFrame) -> OsResult<()> {
     tf.xs[0] = SCHEDULER.fork(tf).ok_or(OsError::NoVmSpace)?;
+    tf.xs[1] = 0;
+
+    Ok(())
+}
+
+fn sys_execute(tf: &mut TrapFrame) -> OsResult<()> {
+    let mut arguments = vec![0u8; tf.xs[1] as usize];
+    let mut environment = vec![0u8; tf.xs[3] as usize];
+
+    copy_from_userspace(tf, tf.xs[0], arguments.as_mut_slice())?;
+    copy_from_userspace(tf, tf.xs[2], environment.as_mut_slice())?;
+
+    SCHEDULER.on_process(tf, |process|
+        process.execute(arguments.as_slice(), environment.as_slice()))??;
     Ok(())
 }
 
@@ -166,15 +184,6 @@ fn sys_wait(tf: &mut TrapFrame) -> OsResult<()> {
             false
         }
     })), tf);
-    Ok(())
-}
-
-fn sys_duplicate(tf: &mut TrapFrame) -> OsResult<()> {
-    let descriptor = tf.xs[0];
-    tf.xs[0] = SCHEDULER.on_process(tf, |process| {
-        process.duplicate(descriptor)
-    })??;
-
     Ok(())
 }
 
@@ -229,20 +238,16 @@ pub fn handle_syscall(num: u16, tf: &mut TrapFrame) {
             sys_getpid(tf)
         }
         Syscall::Sbrk => {
-            info!("sbrk received");
             sys_sbrk(tf)
         }
         Syscall::Fork => {
-            info!("elr fork {:x?}", tf.elr);
             sys_fork(tf)
         }
         Syscall::Duplicate => {
             sys_duplicate(tf)
         }
         Syscall::Execute => {
-            info!("needs to implement {:?}", Syscall::from(num));
-            panic!("called unimplemented syscall");
-            Err(OsError::Unknown)
+            sys_execute(tf)
         }
         Syscall::Wait => {
             sys_wait(tf)

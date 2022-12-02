@@ -6,7 +6,7 @@ use core::fmt;
 use core::time::Duration;
 
 use aarch64;
-use aarch64::SP;
+use aarch64::{affinity, SP};
 use kernel_api::syscall::sleep;
 use pi::local_interrupt::{local_tick_in, LocalController, LocalInterrupt};
 use shim::{io, newioerr};
@@ -209,11 +209,10 @@ impl Scheduler {
     fn fork(&mut self, process_id: Id) -> Option<Id> {
         let new_pid = self.new_pid()?;
 
-        let mut new_process = self.processes.iter_mut()
+        let new_process = self.processes.iter_mut()
             .find(|process| process.context.tpidr == process_id)?
             .fork(new_pid).ok()?;
 
-        new_process.context.tpidr = new_pid;
         self.processes.push_back(new_process);
         Some(new_pid)
     }
