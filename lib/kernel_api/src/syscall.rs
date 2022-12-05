@@ -1,5 +1,5 @@
-use core::{fmt, slice};
 use core::arch::asm;
+use core::fmt;
 use core::fmt::Write;
 use core::time::Duration;
 

@@ -5,4 +5,5 @@ use alloc::string::String;
 pub(crate) struct Resource {
     pub(crate) descriptor: u64,
     pub(crate) path: String,
+    pub(crate) seek: usize,
 }

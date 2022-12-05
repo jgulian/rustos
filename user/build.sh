@@ -34,7 +34,11 @@ for d in ${PROGS[@]}; do
     sudo cp $ROOT/target/aarch64-unknown-none/release/$d.bin $MNT/$d
 done
 
-sudo sh -c 'echo "test file for user applications" > $MNT/user.txt'
+# TODO: make this use the environment variable
+sudo bash -c 'echo "test file for user applications" > mnt/test'
+
+echo "listing"
+ls $MNT
 
 # TODO: find a general way to fix this
 qemu-img resize fs.img 256M

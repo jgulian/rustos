@@ -13,7 +13,7 @@ use filesystem::fs2::FileSystem2;
 use filesystem::path::Path;
 use kernel_api::{OsError, OsResult, println};
 use shim::{io, newioerr};
-use shim::io::Write;
+use shim::io::{SeekFrom, Write};
 
 use crate::{FILESYSTEM, VMM};
 use crate::memory::*;
@@ -43,6 +43,8 @@ pub struct Process {
     pub(crate) parent: Option<Id>,
     /// Last dead process
     pub(crate) dead_children: Vec<Id>,
+    /// Current Working Directory
+    current_directory: Path,
 }
 
 impl Process {
@@ -61,6 +63,7 @@ impl Process {
             resources: Vec::new(),
             parent: None,
             dead_children: Vec::new(),
+            current_directory: Path::root(),
         })
     }
 
@@ -185,6 +188,7 @@ impl Process {
         self.resources.push(Resource {
             descriptor,
             path,
+            seek: 0,
         });
 
         Ok(descriptor)
@@ -196,10 +200,14 @@ impl Process {
             .next()
     }
 
-    pub fn read(&self, descriptor: u64, buffer: &mut [u8]) -> io::Result<usize> {
-        let path = Path::try_from(self.find_resource(descriptor)
-            .ok_or(newioerr!(NotFound))?.path.as_str())?;
-        let mut file = FILESYSTEM.borrow().open(&path)?
+    //TODO: fix seek/clean and make write have the same semantics
+    pub fn read(&mut self, descriptor: u64, buffer: &mut [u8]) -> io::Result<usize> {
+        let resource = self.find_resource(descriptor)
+            .ok_or(newioerr!(NotFound))?;
+        let path = Path::try_from(resource.path.as_str());
+        let mut full_path = self.current_directory.clone();
+        full_path.append(&path?);
+        let mut file = FILESYSTEM.borrow().open(&full_path)?
             .into_file().ok_or(newioerr!(NotFound))?;
         file.read(buffer)
     }
@@ -207,7 +215,6 @@ impl Process {
     pub fn write(&self, descriptor: u64, buffer: &[u8]) -> io::Result<usize> {
         let path = Path::try_from(self.find_resource(descriptor)
             .ok_or(newioerr!(NotFound))?.path.as_str())?;
-        use alloc::string::ToString;
         let mut file = FILESYSTEM.borrow().open(&path)?
             .into_file().ok_or(newioerr!(NotFound))?;
         file.write(buffer)
@@ -229,6 +236,7 @@ impl Process {
             resources: self.resources.clone(),
             parent: Some(self.context.tpidr),
             dead_children: Vec::new(),
+            current_directory: self.current_directory.clone(),
         };
 
         new_process.context.xs[0] = 0;

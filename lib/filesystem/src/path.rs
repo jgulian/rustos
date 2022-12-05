@@ -6,14 +6,16 @@ use core::borrow::Borrow;
 use core::fmt::{Display, Formatter, Write};
 use core::ops::Index;
 
+use log::info;
+
 use shim::{io, ioerr};
 
 use crate::path::Component::Parent;
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 pub struct Path(Vec<Component>);
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum Component {
     Root,
     Current,
@@ -164,7 +166,10 @@ fn is_valid_entry(name: &str) -> bool {
     name.chars().all(|c| {
         match c {
             'A'..='Z' | 'a'..='z' | '0'..='9' | '_' | ' ' | '.' => true,
-            _ => false,
+            _ => {
+                info!("invalid character {}", c as u8);
+                false
+            },
         }
     })
 }

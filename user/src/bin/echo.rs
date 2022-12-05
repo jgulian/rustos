@@ -5,8 +5,6 @@
 
 extern crate alloc;
 
-use alloc::vec::Vec;
-
 use kernel_api::{print, println};
 
 use crate::user::get_arguments;

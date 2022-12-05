@@ -4,7 +4,7 @@ use core::cell::UnsafeCell;
 use core::mem;
 use core::mem::zeroed;
 use core::panic::PanicInfo;
-use core::ptr::{slice_from_raw_parts, write_volatile};
+use core::ptr::write_volatile;
 
 use kernel_api::println;
 use kernel_api::syscall::{exit, sbrk, write};
