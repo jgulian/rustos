@@ -5,7 +5,7 @@ TARGET_DIR := target/aarch64-unknown-none/release/
 TARGET := $(TARGET_DIR)/$(KERN)
 BINARY := $(TARGET).bin
 SDCARD ?= $(ROOT)/user/fs.img
-USER_PROGRAMS := cat fib heap init shell
+USER_PROGRAMS := cat echo fib heap init shell stack
 
 QEMU := qemu-system-aarch64
 QEMU_ARGS := -nographic -M raspi3b -serial null -serial mon:stdio \

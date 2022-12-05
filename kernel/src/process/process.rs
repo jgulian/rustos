@@ -11,8 +11,9 @@ use aarch64;
 use aarch64::SPSR_EL1;
 use filesystem::fs2::FileSystem2;
 use filesystem::path::Path;
-use kernel_api::{OsError, OsResult};
+use kernel_api::{OsError, OsResult, println};
 use shim::{io, newioerr};
+use shim::io::Write;
 
 use crate::{FILESYSTEM, VMM};
 use crate::memory::*;
@@ -259,11 +260,28 @@ impl Process {
             .into_file().ok_or(newioerr!(InvalidFilename))?;
 
         self.vmap = Box::new(UserPageTable::new());
-        self.vmap.alloc(Process::get_stack_base(), PagePerm::RW);
+
+        let stack = self.vmap.alloc(Process::get_stack_base(), PagePerm::RW);
+        let mut stack_data = Vec::new();
+        info!("args bytes {:?}", &(arguments.len() as u64).to_be_bytes());
+        info!("args len {:x}", arguments.len());
+
+        //TODO: clean this
+        stack_data.extend_from_slice(&(arguments.len() as u64).to_be_bytes());
+        stack_data.extend_from_slice(&(environment.len() as u64).to_be_bytes());
+        arguments.split(|x| *x == 0).for_each(|arg|
+            stack_data.extend(arg.iter().rev().chain(&[0])));
+        environment.split(|x| *x == 0).for_each(|arg|
+            stack_data.extend(arg.iter().rev().chain(&[0])));
+
+        let stack_size = stack.len();
+        stack_data.reverse();
+        stack[stack_size - stack_data.len()..].copy_from_slice(stack_data.as_slice());
+
         let user_image = self.vmap.alloc(Process::get_image_base(), PagePerm::RWX);
         program_file.read(user_image)?;
 
-        self.context.sp = Process::get_stack_top().as_u64();
+        self.context.sp = Process::get_stack_top().as_u64() - (stack_data.len() as u64);
         self.context.elr = Process::get_image_base().as_u64();
         self.context.ttbr0 = VMM.get_baddr().as_u64();
         self.context.ttbr1 = self.vmap.get_baddr().as_u64();

@@ -17,11 +17,12 @@ mod user;
 fn main() {
     let mut stdin = File::new(0);
     let mut stdout = File::new(1);
+    let mut commands: Vec<String> = Vec::new();
 
     loop {
         let mut byte = [0u8; 1];
         let mut command = String::new();
-        let mut escape = 0;
+        let mut command_index = commands.len();
 
         print!("shell > ");
 
@@ -30,11 +31,46 @@ fn main() {
 
             // TODO: work for serial escape codes broader than arrow keys
             if byte[0] == 27 {
-                escape = 2;
-            } else if escape != 0 {
-                escape -= 1;
+                let mut escape_bytes = [0u8; 2];
+                stdin.read(&mut escape_bytes).expect("could not read stdio");
+                // up 91, 65
+                // right 91, 67
+                // down 91, 66
+                // left 91, 68
+                match escape_bytes[1] {
+                    65 => {
+                        match commands.get(command_index - 1) {
+                            None => {}
+                            Some(old_command) => {
+                                print!("{}{}", "\x08 \x08".repeat(command.len()), old_command);
+                                command = old_command.to_string();
+                                command_index -= 1;
+                            }
+                        }
+                    },
+                    66 => {
+                        match commands.get(command_index + 1) {
+                            None => {
+                                print!("{}", "\x08 \x08".repeat(command.len()));
+                                command = "".to_string();
+                                command_index = commands.len();
+                            }
+                            Some(old_command) => {
+                                print!("{}{}", "\x08 \x08".repeat(command.len()), old_command);
+                                command = old_command.to_string();
+                                command_index += 1;
+                            }
+                        }
+                    },
+                    _ => {}
+                }
             } else if byte[0] == 8 || byte[0] == 127 {
-                stdout.write("\x08 \x08".as_bytes()).expect("could not write to stdout");
+                match command.pop() {
+                    None => {}
+                    Some(_) => {
+                        stdout.write("\x08 \x08".as_bytes()).expect("could not write to stdout");
+                    }
+                }
             } else {
                 stdout.write(&byte).expect("could not write to stdout");
                 command.push(byte[0] as char);
@@ -45,6 +81,7 @@ fn main() {
         } {}
 
         command = command.trim().to_string();
+        commands.push(command.clone());
         if command.eq("exit") {
             println!();
             break;

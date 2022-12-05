@@ -1,9 +1,10 @@
 use core::alloc::GlobalAlloc;
 use core::alloc::Layout;
 use core::cell::UnsafeCell;
+use core::mem;
 use core::mem::zeroed;
 use core::panic::PanicInfo;
-use core::ptr::write_volatile;
+use core::ptr::{slice_from_raw_parts, write_volatile};
 
 use kernel_api::println;
 use kernel_api::syscall::{exit, sbrk, write};
@@ -89,3 +90,35 @@ unsafe impl GlobalAlloc for GlobalAllocator {
 
 #[global_allocator]
 pub static ALLOCATOR: GlobalAllocator = GlobalAllocator::new();
+
+pub struct ArgumentIterator(usize, usize);
+
+pub fn get_arguments() -> ArgumentIterator {
+    let usize_size = mem::size_of::<usize>();
+    let argument_count_bytes = unsafe { *((usize::MAX - usize_size + 1) as *const [u8; 8]) };
+    let argument_count = usize::from_le_bytes(argument_count_bytes);
+    ArgumentIterator(usize::MAX - 2 * usize_size, argument_count + 1)
+}
+
+impl Iterator for ArgumentIterator {
+    type Item = &'static str;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.1 == 0 {
+            None
+        } else {
+            let mut location = self.0;
+            let mut length = 1;
+            while unsafe { *(location as *const u8) } != 0 {
+                location -= 1;
+                length += 1;
+            }
+
+            self.0 -= length;
+            self.1 -= length;
+
+            let slice = unsafe { core::slice::from_raw_parts(location as *const u8, length) };
+            Some(unsafe { core::str::from_utf8_unchecked(slice) })
+        }
+    }
+}
