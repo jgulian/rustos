@@ -18,11 +18,18 @@ Currently, the project is on `1.67.0-nightly`. I'm working on making it easier
 to run on general (more) hardware, but for now qemu is recommended with the
 settings in the Makefile.
 
+## Features
+
+* Kernel Allocator
+* FAT32 Filesystem support (read and write)
+* Preemptive Scheduling
+* Virtual Memory
+* Virtual File System
+* Exception Calls (`exit`, `open`, `read`, `write`, `sbrk`, `fork`, `exec`, `wait`, and more)
+* User programs (`cat`, `echo`, `shell` or `sh`, and more)
+
 ## Roadmap
 
-* Allow processes to open files
-* Add more system calls read, write (beyond single characters), fork, exec, wait, and pipe (maybe more?)
-* Implement shell and have stdin, stdout, and stderr
 * Make the file system writable*
     * Move from the current c library to a rust library
 * Add page swapping mechanisms

@@ -1,0 +1,6 @@
+[book]
+authors = ["Joseph Gulian"]
+language = "en"
+multilingual = false
+src = "src"
+title = "RustOS Documentation"
