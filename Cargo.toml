@@ -1,6 +1,6 @@
 [profile.release]
 debug = true
-lto = false # this can be deleted?
+lto = false # TODO: this can be changed?
 strip = true
 
 [workspace]
@@ -14,6 +14,7 @@ members = [
     "lib/kernel_api",
     "lib/pi",
     "lib/shim",
+    "lib/sync",
     "lib/volatile",
     "lib/xmodem",
     "user",

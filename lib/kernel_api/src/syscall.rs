@@ -136,6 +136,13 @@ pub fn write(file: u64, bytes: &[u8]) -> OsResult<()> {
     }
 }
 
+pub fn pipe() -> OsResult<(u64, u64)> {
+    unsafe {
+        syscall!(Syscall::Pipe);
+        syscall_receive2!()
+    }
+}
+
 pub fn getpid() -> OsResult<u64> {
     unsafe {
         syscall!(Syscall::GetPid);
@@ -163,9 +170,9 @@ pub fn fork() -> OsResult<Option<u64>> {
     }
 }
 
-pub fn duplicate(file: u64) -> OsResult<u64> {
+pub fn duplicate(file: u64, new: u64) -> OsResult<u64> {
     unsafe {
-        syscall_args!(file);
+        syscall_args!(file, new);
         syscall!(Syscall::Duplicate);
         syscall_receive1!()
     }

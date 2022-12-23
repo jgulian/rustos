@@ -114,6 +114,16 @@ pub fn sys_write(tf: &mut TrapFrame) -> OsResult<()> {
     Ok(())
 }
 
+fn sys_pipe() -> OsResult<()> {
+    let (ingress, egress) = SCHEDULER.on_process(tf, |process| {
+        process.pipe()
+    })??;
+
+    tf.xs[0] = ingress;
+    tf.xs[1] = egress;
+    Ok(())
+}
+
 /// Returns the current process's ID.
 ///
 /// This system call does not take parameter.
@@ -149,8 +159,9 @@ pub fn sys_sbrk(tf: &mut TrapFrame) -> OsResult<()> {
 
 fn sys_duplicate(tf: &mut TrapFrame) -> OsResult<()> {
     let descriptor = tf.xs[0];
+    let new_descriptor = tf.xs[1];
     tf.xs[0] = SCHEDULER.on_process(tf, |process| {
-        process.duplicate(descriptor)
+        process.duplicate(descriptor, new_descriptor)
     })??;
 
     Ok(())

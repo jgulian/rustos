@@ -1,60 +1,17 @@
 #![no_std]
 
 use core::marker::Sized;
-use core::ops::{Deref, DerefMut, Drop, FnOnce};
+use core::ops::{Deref, DerefMut, Drop};
 
-pub trait Mutex: Sized {
-    fn new() -> Self;
-    fn lock(&mut self);
-    fn unlock(&mut self);
-}
+pub struct PoisonError<G>(G);
 
-pub struct Latch<M: Mutex, T: Sized> {
-    mutex: M,
-    data: T,
-}
+pub type LockResult<Guard> = Result<Guard, PoisonError<Guard>>;
 
-impl<'a, M: Mutex, T: Sized> Latch<M, T> {
-    pub fn new(data: T) -> Self {
-        Latch {
-            mutex: M::new(),
-            data,
-        }
-    }
+pub trait Guard<'a, T: Sized + 'a>: Deref<Target=T> + DerefMut<Target=T> {}
 
-    pub fn guard(&'a mut self) -> LatchGuard<'a, M, T> {
-        LatchGuard(self)
-    }
+pub trait Mutex<'a, T: Sized + 'a> {
+    type Guard: Guard<'a, T>;
 
-    pub fn critical<F: FnOnce(&T) -> R, R>(&mut self, function: F) -> R {
-        let lock_guard = self.guard();
-        function(&*lock_guard)
-    }
-
-    pub fn critical_mut<F: FnOnce(&mut T) -> R, R>(&mut self, function: F) -> R {
-        let mut lock_guard = self.guard();
-        function(&mut *lock_guard)
-    }
-}
-
-pub struct LatchGuard<'a, M: Mutex, T: Sized>(&'a mut Latch<M, T>);
-
-impl<'a, M: Mutex, T: Sized> Deref for LatchGuard<'a, M, T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0.data
-    }
-}
-
-impl<'a, M: Mutex, T: Sized> DerefMut for LatchGuard<'a, M, T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0.data
-    }
-}
-
-impl<'a, M: Mutex, T: Sized> Drop for LatchGuard<'a, M, T> {
-    fn drop(&mut self) {
-        self.0.mutex.unlock();
-    }
+    fn new(data: T) -> Self;
+    fn lock(&mut self) -> LockResult<Self::Guard>;
 }

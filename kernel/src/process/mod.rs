@@ -12,4 +12,5 @@ mod scheduler;
 mod stack;
 mod state;
 mod resource;
+mod pipe;
 
