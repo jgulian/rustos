@@ -5,5 +5,4 @@ edition = "2021"
 
 [dependencies]
 shim = { path = "../shim", features = ["alloc"] }
-sync = { path = "../sync" }
-log = "0.4" #FIXME: remove
+log = "0.4"

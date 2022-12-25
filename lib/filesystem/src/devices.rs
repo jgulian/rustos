@@ -10,7 +10,6 @@ use core::ops::DerefMut;
 use log::info;
 
 use shim::{io, ioerr};
-use sync::Mutex;
 
 use crate::{File, FileSystem};
 use crate::fs2::{Directory2, Entry2, File2, FileSystem2, Metadata2};

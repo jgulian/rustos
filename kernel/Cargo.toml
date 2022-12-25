@@ -19,7 +19,6 @@ filesystem = { path = "../lib/filesystem/" }
 kernel_api = { path = "../lib/kernel_api", features = [] }
 pi = { path = "../lib/pi" }
 shim = { path = "../lib/shim", features = ["no_std", "alloc"] }
-sync = { path = "../lib/sync" }
 
 log = "0.4"
 
