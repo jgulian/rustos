@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 use core::cmp::Ordering;
 use core::fmt;
 use core::fmt::Formatter;
-use core::ops::Deref;
+
 use filesystem::fs2::File2;
 use kernel_api::{OsError, OsResult};
 

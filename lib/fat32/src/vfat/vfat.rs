@@ -5,7 +5,7 @@ use core::{fmt, mem};
 use core::cmp::min;
 use core::fmt::{Debug, Formatter};
 use core::marker::PhantomData;
-use core::ops::DerefMut;
+
 
 use log::info;
 
@@ -470,7 +470,7 @@ impl<'a, HANDLE: VFatHandle> FileSystem for HandleReference<'a, HANDLE> {
         Ok(path_stack.pop().ok_or(io::Error::from(io::ErrorKind::InvalidInput))?)
     }
 
-    fn new_file(&mut self, path: &Path) -> io::Result<Self::File> {
+    fn new_file(&mut self, _path: &Path) -> io::Result<Self::File> {
         unimplemented!("deprecated");
 
         //let name = match path.file_name() {
@@ -488,7 +488,7 @@ impl<'a, HANDLE: VFatHandle> FileSystem for HandleReference<'a, HANDLE> {
         //})
     }
 
-    fn new_dir(&mut self, path: &Path) -> io::Result<Self::Dir> {
+    fn new_dir(&mut self, _path: &Path) -> io::Result<Self::Dir> {
         unimplemented!("deprecated");
 
         //let name = match path.file_name() {
@@ -562,7 +562,7 @@ impl<HANDLE: VFatHandle> Directory2 for Dir<HANDLE> where HANDLE: 'static {
             .collect())
     }
 
-    fn metadata(&mut self, name: &str) -> io::Result<Box<dyn Metadata2>> {
+    fn metadata(&mut self, _name: &str) -> io::Result<Box<dyn Metadata2>> {
         todo!()
     }
 }

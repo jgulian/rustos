@@ -95,7 +95,7 @@ impl BlockDevice for Sd {
         unimplemented!("SD card and file system are read only")
     }
 
-    fn flush_sector(&mut self, n: u64) -> io::Result<()> {
+    fn flush_sector(&mut self, _n: u64) -> io::Result<()> {
         unimplemented!("SD card and file system are read only")
     }
 }

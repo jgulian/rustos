@@ -1,10 +1,10 @@
 use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
-use core::borrow::{Borrow, BorrowMut};
+use core::borrow::{Borrow};
 use core::mem;
 use core::mem::zeroed;
-use core::ops::{Deref, DerefMut};
+
 use core::ptr::write_volatile;
 use core::slice::from_raw_parts;
 
@@ -12,16 +12,16 @@ use aarch64;
 use aarch64::SPSR_EL1;
 use filesystem::fs2::FileSystem2;
 use filesystem::path::Path;
-use kernel_api::{OsError, OsResult, println};
-use shim::{io, ioerr, newioerr};
-use shim::io::{SeekFrom, Write};
+use kernel_api::{OsError, OsResult};
+use shim::{io, newioerr};
+use shim::io::{Write};
 
 use crate::{FILESYSTEM, VMM};
 use crate::memory::*;
 use crate::param::*;
 use crate::process::{Stack, State};
 use crate::process::pipe::PipeResource;
-use crate::process::resource::{Resource, ResourceEntry, ResourceId, ResourceList};
+use crate::process::resource::{Resource, ResourceId, ResourceList};
 use crate::traps::TrapFrame;
 
 /// Type alias for the type of a process ID.
@@ -104,7 +104,7 @@ impl Process {
             .map_err(|_| OsError::IoError)?
             .into_file().ok_or(OsError::NoEntry)?;
 
-        file.read(user_image).map_err(|e| OsError::IoError)?;
+        file.read(user_image).map_err(|_e| OsError::IoError)?;
         Ok(process)
     }
 

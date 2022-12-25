@@ -1,13 +1,13 @@
 use alloc::boxed::Box;
 use alloc::collections::vec_deque::VecDeque;
-use alloc::vec;
+
 use core::arch::asm;
 use core::fmt;
-use core::time::Duration;
+
 
 use aarch64;
-use aarch64::{affinity, SP};
-use kernel_api::syscall::sleep;
+use aarch64::{SP};
+
 use pi::local_interrupt::{local_tick_in, LocalController, LocalInterrupt};
 use shim::{io, newioerr};
 
@@ -15,7 +15,7 @@ use crate::{SCHEDULER, VMM};
 use crate::multiprocessing::mutex::Mutex;
 use crate::multiprocessing::per_core::local_irq;
 use crate::param::*;
-use crate::process::{Id, Process, Stack, State};
+use crate::process::{Id, Process, State};
 use crate::traps::irq::IrqHandlerRegistry;
 use crate::traps::TrapFrame;
 

@@ -1,12 +1,12 @@
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use core::borrow::Borrow;
+
 use core::cmp::min;
-use core::ops::DerefMut;
+
 
 use filesystem::fs2::File2;
-use kernel_api::OsResult;
+
 use shim::{io, ioerr};
 use shim::io::{Seek, SeekFrom};
 
@@ -68,7 +68,7 @@ impl io::Write for PipeResource {
                 pipe.0.extend_from_slice(buf);
                 Ok(buf.len())
             }
-            PipeResource::Reader(pipe_arc) => {
+            PipeResource::Reader(_pipe_arc) => {
                 ioerr!(Unsupported)
             }
         }

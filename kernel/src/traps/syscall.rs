@@ -177,7 +177,7 @@ fn sys_duplicate(tf: &mut TrapFrame) -> OsResult<()> {
     Ok(())
 }
 
-fn sys_seek(tf: &mut TrapFrame) -> OsResult<()> {
+fn sys_seek(_tf: &mut TrapFrame) -> OsResult<()> {
     Err(OsError::Unknown)
 }
 
