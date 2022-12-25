@@ -14,7 +14,7 @@ use crate::path::{Component, Path};
 pub trait Metadata2 {}
 
 // For char devices, their seek just gives a NotSeekable error
-pub trait File2: io::Seek + io::Read + io::Write + Drop {
+pub trait File2: io::Seek + io::Read + io::Write + Drop + Send + Sync {
     fn duplicate(&mut self) -> io::Result<Box<dyn File2>>;
 }
 

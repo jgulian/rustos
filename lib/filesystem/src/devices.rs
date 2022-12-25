@@ -124,24 +124,21 @@ impl_for_read_write_seek!(shim::io::Cursor<Box<[u8]>>);
 #[cfg(test)]
 impl_for_read_write_seek!(::std::fs::File);
 
-pub trait CharDevice: io::Send + io::Read + io::Write {}
+pub trait CharDevice: Send + Sync + io::Read + io::Write + Clone {}
 
-pub struct CharDeviceFileSystem<T: CharDevice + 'static, M: Mutex<T>>(String, Arc<M<T>>);
+pub struct CharDeviceFileSystem<T: CharDevice + 'static>(String, T);
 
-pub struct CharDeviceRootDirectory<T: CharDevice + 'static, M: Mutex<T>>(String, Arc<M<T>>);
+pub struct CharDeviceRootDirectory<T: CharDevice + 'static>(String, T);
 
-pub struct CharDeviceFile<T: CharDevice + 'static, M: Mutex<T>>(Arc<M<T>>);
+pub struct CharDeviceFile<T: CharDevice + 'static>(T);
 
-impl<T: CharDevice + 'static, M: Mutex<T>> CharDeviceFileSystem<T, M> {
+impl<T: CharDevice + 'static> CharDeviceFileSystem<T> {
     pub fn new(name: String, device: T) -> Self {
-        CharDeviceFileSystem {
-            0: name,
-            1: Arc::new(M::new(device)),
-        }
+        CharDeviceFileSystem(name, device)
     }
 }
 
-impl<T: CharDevice + 'static, M: Mutex<T>> FileSystem2 for CharDeviceFileSystem<T, M> {
+impl<T: CharDevice + 'static> FileSystem2 for CharDeviceFileSystem<T> {
     fn root(&mut self) -> io::Result<Box<dyn Directory2>> {
         Ok(Box::new(CharDeviceRootDirectory(self.0.clone(), self.1.clone())))
     }
@@ -151,7 +148,7 @@ impl<T: CharDevice + 'static, M: Mutex<T>> FileSystem2 for CharDeviceFileSystem<
     }
 }
 
-impl<T: CharDevice + 'static, M: Mutex<T>> Directory2 for CharDeviceRootDirectory<T, M> {
+impl<T: CharDevice + 'static> Directory2 for CharDeviceRootDirectory<T> {
     fn open_entry(&mut self, name: &str) -> io::Result<Entry2> {
         if self.0.eq(name) {
             Ok(Entry2::File(Box::new(CharDeviceFile(self.1.clone()))))
@@ -181,22 +178,21 @@ impl<T: CharDevice + 'static, M: Mutex<T>> Directory2 for CharDeviceRootDirector
     }
 }
 
-impl<T: CharDevice + 'static, M: Mutex<T>> io::Seek for CharDeviceFile<T, M> {
+impl<T: CharDevice + 'static> io::Seek for CharDeviceFile<T> {
     fn seek(&mut self, _: io::SeekFrom) -> io::Result<u64> {
         ioerr!(NotSeekable)
     }
 }
 
-impl<T: CharDevice + 'static, M: Mutex<T>> io::Read for CharDeviceFile<T, M> {
+impl<T: CharDevice + 'static> io::Read for CharDeviceFile<T> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.0.borrow().lock()?.deref_mut().read(buf)
+        self.0.read(buf)
     }
 }
 
-impl<T: CharDevice + 'static, M: Mutex<T>> io::Write for CharDeviceFile<T, M> {
+impl<T: CharDevice + 'static> io::Write for CharDeviceFile<T> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        use io::Write;
-        self.0.borrow().lock()?.deref_mut().write(buf)
+        self.0.write(buf)
     }
 
     fn flush(&mut self) -> io::Result<()> {
@@ -204,16 +200,12 @@ impl<T: CharDevice + 'static, M: Mutex<T>> io::Write for CharDeviceFile<T, M> {
     }
 }
 
-impl<T: CharDevice + 'static, M: Mutex<T>> File2 for CharDeviceFile<T, M> {
+impl<T: CharDevice + 'static> File2 for CharDeviceFile<T> {
     fn duplicate(&mut self) -> io::Result<Box<dyn File2>> {
-        todo!()
+        Ok(Box::new(CharDeviceFile(self.0.clone())))
     }
 }
 
-impl<T: CharDevice + 'static, M: Mutex<T>> Drop for CharDeviceFile<T, M> {
-    fn drop(&mut self) {
-        let mut binding = self.0.as_ref().borrow_mut();
-        let (_, busy) = binding.deref_mut();
-        *busy = false;
-    }
+impl<T: CharDevice + 'static> Drop for CharDeviceFile<T> {
+    fn drop(&mut self) {}
 }

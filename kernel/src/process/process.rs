@@ -40,7 +40,7 @@ pub struct Process {
     /// The scheduling state of the process.
     pub state: State,
     /// The resources (files) open by a process
-    resources: ResourceList,
+    pub(crate) resources: ResourceList,
     /// Parent process
     pub(crate) parent: Option<Id>,
     /// Last dead process
@@ -166,9 +166,10 @@ impl Process {
     }
 
     //TODO: limit number of open files
-    pub fn open(&mut self, path: String) -> OsResult<ResourceId> {
+    pub fn open(&mut self, path_name: String) -> OsResult<ResourceId> {
+        let path = Path::try_from(path_name)?;
         let file = FILESYSTEM.borrow()
-            .open(&path_data)?
+            .open(&path)?
             .into_file().ok_or(newioerr!(NotFound))?;
         Ok(self.resources.insert(Resource::File(file)))
     }
@@ -179,17 +180,23 @@ impl Process {
 
     //TODO: fix seek/clean and make write have the same semantics
     pub fn read(&mut self, id: ResourceId, buffer: &mut [u8]) -> OsResult<usize> {
-        match self.resources.get(id) {
-            Resource::File(mut file) => {
-                file.read(buffer).into()
+        match self.resources.get(id)? {
+            Resource::File(ref mut file) => {
+                match file.read(buffer) {
+                    Ok(value) => Ok(value),
+                    Err(err) => Err(err.into())
+                }
             }
         }
     }
 
     pub fn write(&mut self, id: ResourceId, buffer: &[u8]) -> OsResult<usize> {
-        match self.resources.get(id) {
-            Resource::File(mut file) => {
-                file.write(buffer).into()
+        match self.resources.get(id)? {
+            Resource::File(ref mut file) => {
+                match file.write(buffer) {
+                    Ok(value) => Ok(value),
+                    Err(err) => Err(err.into())
+                }
             }
         }
     }
@@ -211,14 +218,14 @@ impl Process {
         self.resources.insert_with_id(new_id, duplicate)
     }
 
-    pub fn fork(&mut self, id: Id) -> io::Result<Process> {
+    pub fn fork(&mut self, id: Id) -> OsResult<Process> {
         let stack = Stack::new().ok_or(newioerr!(OutOfMemory))?;
         let mut new_process = Process {
             context: Box::new(*self.context),
             stack,
             vmap: Box::new(UserPageTable::new()),
             state: State::Ready,
-            resources: self.resources.clone(),
+            resources: self.resources.duplicate()?,
             parent: Some(self.context.tpidr),
             dead_children: Vec::new(),
             current_directory: self.current_directory.clone(),

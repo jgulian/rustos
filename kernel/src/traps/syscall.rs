@@ -10,7 +10,7 @@ use pi::timer;
 use crate::{kprintln, SCHEDULER};
 use crate::memory::{PagePerm, VirtualAddr};
 use crate::param::{PAGE_SIZE, USER_IMG_BASE};
-use crate::process::State;
+use crate::process::{ResourceId, State};
 use crate::traps::TrapFrame;
 
 /// Sleep for `ms` milliseconds.
@@ -20,7 +20,8 @@ use crate::traps::TrapFrame;
 /// In addition to the usual status value, this system call returns one
 /// parameter: the approximate true elapsed time from when `sleep` was called to
 /// when `sleep` returned.
-pub fn sys_sleep(ms: u32, tf: &mut TrapFrame) -> OsResult<()> {
+pub fn sys_sleep(tf: &mut TrapFrame) -> OsResult<()> {
+    let ms = tf.xs[0];
     let started = timer::current_time();
     let sleep_until = started + Duration::from_millis(ms as u64);
 
@@ -76,9 +77,17 @@ pub fn sys_open(tf: &mut TrapFrame) -> OsResult<()> {
 
     tf.xs[0] = SCHEDULER.on_process(tf, |process| {
         process.open(path)
-    })??;
+    })??.into();
 
     Ok(())
+}
+
+fn sys_close(tf: &mut TrapFrame) -> OsResult<()> {
+    let id = ResourceId::from(tf.xs[0]);
+    SCHEDULER.on_process(tf, |process| {
+        process.resources.remove(id)?;
+        Ok(())
+    })?
 }
 
 pub fn sys_read(tf: &mut TrapFrame) -> OsResult<()> {
@@ -89,7 +98,7 @@ pub fn sys_read(tf: &mut TrapFrame) -> OsResult<()> {
     let mut buffer = vec![0u8; len];
 
     let amount_read = SCHEDULER.on_process(tf, |process| {
-        process.read(descriptor, buffer.as_mut_slice())
+        process.read(ResourceId::from(descriptor), buffer.as_mut_slice())
     })??;
 
     copy_into_userspace(tf, ptr, &buffer[0..amount_read])?;
@@ -107,20 +116,20 @@ pub fn sys_write(tf: &mut TrapFrame) -> OsResult<()> {
     copy_from_userspace(tf, ptr, buffer.as_mut_slice())?;
 
     let amount_written = SCHEDULER.on_process(tf, |process| {
-        process.write(descriptor, buffer.as_slice())
+        process.write(ResourceId::from(descriptor), buffer.as_slice())
     })??;
     tf.xs[0] = amount_written as u64;
 
     Ok(())
 }
 
-fn sys_pipe() -> OsResult<()> {
+fn sys_pipe(tf: &mut TrapFrame) -> OsResult<()> {
     let (ingress, egress) = SCHEDULER.on_process(tf, |process| {
         process.pipe()
     })??;
 
-    tf.xs[0] = ingress;
-    tf.xs[1] = egress;
+    tf.xs[0] = ingress.into();
+    tf.xs[1] = egress.into();
     Ok(())
 }
 
@@ -158,13 +167,18 @@ pub fn sys_sbrk(tf: &mut TrapFrame) -> OsResult<()> {
 }
 
 fn sys_duplicate(tf: &mut TrapFrame) -> OsResult<()> {
-    let descriptor = tf.xs[0];
-    let new_descriptor = tf.xs[1];
-    tf.xs[0] = SCHEDULER.on_process(tf, |process| {
+    let descriptor = ResourceId::from(tf.xs[0]);
+    let new_descriptor = ResourceId::from(tf.xs[1]);
+
+    SCHEDULER.on_process(tf, |process| {
         process.duplicate(descriptor, new_descriptor)
     })??;
 
     Ok(())
+}
+
+fn sys_seek(tf: &mut TrapFrame) -> OsResult<()> {
+    Err(OsError::Unknown)
 }
 
 fn sys_fork(tf: &mut TrapFrame) -> OsResult<()> {
@@ -225,54 +239,32 @@ fn copy_into_userspace(_: &TrapFrame, ptr: u64, buf: &[u8]) -> OsResult<()> {
     }
 }
 
-pub fn handle_syscall(num: u16, tf: &mut TrapFrame) {
-    let result = match Syscall::from(num) {
-        Syscall::Sleep => {
-            sys_sleep(tf.xs[0] as u32, tf)
-        }
-        Syscall::Time => {
-            sys_time(tf)
-        }
-        Syscall::Exit => {
-            sys_exit(tf)
-        }
-        Syscall::Open => {
-            sys_open(tf)
-        }
-        Syscall::Read => {
-            sys_read(tf)
-        }
-        Syscall::Write => {
-            sys_write(tf)
-        }
-        Syscall::GetPid => {
-            sys_getpid(tf)
-        }
-        Syscall::Sbrk => {
-            sys_sbrk(tf)
-        }
-        Syscall::Fork => {
-            sys_fork(tf)
-        }
-        Syscall::Duplicate => {
-            sys_duplicate(tf)
-        }
-        Syscall::Execute => {
-            sys_execute(tf)
-        }
-        Syscall::Wait => {
-            sys_wait(tf)
-        }
-        Syscall::Unknown => {
-            Err(OsError::Unknown)
-        }
-    };
+fn syscall_to_function(call: Syscall) -> fn(tf: &mut TrapFrame) -> OsResult<()> {
+    match call {
+        Syscall::Open => sys_open,
+        Syscall::Close => sys_close,
+        Syscall::Read => sys_read,
+        Syscall::Write => sys_write,
+        Syscall::Pipe => sys_pipe,
+        Syscall::Duplicate => sys_duplicate,
+        Syscall::Seek => sys_seek,
+        Syscall::Fork => sys_fork,
+        Syscall::Execute => sys_execute,
+        Syscall::Exit => sys_exit,
+        Syscall::Wait => sys_wait,
+        Syscall::GetPid => sys_getpid,
+        Syscall::Sbrk => sys_sbrk,
+        Syscall::Sleep => sys_sleep,
+        Syscall::Time => sys_time,
+        Syscall::Unknown => |_| Err(OsError::Unknown)
+    }
+}
 
-    // TODO: this can be simplified with into/from?
+pub fn handle_syscall(num: u16, tf: &mut TrapFrame) {
+    let call = Syscall::from(num);
+    let result = syscall_to_function(call)(tf);
     tf.xs[7] = match result {
         Ok(_) => 1,
-        Err(err) => {
-            err as u64
-        }
-    };
+        Err(err) => err as u64
+    }
 }

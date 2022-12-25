@@ -1,29 +1,58 @@
 use alloc::boxed::Box;
-use alloc::sync::Arc;
 use alloc::vec::Vec;
-use core::borrow::Borrow;
-use core::cmp::min;
-use core::ops::DerefMut;
-
+use core::cmp::Ordering;
+use core::fmt;
+use core::fmt::Formatter;
+use core::ops::Deref;
 use filesystem::fs2::File2;
 use kernel_api::{OsError, OsResult};
-use shim::{io, ioerr};
-use shim::io::{Seek, SeekFrom};
 
-use crate::multiprocessing::mutex::Mutex;
+#[derive(Clone, Copy, PartialOrd, PartialEq, Debug)]
+pub struct ResourceId(u64);
 
-pub(crate) type ResourceId = usize;
+impl From<u64> for ResourceId {
+    fn from(value: u64) -> Self {
+        ResourceId(value)
+    }
+}
 
-pub(crate) enum Resource {
+impl Into<u64> for ResourceId {
+    fn into(self) -> u64 {
+        self.0
+    }
+}
+
+impl PartialEq<u64> for ResourceId {
+    fn eq(&self, other: &u64) -> bool {
+        self.0.eq(other)
+    }
+}
+
+impl PartialOrd<u64> for ResourceId {
+    fn partial_cmp(&self, other: &u64) -> Option<Ordering> {
+        self.0.partial_cmp(other)
+    }
+}
+
+pub enum Resource {
     File(Box<dyn File2>),
 }
 
-pub(crate) struct ResourceEntry {
+pub struct ResourceEntry {
     pub(crate) id: ResourceId,
     pub(crate) resource: Resource,
 }
 
-pub(crate) struct ResourceList {
+impl fmt::Debug for ResourceEntry {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ResourceEntry")
+            .field("id", &self.id)
+            .finish()
+    }
+}
+
+#[derive(Debug)]
+pub struct ResourceList {
     list: Vec<ResourceEntry>,
 }
 
@@ -37,24 +66,21 @@ impl ResourceList {
     pub(crate) fn insert(&mut self, resource: Resource) -> ResourceId {
         let index = self.list.iter().enumerate()
             .filter_map(|(i, resource)| {
-                if i != resource.id {
+                if resource.id != i as u64 {
                     Some(i)
                 } else {
                     None
                 }
             }).next().unwrap_or(0);
-        self.list.insert(index, ResourceEntry {
-            id: index,
-            resource,
-        });
-
-        index
+        let id = ResourceId::from(index as u64);
+        self.list.insert(index, ResourceEntry { id, resource });
+        id
     }
 
     pub(crate) fn insert_with_id(&mut self, id: ResourceId, resource: Resource) -> OsResult<()> {
         let index = self.list.iter().enumerate()
             .filter_map(|(i, resource)| {
-                if i >= resource.id {
+                if resource.id <= i as u64 {
                     Some(i)
                 } else {
                     None
@@ -107,5 +133,22 @@ impl ResourceList {
                 Some(&mut resource.resource)
             }
         }).next().ok_or(OsError::UnknownResourceId)
+    }
+
+    pub(crate) fn duplicate(&mut self) -> OsResult<ResourceList> {
+        let list: Vec<ResourceEntry> = self.list.iter_mut().map_while(|entry| {
+            let resource = match &mut entry.resource {
+                Resource::File(ref mut file) => Resource::File(file.duplicate().ok()?),
+            };
+
+            Some(ResourceEntry {
+                id: entry.id,
+                resource,
+            })
+        }).collect();
+
+        Ok(ResourceList {
+            list,
+        })
     }
 }

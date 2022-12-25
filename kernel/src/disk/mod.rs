@@ -1,6 +1,7 @@
 use alloc::boxed::Box;
 use alloc::rc::Rc;
 use alloc::string::{String, ToString};
+use alloc::sync::Arc;
 use core::borrow::{Borrow, BorrowMut};
 use core::cell::UnsafeCell;
 use core::fmt::{self, Debug};
@@ -10,9 +11,11 @@ use filesystem;
 use filesystem::devices::CharDeviceFileSystem;
 use filesystem::fs2::{Directory2, FileSystem2};
 use filesystem::path::Path;
-use filesystem::VirtualFileSystem;
+use filesystem::{CharDevice, VirtualFileSystem};
 use pi::uart::MiniUart;
 use shim::{io, newioerr};
+use shim::io::{Read, Write};
+use crate::console::Console;
 
 use crate::FILESYSTEM;
 use crate::multiprocessing::mutex::Mutex;
@@ -107,8 +110,9 @@ impl FileSystem {
         FILESYSTEM.0.lock().as_mut().unwrap().mount(Path::root(), disk_file_system);
 
         let mut console_path = Path::root();
+
         let console_filesystem = Box::new(CharDeviceFileSystem::new(
-            "console".to_string(), MiniUart::new())
+            "console".to_string(), ConsoleFile::new())
         );
         FILESYSTEM.0.lock().as_mut().unwrap().mount(console_path, console_filesystem);
     }
@@ -121,5 +125,37 @@ impl FileSystem2 for &FileSystem {
 
     fn copy_entry(&mut self, source: &Path, destination: &Path) -> io::Result<()> {
         self.0.lock().as_mut().ok_or(newioerr!(Unsupported))?.copy_entry(source, destination)
+    }
+}
+
+struct ConsoleFile(Arc<Mutex<MiniUart>>);
+
+impl Read for ConsoleFile {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.0.lock().read(buf)
+    }
+}
+
+impl Write for ConsoleFile {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.0.lock().write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.0.lock().flush()
+    }
+}
+
+impl Clone for ConsoleFile {
+    fn clone(&self) -> Self {
+        ConsoleFile(self.0.clone())
+    }
+}
+
+impl CharDevice for ConsoleFile {}
+
+impl ConsoleFile {
+    fn new() -> Self {
+        ConsoleFile(Arc::new(Mutex::new(MiniUart::new())))
     }
 }

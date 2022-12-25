@@ -507,7 +507,20 @@ impl<'a, HANDLE: VFatHandle> FileSystem for HandleReference<'a, HANDLE> {
     }
 }
 
-impl<HANDLE: VFatHandle> File2 for File<HANDLE> {}
+impl<HANDLE: VFatHandle + 'static> File2 for File<HANDLE> {
+    fn duplicate(&mut self) -> io::Result<Box<dyn File2>> {
+        Ok(Box::new(File::<HANDLE> {
+            name: self.name.clone(),
+            metadata: self.metadata.clone(),
+            file_size: self.file_size,
+            chain: self.chain.clone(),
+        }))
+    }
+}
+
+impl<HANDLE: VFatHandle> Drop for File<HANDLE> {
+    fn drop(&mut self) {}
+}
 
 impl<HANDLE: VFatHandle> Directory2 for Dir<HANDLE> where HANDLE: 'static {
     fn open_entry(&mut self, name: &str) -> io::Result<Entry2> {
