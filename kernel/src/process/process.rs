@@ -1,9 +1,10 @@
 use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
-use core::borrow::Borrow;
+use core::borrow::{Borrow};
 use core::mem;
 use core::mem::zeroed;
+
 use core::ptr::write_volatile;
 use core::slice::from_raw_parts;
 
@@ -11,15 +12,16 @@ use aarch64;
 use aarch64::SPSR_EL1;
 use filesystem::fs2::FileSystem2;
 use filesystem::path::Path;
-use kernel_api::{OsError, OsResult, println};
+use kernel_api::{OsError, OsResult};
 use shim::{io, newioerr};
-use shim::io::{SeekFrom, Write};
+use shim::io::{Write};
 
 use crate::{FILESYSTEM, VMM};
 use crate::memory::*;
 use crate::param::*;
 use crate::process::{Stack, State};
-use crate::process::resource::Resource;
+use crate::process::pipe::PipeResource;
+use crate::process::resource::{Resource, ResourceId, ResourceList};
 use crate::traps::TrapFrame;
 
 /// Type alias for the type of a process ID.
@@ -38,7 +40,7 @@ pub struct Process {
     /// The scheduling state of the process.
     pub state: State,
     /// The resources (files) open by a process
-    pub(crate) resources: Vec<Resource>,
+    pub(crate) resources: ResourceList,
     /// Parent process
     pub(crate) parent: Option<Id>,
     /// Last dead process
@@ -60,7 +62,7 @@ impl Process {
             stack,
             vmap: Box::new(UserPageTable::new()),
             state: State::Ready,
-            resources: Vec::new(),
+            resources: ResourceList::new(),
             parent: None,
             dead_children: Vec::new(),
             current_directory: Path::root(),
@@ -102,23 +104,8 @@ impl Process {
             .map_err(|_| OsError::IoError)?
             .into_file().ok_or(OsError::NoEntry)?;
 
-        file.read(user_image).map_err(|e| OsError::IoError)?;
+        file.read(user_image).map_err(|_e| OsError::IoError)?;
         Ok(process)
-    }
-
-    pub fn load_from_kernel(_function: fn()) -> OsResult<Process> {
-        unimplemented!("need to fix text");
-        //let mut process = Process::new()?;
-        //
-        //let mut page = process.vmap.alloc(
-        //    VirtualAddr::from(USER_IMG_BASE as u64), PagePerm::RWX);
-        //
-        //let text = unsafe {
-        //    core::slice::from_raw_parts(function as *const u8, 24)
-        //};
-        //
-        //page[0..24].copy_from_slice(text);
-        //Err(OsError::NoMemory)
     }
 
     /// Returns the highest `VirtualAddr` that is supported by this system.
@@ -179,61 +166,66 @@ impl Process {
     }
 
     //TODO: limit number of open files
-    pub fn open(&mut self, path: String) -> io::Result<u64> {
-        let mut descriptor = 0;
-        while let Some(_) = self.find_resource(descriptor) {
-            descriptor += 1;
-        }
-
-        self.resources.push(Resource {
-            descriptor,
-            path,
-            seek: 0,
-        });
-
-        Ok(descriptor)
+    pub fn open(&mut self, path_name: String) -> OsResult<ResourceId> {
+        let path = Path::try_from(path_name)?;
+        let file = FILESYSTEM.borrow()
+            .open(&path)?
+            .into_file().ok_or(newioerr!(NotFound))?;
+        Ok(self.resources.insert(Resource::File(file)))
     }
 
-    fn find_resource(&self, descriptor: u64) -> Option<&Resource> {
-        self.resources.iter()
-            .filter(|resource| resource.descriptor == descriptor)
-            .next()
+    pub fn close(&mut self, id: ResourceId) -> OsResult<()> {
+        self.resources.remove(id)
     }
 
     //TODO: fix seek/clean and make write have the same semantics
-    pub fn read(&mut self, descriptor: u64, buffer: &mut [u8]) -> io::Result<usize> {
-        let resource = self.find_resource(descriptor)
-            .ok_or(newioerr!(NotFound))?;
-        let path = Path::try_from(resource.path.as_str());
-        let mut full_path = self.current_directory.clone();
-        full_path.append(&path?);
-        let mut file = FILESYSTEM.borrow().open(&full_path)?
-            .into_file().ok_or(newioerr!(NotFound))?;
-        file.read(buffer)
+    pub fn read(&mut self, id: ResourceId, buffer: &mut [u8]) -> OsResult<usize> {
+        match self.resources.get(id)? {
+            Resource::File(ref mut file) => {
+                match file.read(buffer) {
+                    Ok(value) => Ok(value),
+                    Err(err) => Err(err.into())
+                }
+            }
+        }
     }
 
-    pub fn write(&self, descriptor: u64, buffer: &[u8]) -> io::Result<usize> {
-        let path = Path::try_from(self.find_resource(descriptor)
-            .ok_or(newioerr!(NotFound))?.path.as_str())?;
-        let mut file = FILESYSTEM.borrow().open(&path)?
-            .into_file().ok_or(newioerr!(NotFound))?;
-        file.write(buffer)
+    pub fn write(&mut self, id: ResourceId, buffer: &[u8]) -> OsResult<usize> {
+        match self.resources.get(id)? {
+            Resource::File(ref mut file) => {
+                match file.write(buffer) {
+                    Ok(value) => Ok(value),
+                    Err(err) => Err(err.into())
+                }
+            }
+        }
     }
 
-    pub fn duplicate(&mut self, descriptor: u64) -> io::Result<u64> {
-        let path = self.find_resource(descriptor)
-            .ok_or(newioerr!(NotFound))?.path.clone();
-        self.open(path)
+    pub fn pipe(&mut self) -> OsResult<(ResourceId, ResourceId)> {
+        let (writer, reader) = PipeResource::new_pair();
+        let writer_id = self.resources.insert(Resource::File(Box::new(writer)));
+        let reader_id = self.resources.insert(Resource::File(Box::new(reader)));
+        Ok((writer_id, reader_id))
     }
 
-    pub fn fork(&mut self, id: Id) -> io::Result<Process> {
+    pub fn duplicate(&mut self, id: ResourceId, new_id: ResourceId) -> OsResult<()> {
+        let resource = self.resources.get(id)?;
+        let duplicate = match resource {
+            Resource::File(file) => {
+                Resource::File(file.duplicate()?)
+            }
+        };
+        self.resources.insert_with_id(new_id, duplicate)
+    }
+
+    pub fn fork(&mut self, id: Id) -> OsResult<Process> {
         let stack = Stack::new().ok_or(newioerr!(OutOfMemory))?;
         let mut new_process = Process {
             context: Box::new(*self.context),
             stack,
             vmap: Box::new(UserPageTable::new()),
             state: State::Ready,
-            resources: self.resources.clone(),
+            resources: self.resources.duplicate()?,
             parent: Some(self.context.tpidr),
             dead_children: Vec::new(),
             current_directory: self.current_directory.clone(),

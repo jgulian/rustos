@@ -2,7 +2,7 @@ use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::fmt;
 
-use log::info;
+
 
 use filesystem::BlockDevice;
 use shim::io;
@@ -81,7 +81,7 @@ impl CachedPartition {
     fn cache_location(&self, virtual_sector: u64) -> Option<usize> {
         Some(self.cache.iter()
             .enumerate()
-            .filter(|(i, entry)| entry.virtual_sector == virtual_sector)
+            .filter(|(_i, entry)| entry.virtual_sector == virtual_sector)
             .next()?.0)
     }
 
@@ -155,7 +155,7 @@ impl BlockDevice for CachedPartition {
         Ok(self.sector_size() as usize)
     }
 
-    fn flush_sector(&mut self, n: u64) -> io::Result<()> {
+    fn flush_sector(&mut self, _n: u64) -> io::Result<()> {
         unimplemented!("this is not implemented")
     }
 }

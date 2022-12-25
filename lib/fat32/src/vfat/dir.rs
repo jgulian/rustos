@@ -4,13 +4,13 @@ use alloc::vec::Vec;
 use log::info;
 
 use filesystem;
-use filesystem::path::Path;
+
 use shim::const_assert_size;
 use shim::io;
 use shim::io::{Read, Seek, SeekFrom, Write};
 
 use crate::util::VecExt;
-use crate::vfat::{Date, file, Metadata, Timestamp};
+use crate::vfat::{Date, Metadata, Timestamp};
 use crate::vfat::{Cluster, Entry, File, VFatHandle};
 use crate::vfat::vfat::Chain;
 
@@ -143,7 +143,7 @@ impl<HANDLE: VFatHandle> filesystem::Dir for Dir<HANDLE> {
 
     fn entries(&mut self) -> io::Result<Self::Iter> {
         let mut data: Vec<u8> = Vec::new();
-        let read = self.chain.read_to_end(&mut data)?;
+        let _read = self.chain.read_to_end(&mut data)?;
 
         Ok(DirIter {
             vfat: self.vfat.clone(),

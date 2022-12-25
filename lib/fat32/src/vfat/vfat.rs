@@ -5,7 +5,7 @@ use core::{fmt, mem};
 use core::cmp::min;
 use core::fmt::{Debug, Formatter};
 use core::marker::PhantomData;
-use core::ops::DerefMut;
+
 
 use log::info;
 
@@ -470,7 +470,7 @@ impl<'a, HANDLE: VFatHandle> FileSystem for HandleReference<'a, HANDLE> {
         Ok(path_stack.pop().ok_or(io::Error::from(io::ErrorKind::InvalidInput))?)
     }
 
-    fn new_file(&mut self, path: &Path) -> io::Result<Self::File> {
+    fn new_file(&mut self, _path: &Path) -> io::Result<Self::File> {
         unimplemented!("deprecated");
 
         //let name = match path.file_name() {
@@ -488,7 +488,7 @@ impl<'a, HANDLE: VFatHandle> FileSystem for HandleReference<'a, HANDLE> {
         //})
     }
 
-    fn new_dir(&mut self, path: &Path) -> io::Result<Self::Dir> {
+    fn new_dir(&mut self, _path: &Path) -> io::Result<Self::Dir> {
         unimplemented!("deprecated");
 
         //let name = match path.file_name() {
@@ -507,7 +507,20 @@ impl<'a, HANDLE: VFatHandle> FileSystem for HandleReference<'a, HANDLE> {
     }
 }
 
-impl<HANDLE: VFatHandle> File2 for File<HANDLE> {}
+impl<HANDLE: VFatHandle + 'static> File2 for File<HANDLE> {
+    fn duplicate(&mut self) -> io::Result<Box<dyn File2>> {
+        Ok(Box::new(File::<HANDLE> {
+            name: self.name.clone(),
+            metadata: self.metadata.clone(),
+            file_size: self.file_size,
+            chain: self.chain.clone(),
+        }))
+    }
+}
+
+impl<HANDLE: VFatHandle> Drop for File<HANDLE> {
+    fn drop(&mut self) {}
+}
 
 impl<HANDLE: VFatHandle> Directory2 for Dir<HANDLE> where HANDLE: 'static {
     fn open_entry(&mut self, name: &str) -> io::Result<Entry2> {
@@ -549,7 +562,7 @@ impl<HANDLE: VFatHandle> Directory2 for Dir<HANDLE> where HANDLE: 'static {
             .collect())
     }
 
-    fn metadata(&mut self, name: &str) -> io::Result<Box<dyn Metadata2>> {
+    fn metadata(&mut self, _name: &str) -> io::Result<Box<dyn Metadata2>> {
         todo!()
     }
 }

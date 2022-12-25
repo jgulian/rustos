@@ -25,6 +25,9 @@ build:
 check:
 	@cargo check
 
+clippy:
+	@cargo clippy
+
 qemu: build
 	$(QEMU) $(QEMU_ARGS) $(BINARY)
 

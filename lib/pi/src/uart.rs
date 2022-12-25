@@ -187,5 +187,3 @@ impl io::Write for MiniUart {
         Ok(())
     }
 }
-
-impl CharDevice for MiniUart {}

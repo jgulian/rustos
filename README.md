@@ -14,7 +14,7 @@ working on
 
 ## Installing
 
-Currently, the project is on `1.67.0-nightly`. I'm working on making it easier
+Currently, the project is on `1.68.0-nightly`. I'm working on making it easier
 to run on general (more) hardware, but for now qemu is recommended with the
 settings in the Makefile.
 

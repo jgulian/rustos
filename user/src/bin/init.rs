@@ -14,8 +14,8 @@ mod user;
 
 fn main() {
     let console = open("/console").expect("unable to open console");
-    duplicate(console).expect("unable to duplicate console");
-    duplicate(console).expect("unable to duplicate console");
+    duplicate(console, 1).expect("unable to duplicate console");
+    duplicate(console, 2).expect("unable to duplicate console");
 
     println!("init");
     loop {
