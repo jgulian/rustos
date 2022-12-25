@@ -1,9 +1,9 @@
 use core::mem::zeroed;
 use core::ptr::write_volatile;
 
-mod panic;
-
 use crate::kmain;
+
+mod panic;
 
 global_asm!(include_str!("init/init.s"));
 

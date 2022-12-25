@@ -1,22 +1,23 @@
+use core::fmt;
+use core::fmt::Formatter;
+
+use aarch64::enable_fiq_interrupt;
+use pi::interrupt::{Controller, Interrupt};
+use pi::local_interrupt::{LocalController, LocalInterrupt};
+
+use crate::GLOABAL_IRQ;
+use crate::multiprocessing::per_core::local_irq;
+use crate::traps::irq::IrqHandlerRegistry;
+
+pub use self::frame::TrapFrame;
+use self::syndrome::Syndrome;
+use self::syscall::handle_syscall;
+
 mod frame;
 mod syndrome;
 mod syscall;
 
 pub mod irq;
-
-use core::fmt;
-use core::fmt::Formatter;
-use aarch64::enable_fiq_interrupt;
-pub use self::frame::TrapFrame;
-
-use pi::interrupt::{Controller, Interrupt};
-use crate::GLOABAL_IRQ;
-use pi::local_interrupt::{LocalController, LocalInterrupt};
-use crate::multiprocessing::per_core::local_irq;
-
-use self::syndrome::Syndrome;
-use self::syscall::handle_syscall;
-use crate::traps::irq::IrqHandlerRegistry;
 
 #[repr(u16)]
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
@@ -60,8 +61,7 @@ impl fmt::Display for Info {
 pub extern "C" fn handle_exception(info: Info, esr: u32, tf: &mut TrapFrame) {
     let syndrome = Syndrome::from(esr);
 
-    //kprintln!("handle_exception {}: {}", core, info);
-    //kprintln!("{}", syndrome);
+    //info!("handle_exception {}: {}", info, syndrome);
 
     match info.kind {
         Kind::Synchronous => {
@@ -69,7 +69,7 @@ pub extern "C" fn handle_exception(info: Info, esr: u32, tf: &mut TrapFrame) {
             match syndrome {
                 Syndrome::Brk(_) => {
                     tf.elr += 4;
-                },
+                }
                 Syndrome::Svc(s) => {
                     handle_syscall(s, tf);
                 }
@@ -95,9 +95,7 @@ pub extern "C" fn handle_exception(info: Info, esr: u32, tf: &mut TrapFrame) {
                 }
             }
         }
-        Kind::Fiq => {
-
-        },
+        Kind::Fiq => {}
         _ => {}
     }
 }

@@ -5,12 +5,13 @@ TARGET_DIR := target/aarch64-unknown-none/release/
 TARGET := $(TARGET_DIR)/$(KERN)
 BINARY := $(TARGET).bin
 SDCARD ?= $(ROOT)/user/fs.img
+USER_PROGRAMS := cat echo fib heap init shell stack
 
 QEMU := qemu-system-aarch64
 QEMU_ARGS := -nographic -M raspi3b -serial null -serial mon:stdio \
 			 -drive file=$(SDCARD),format=raw,if=sd -kernel
 
-.PHONY: all build qemu transmit objdump nm check clean install test
+.PHONY: all build qemu transmit objdump nm check clean install test user image
 
 all: build
 
@@ -23,6 +24,9 @@ build:
 
 check:
 	@cargo check
+
+clippy:
+	@cargo clippy
 
 qemu: build
 	$(QEMU) $(QEMU_ARGS) $(BINARY)
@@ -41,7 +45,10 @@ clean:
 
 user:
 	@echo "+ Building user programs"
-	cargo build --bin fib --release
-	llvm-objcopy -O binary $(TARGET_DIR)/fib $(TARGET_DIR)/fib.bin
+	@for program in $(USER_PROGRAMS) ; do 											\
+		cargo build --bin $$program --release;											\
+		llvm-objcopy -O binary $(TARGET_DIR)/$$program $(TARGET_DIR)/$$program.bin;		\
+    done
 
-drive:
+image:
+	cd user; ./build.sh

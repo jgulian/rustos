@@ -1,6 +1,7 @@
-use super::*;
-use std::sync::mpsc::{Receiver, Sender, channel};
 use std::io::Cursor;
+use std::sync::mpsc::{channel, Receiver, Sender};
+
+use super::*;
 
 struct Pipe(Sender<u8>, Receiver<u8>, Vec<u8>);
 

@@ -3,6 +3,7 @@ use core::arch::asm;
 //FIXME: remove this
 
 pub struct _SP;
+
 impl _SP {
     /// Returns the current stack pointer.
     #[inline(always)]
@@ -24,4 +25,5 @@ impl _SP {
         );
     }
 }
+
 pub static SP: _SP = _SP {};

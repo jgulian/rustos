@@ -14,12 +14,36 @@ edition = "2021"
 [dependencies]
 aarch64 = { path = "../lib/aarch64/" }
 kernel_api = { path = "../lib/kernel_api" }
+shim = { path = "../lib/shim", features = ["no_std"] }
 
+[[bin]]
+name = "cat"
+path = "src/bin/cat.rs"
+
+[[bin]]
+name = "echo"
+path = "src/bin/echo.rs"
 
 [[bin]]
 name = "fib"
 path = "src/bin/fib.rs"
 
 [[bin]]
+name = "heap"
+path = "src/bin/heap.rs"
+
+[[bin]]
+name = "init"
+path = "src/bin/init.rs"
+
+[[bin]]
+name = "shell"
+path = "src/bin/shell.rs"
+
+[[bin]]
 name = "sleep"
 path = "src/bin/sleep.rs"
+
+[[bin]]
+name = "stack"
+path = "src/bin/stack.rs"

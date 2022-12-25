@@ -1,13 +1,11 @@
-#![feature(asm_const)]
-
 #![no_std]
+
+#![feature(asm_const)]
 
 use shim::io;
 
 #[cfg(feature = "user-space")]
 pub mod syscall;
-#[cfg(feature = "user-space")]
-pub mod user_alloc;
 
 pub type OsResult<T> = Result<T, OsError>;
 
@@ -24,6 +22,8 @@ pub enum OsError {
     FileExists = 60,
     InvalidArgument = 70,
 
+    UnknownResourceId = 80,
+
     IoError = 101,
     IoErrorEof = 102,
     IoErrorInvalidData = 103,
@@ -34,7 +34,7 @@ pub enum OsError {
     IllegalSocketOperation = 201,
 }
 
-impl core::convert::From<u64> for OsError {
+impl From<u64> for OsError {
     fn from(e: u64) -> Self {
         match e {
             1 => OsError::Ok,
@@ -60,7 +60,7 @@ impl core::convert::From<u64> for OsError {
     }
 }
 
-impl core::convert::From<io::Error> for OsError {
+impl From<io::Error> for OsError {
     fn from(e: io::Error) -> Self {
         match e.kind() {
             io::ErrorKind::UnexpectedEof => OsError::IoErrorEof,
@@ -73,25 +73,52 @@ impl core::convert::From<io::Error> for OsError {
     }
 }
 
+#[derive(Debug)]
 pub enum Syscall {
-    Sleep = 0,
-    Time = 1,
-    Exit = 2,
+    Open = 0,
+    Close = 1,
+    Read = 2,
     Write = 3,
-    GetPid = 4,
-    Sbrk = 5,
+    Pipe = 4,
+    Duplicate = 5,
+    Seek = 6,
+
+    Fork = 10,
+    Execute = 11,
+    Exit = 12,
+    Wait = 13,
+    GetPid = 14,
+
+    Sbrk = 20,
+
+    Sleep = 30,
+    Time = 31,
+
     Unknown = 256,
 }
 
 impl From<u16> for Syscall {
     fn from(value: u16) -> Self {
         match value {
-            0 => Syscall::Sleep,
-            1 => Syscall::Time,
-            2 => Syscall::Exit,
+            0 => Syscall::Open,
+            1 => Syscall::Close,
+            2 => Syscall::Read,
             3 => Syscall::Write,
-            4 => Syscall::GetPid,
-            5 => Syscall::Sbrk,
+            4 => Syscall::Pipe,
+            5 => Syscall::Duplicate,
+            6 => Syscall::Seek,
+
+            10 => Syscall::Fork,
+            11 => Syscall::Execute,
+            12 => Syscall::Exit,
+            13 => Syscall::Wait,
+            14 => Syscall::GetPid,
+
+            20 => Syscall::Sbrk,
+
+            30 => Syscall::Sleep,
+            31 => Syscall::Time,
+
             _ => Syscall::Unknown,
         }
     }

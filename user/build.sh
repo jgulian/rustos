@@ -4,11 +4,7 @@ IMG=fs.img
 MNT=mnt
 ROOT=$(git rev-parse --show-toplevel)
 
-PROGS=(fib)
-
-for d in ${PROGS[@]}; do
-    (cd $d; make build)
-done
+PROGS=(cat echo fib heap init shell stack)
 
 dd if=/dev/zero of=$IMG bs=1MB count=128
 echo -e "n\np\n1\n\n\nt\nc\nw\n" | fdisk $IMG
@@ -35,8 +31,14 @@ sudo mount $LOP1 $MNT
 trap "sudo umount $MNT; rmdir $MNT; sudo losetup -d $LO" EXIT
 
 for d in ${PROGS[@]}; do
-    sudo cp $ROOT/target/aarch64-unknown-none/release/$d/$d.bin $MNT/$d
+    sudo cp $ROOT/target/aarch64-unknown-none/release/$d.bin $MNT/$d
 done
+
+# TODO: make this use the environment variable
+sudo bash -c 'echo "test file for user applications" > mnt/test'
+
+echo "listing"
+ls $MNT
 
 # TODO: find a general way to fix this
 qemu-img resize fs.img 256M

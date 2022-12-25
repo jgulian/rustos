@@ -1,9 +1,9 @@
 use core::{fmt, mem};
 use core::fmt::Debug;
-use shim::const_assert_size;
-use shim::io;
 
 use filesystem::BlockDevice;
+use shim::const_assert_size;
+use shim::io;
 
 /// Sector includes bottom two bits of sector.
 #[repr(C)]

@@ -1,8 +1,7 @@
-use core::{cmp, result};
 use alloc::boxed::Box;
 use alloc::vec::Vec;
-use core::fmt::Formatter;
-use crate::io;
+use core::{cmp, result};
+use core::fmt::{Debug, Formatter};
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum ErrorKind {
@@ -115,11 +114,11 @@ pub trait Read {
             match self.read(&mut buf[i..]) {
                 Ok(0) => {
                     Err(Error::from(ErrorKind::UnexpectedEof))
-                },
+                }
                 Ok(n) => {
                     i += n;
                     Ok(())
-                },
+                }
                 Err(error) => {
                     if error.kind() == ErrorKind::Interrupted {
                         Ok(())
@@ -179,7 +178,7 @@ pub struct Cursor<T> {
     position: u64,
 }
 
-impl<T> Seek for Cursor<T> where T: AsRef<[u8]>  {
+impl<T> Seek for Cursor<T> where T: AsRef<[u8]> {
     fn seek(&mut self, pos: SeekFrom) -> Result<u64> {
         let new_position = match pos {
             SeekFrom::Start(n) => Some(n as i64),

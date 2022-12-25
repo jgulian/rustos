@@ -1,15 +1,15 @@
 use core::arch::global_asm;
-use aarch64::*;
-
 use core::mem::zeroed;
 use core::ptr::write_volatile;
 
-mod oom;
-mod panic;
+use aarch64::*;
 
-use crate::{kmain, SCHEDULER};
+use crate::{kernel_main, SCHEDULER};
 use crate::param::*;
 use crate::VMM;
+
+mod oom;
+mod panic;
 
 global_asm!(include_str!("vectors.s"));
 
@@ -112,7 +112,7 @@ unsafe fn kinit() -> ! {
     zeros_bss();
     switch_to_el2();
     switch_to_el1();
-    kmain();
+    kernel_main();
 }
 
 /// Kernel entrypoint for core 1, 2, and 3

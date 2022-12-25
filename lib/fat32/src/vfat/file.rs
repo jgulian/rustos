@@ -1,8 +1,8 @@
 use alloc::string::String;
 
+use filesystem;
 use shim::io::{self, SeekFrom};
 
-use filesystem;
 use crate::vfat::{Cluster, Metadata, Status, VFatHandle};
 use crate::vfat::vfat::Chain;
 

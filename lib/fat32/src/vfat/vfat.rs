@@ -1,20 +1,23 @@
-use alloc::string::String;
+use alloc::boxed::Box;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
+use core::{fmt, mem};
+use core::cmp::min;
 use core::fmt::{Debug, Formatter};
 use core::marker::PhantomData;
 
-use alloc::vec::Vec;
-use core::cmp::min;
-use core::{fmt, mem};
-use core::ops::DerefMut;
+
 use log::info;
 
+use filesystem::{BlockDevice, FileSystem};
+use filesystem::Dir as DirTrait;
+use filesystem::fs2::{Directory2, Entry2, File2, FileSystem2, Metadata2};
+use filesystem::path::{Component, Path};
 use shim::{io, ioerr, newioerr};
-use shim::path::{Component, Path};
+use shim::io::SeekFrom;
 
 use crate::mbr::MasterBootRecord;
 use crate::PartitionEntry;
-use filesystem::{BlockDevice, FileSystem};
-use shim::io::SeekFrom;
 use crate::vfat::{BiosParameterBlock, CachedPartition, Partition};
 use crate::vfat::{Cluster, Dir, Entry, Error, FatEntry, File, Status};
 
@@ -141,7 +144,6 @@ impl<HANDLE: VFatHandle> VFat<HANDLE> {
         current_sector += offset / sector_size;
 
         if offset % self.device.sector_size() != 0 {
-            info!("not here 1");
             let amount_to_write = (sector_size - (offset % sector_size)) as usize;
             let buffer = &buf[..amount_to_write];
             self.update_sector(current_sector, (offset % sector_size) as usize, buffer)?;
@@ -150,7 +152,6 @@ impl<HANDLE: VFatHandle> VFat<HANDLE> {
         }
 
         while (sector_size as usize) < buf.len() - amount_written {
-            info!("not here 2");
             let buffer = &buf[amount_written..(amount_written + sector_size as usize)];
             self.device.write_sector(current_sector, buffer)?;
             current_sector += 1;
@@ -167,13 +168,13 @@ impl<HANDLE: VFatHandle> VFat<HANDLE> {
         Ok(amount_written)
     }
 
-    pub fn fat_entry(&mut self, cluster: Cluster) -> io::Result<&FatEntry> {
+    pub fn fat_entry(&mut self, cluster: Cluster) -> io::Result<FatEntry> {
         let sector = self.fat_start_sector + (cluster.offset() / self.bytes_per_sector as u32) as u64;
         let mut data = vec![0u8; self.device.sector_size() as usize];
         self.device.read_sector(sector, data.as_mut_slice())?;
         let offset = (cluster.offset() % self.bytes_per_sector as u32) as usize;
         let entry = &data[offset];
-        Ok(unsafe { mem::transmute::<&u8, &FatEntry>(entry) })
+        Ok(*unsafe { mem::transmute::<&u8, &FatEntry>(entry) })
     }
 
     pub(crate) fn next_cluster(&mut self, cluster: Cluster) -> io::Result<Option<Cluster>> {
@@ -285,7 +286,7 @@ impl<HANDLE: VFatHandle> io::Read for Chain<HANDLE> {
                 let read = vfat.read_cluster(current_cluster, cluster_offset as u64, buffer)?;
                 amount_read += read;
                 cluster_offset += read;
-                //info!("in read info {} {} {}", amount_read, cluster_offset, read);
+
                 if cluster_offset == bytes_per_cluster {
                     cluster_offset = 0;
                     match vfat.next_cluster(current_cluster)? {
@@ -300,8 +301,6 @@ impl<HANDLE: VFatHandle> io::Read for Chain<HANDLE> {
                     panic!("read more bytes within cluster than exist within cluster");
                 }
             }
-
-            //info!("position updated by {}", amount_read);
 
             self.position += amount_read as u64;
             self.current_cluster = current_cluster;
@@ -322,9 +321,7 @@ impl<HANDLE: VFatHandle> io::Write for Chain<HANDLE> {
             let mut exhausted = self.exhausted;
             let mut amount_written = 0;
 
-            info!("amogus 1 {}", buf.len());
             while !exhausted && amount_written < buf.len() {
-                info!("amogus 2 {}", amount_written);
                 let end_of_buffer = min(buf.len(), bytes_per_cluster - cluster_offset);
                 let buffer = &buf[amount_written..end_of_buffer];
                 let read = vfat.write_cluster(current_cluster, cluster_offset as u64, buffer)?;
@@ -344,8 +341,6 @@ impl<HANDLE: VFatHandle> io::Write for Chain<HANDLE> {
                     panic!("read more bytes within cluster than exist within cluster");
                 }
             }
-
-            info!("amogus 3 {}", amount_written);
 
             self.position += amount_written as u64;
             self.current_cluster = current_cluster;
@@ -449,28 +444,25 @@ impl<'a, HANDLE: VFatHandle> FileSystem for HandleReference<'a, HANDLE> {
     type Dir = Dir<HANDLE>;
     type Entry = Entry<HANDLE>;
 
-    fn open<P: AsRef<Path>>(self, path: P) -> io::Result<Self::Entry> {
+    fn open(&mut self, path: &Path) -> io::Result<Self::Entry> {
         let mut path_stack = Vec::<Entry<HANDLE>>::new();
         path_stack.push(Entry::root(self.0.clone()));
 
-        for component in path.as_ref().components() {
+        for component in path.simplify()?.components() {
             match component {
-                Component::Prefix(_) => {
-                    panic!("not implemented")
-                }
-                Component::RootDir => {
+                Component::Root => {
                     path_stack.clear();
                     path_stack.push(Entry::root(self.0.clone()));
                 }
-                Component::CurDir => {}
-                Component::ParentDir => {
+                Component::Current => {}
+                Component::Parent => {
                     path_stack.pop();
                 }
-                Component::Normal(name) => {
+                Component::Child(name) => {
                     use filesystem::Entry;
                     let top = path_stack.last_mut().ok_or(newioerr!(InvalidInput))?.clone();
                     let mut top_dir = top.into_dir().ok_or(newioerr!(InvalidInput))?;
-                    path_stack.push(top_dir.find(name)?);
+                    path_stack.push(top_dir.find(name.as_str())?);
                 }
             }
         }
@@ -478,21 +470,117 @@ impl<'a, HANDLE: VFatHandle> FileSystem for HandleReference<'a, HANDLE> {
         Ok(path_stack.pop().ok_or(io::Error::from(io::ErrorKind::InvalidInput))?)
     }
 
-    fn new_file(&mut self, name: String) -> io::Result<Self::File> {
-        Ok(File::<HANDLE> {
-            name,
-            metadata: Default::default(),
-            file_size: 0,
-            chain: Chain::new(self.0.clone())?
+    fn new_file(&mut self, _path: &Path) -> io::Result<Self::File> {
+        unimplemented!("deprecated");
+
+        //let name = match path.file_name() {
+        //    None => {
+        //        unimplemented!("this is not implemented")
+        //    }
+        //    Some(name) => {String::from(name.to_str().unwrap())}
+        //};
+        //
+        //Ok(File::<HANDLE> {
+        //    name,
+        //    metadata: Default::default(),
+        //    file_size: 0,
+        //    chain: Chain::new(self.0.clone())?
+        //})
+    }
+
+    fn new_dir(&mut self, _path: &Path) -> io::Result<Self::Dir> {
+        unimplemented!("deprecated");
+
+        //let name = match path.file_name() {
+        //    None => {
+        //        unimplemented!("this is not implemented")
+        //    }
+        //    Some(name) => {String::from(name.to_str().unwrap())}
+        //};
+        //
+        //Ok(Dir::<HANDLE> {
+        //    vfat: self.0.clone(),
+        //    name,
+        //    metadata: Default::default(),
+        //    chain: Chain::new(self.0.clone())?
+        //})
+    }
+}
+
+impl<HANDLE: VFatHandle + 'static> File2 for File<HANDLE> {
+    fn duplicate(&mut self) -> io::Result<Box<dyn File2>> {
+        Ok(Box::new(File::<HANDLE> {
+            name: self.name.clone(),
+            metadata: self.metadata.clone(),
+            file_size: self.file_size,
+            chain: self.chain.clone(),
+        }))
+    }
+}
+
+impl<HANDLE: VFatHandle> Drop for File<HANDLE> {
+    fn drop(&mut self) {}
+}
+
+impl<HANDLE: VFatHandle> Directory2 for Dir<HANDLE> where HANDLE: 'static {
+    fn open_entry(&mut self, name: &str) -> io::Result<Entry2> {
+        Ok(match self.find(name)? {
+            Entry::File(file) => Entry2::File(Box::new(file)),
+            Entry::Dir(dir) => Entry2::Directory(Box::new(dir)),
         })
     }
 
-    fn new_dir(&mut self, name: String) -> io::Result<Self::Dir> {
-        Ok(Dir::<HANDLE> {
-            vfat: self.0.clone(),
-            name,
+    fn create_file(&mut self, name: &str) -> io::Result<()> {
+        let file = File::<HANDLE> {
+            name: name.to_string(),
             metadata: Default::default(),
-            chain: Chain::new(self.0.clone())?
-        })
+            file_size: 0,
+            chain: Chain::new(self.vfat.clone())?,
+        };
+
+        DirTrait::append(self, Entry::File(file))
+    }
+
+    fn create_directory(&mut self, name: &str) -> io::Result<()> {
+        let dir = Dir::<HANDLE> {
+            vfat: self.vfat.clone(),
+            name: name.to_string(),
+            metadata: Default::default(),
+            chain: Chain::new(self.vfat.clone())?,
+        };
+
+        DirTrait::append(self, Entry::Dir(dir))
+    }
+
+    fn remove(&mut self, _name: &str) -> io::Result<()> {
+        todo!()
+    }
+
+    fn list(&mut self) -> io::Result<Vec<String>> {
+        Ok(DirTrait::entries(self)?
+            .map(|entry| filesystem::Entry::name(&entry).to_string())
+            .collect())
+    }
+
+    fn metadata(&mut self, _name: &str) -> io::Result<Box<dyn Metadata2>> {
+        todo!()
+    }
+}
+
+impl<'a, HANDLE: VFatHandle> FileSystem2 for HandleReference<'a, HANDLE> where HANDLE: 'static {
+    fn root(&mut self) -> io::Result<Box<dyn Directory2>> {
+        let root_cluster = self.0.lock(|vfat| vfat.root_cluster());
+        let chain = Chain::new_from_cluster(self.0.clone(), root_cluster)?;
+        let entry = Box::new(Dir::<HANDLE> {
+            vfat: self.0.clone(),
+            name: "/".to_string(),
+            metadata: Default::default(),
+            chain,
+        });
+        Ok(entry)
+    }
+
+    fn copy_entry(&mut self, _source: &Path, _destination: &Path) -> io::Result<()> {
+        todo!()
     }
 }

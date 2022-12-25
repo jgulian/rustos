@@ -1,7 +1,7 @@
 use core::alloc::Layout;
 use core::ptr;
-use crate::GenericAllocator;
 
+use crate::GenericAllocator;
 use crate::linked_list::LinkedList;
 use crate::util::{align_down, align_up};
 
@@ -14,7 +14,7 @@ fn log_two(number: usize) -> Option<usize> {
         Some(0)
     } else {
         Some(log_two(number / 2)? + 1)
-    }
+    };
 }
 
 fn is_aligned(ptr: *mut usize, align: usize) -> bool {

@@ -1,7 +1,9 @@
 use alloc::string::String;
-use shim::{io, path::Path};
+
+use shim::io;
 
 use crate::Metadata;
+use crate::path::Path;
 
 /// Trait implemented by files in the file system.
 pub trait File: io::Read + io::Write + io::Seek + Sized {
@@ -18,7 +20,7 @@ pub trait Dir: Sized {
     type Entry: Entry;
 
     /// An type that is an iterator over the entries in this directory.
-    type Iter: Iterator<Item = Self::Entry>;
+    type Iter: Iterator<Item=Self::Entry>;
 
     /// Returns an interator over the entries in this directory.
     fn entries(&mut self) -> io::Result<Self::Iter>;
@@ -71,15 +73,15 @@ pub trait Entry: Sized {
 }
 
 /// Trait implemented by file systems.
-pub trait FileSystem: Sized {
+pub trait FileSystem {
     /// The type of files in this file system.
     type File: File;
 
     /// The type of directories in this file system.
-    type Dir: Dir<Entry = Self::Entry>;
+    type Dir: Dir<Entry=Self::Entry>;
 
     /// The type of directory entries in this file system.
-    type Entry: Entry<File = Self::File, Dir = Self::Dir>;
+    type Entry: Entry<File=Self::File, Dir=Self::Dir>;
 
     /// Opens the entry at `path`. `path` must be absolute.
     ///
@@ -93,7 +95,7 @@ pub trait FileSystem: Sized {
     /// If there is no entry at `path`, an error kind of `NotFound` is returned.
     ///
     /// All other error values are implementation defined.
-    fn open<P: AsRef<Path>>(self, path: P) -> io::Result<Self::Entry>;
+    fn open(&mut self, path: &Path) -> io::Result<Self::Entry>;
 
     /// Opens the file at `path`. `path` must be absolute.
     ///
@@ -101,7 +103,7 @@ pub trait FileSystem: Sized {
     ///
     /// In addition to the error conditions for `open()`, this method returns an
     /// error kind of `Other` if the entry at `path` is not a regular file.
-    fn open_file<P: AsRef<Path>>(self, path: P) -> io::Result<Self::File> {
+    fn open_file(&mut self, path: &Path) -> io::Result<Self::File> {
         self.open(path)?
             .into_file()
             .ok_or(io::Error::new(io::ErrorKind::Other, "not a regular file"))
@@ -113,13 +115,13 @@ pub trait FileSystem: Sized {
     ///
     /// In addition to the error conditions for `open()`, this method returns an
     /// error kind of `Other` if the entry at `path` is not a directory.
-    fn open_dir<P: AsRef<Path>>(self, path: P) -> io::Result<Self::Dir> {
+    fn open_dir(&mut self, path: &Path) -> io::Result<Self::Dir> {
         self.open(path)?
             .into_dir()
             .ok_or(io::Error::new(io::ErrorKind::Other, "not a directory"))
     }
 
-    fn new_file(&mut self, name: String) -> io::Result<Self::File>;
+    fn new_file(&mut self, path: &Path) -> io::Result<Self::File>;
 
-    fn new_dir(&mut self, name: String) -> io::Result<Self::Dir>;
+    fn new_dir(&mut self, path: &Path) -> io::Result<Self::Dir>;
 }

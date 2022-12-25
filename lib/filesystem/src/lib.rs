@@ -4,10 +4,18 @@
 
 extern crate alloc;
 
-pub mod block_device;
-pub mod fs;
-pub mod metadata;
-
-pub use self::block_device::BlockDevice;
-pub use self::fs::{Dir, Entry, File, FileSystem};
+pub use self::devices::{BlockDevice, CharDevice};
 pub use self::metadata::{Metadata, Timestamp};
+pub use self::traits::{Dir, Entry, File, FileSystem};
+pub use self::vfs::VirtualFileSystem;
+
+pub mod devices;
+pub mod traits;
+pub mod metadata;
+pub mod vfs;
+pub mod fs2;
+pub mod path;
+
+#[cfg(test)]
+mod tests;
+

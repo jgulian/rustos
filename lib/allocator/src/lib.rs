@@ -1,6 +1,6 @@
 #![no_std]
 
-use core::alloc::{Layout};
+use core::alloc::Layout;
 
 pub mod bin;
 pub mod linked_list;

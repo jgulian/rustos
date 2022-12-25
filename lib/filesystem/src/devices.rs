@@ -1,6 +1,20 @@
 use alloc::boxed::Box;
+use alloc::string::String;
+use alloc::sync::Arc;
+use alloc::vec;
 use alloc::vec::Vec;
-use shim::io;
+use core::borrow::{Borrow, BorrowMut};
+use core::cell::RefCell;
+use core::ops::DerefMut;
+
+use log::info;
+
+use shim::{io, ioerr};
+use sync::Mutex;
+
+use crate::{File, FileSystem};
+use crate::fs2::{Directory2, Entry2, File2, FileSystem2, Metadata2};
+use crate::path::Path;
 
 /// Trait implemented by devices that can be read/written in sector
 /// granularities.
@@ -79,7 +93,7 @@ impl<'a, T: BlockDevice> BlockDevice for &'a mut T {
 
 //FIXME: this can probably be deleted
 macro impl_for_read_write_seek($(<$($gen:tt),*>)* $T:path) {
-    impl $(<$($gen),*>)* BlockDevice for $T {
+impl $(<$($gen),*>)* BlockDevice for $T {
         fn read_sector(&mut self, n: u64, buf: &mut [u8]) -> io::Result<usize> {
             use shim::io::{Read, Seek, SeekFrom};
             let sector_size = self.sector_size();
@@ -109,3 +123,89 @@ impl_for_read_write_seek!(shim::io::Cursor<Vec<u8>>);
 impl_for_read_write_seek!(shim::io::Cursor<Box<[u8]>>);
 #[cfg(test)]
 impl_for_read_write_seek!(::std::fs::File);
+
+pub trait CharDevice: Send + Sync + io::Read + io::Write + Clone {}
+
+pub struct CharDeviceFileSystem<T: CharDevice + 'static>(String, T);
+
+pub struct CharDeviceRootDirectory<T: CharDevice + 'static>(String, T);
+
+pub struct CharDeviceFile<T: CharDevice + 'static>(T);
+
+impl<T: CharDevice + 'static> CharDeviceFileSystem<T> {
+    pub fn new(name: String, device: T) -> Self {
+        CharDeviceFileSystem(name, device)
+    }
+}
+
+impl<T: CharDevice + 'static> FileSystem2 for CharDeviceFileSystem<T> {
+    fn root(&mut self) -> io::Result<Box<dyn Directory2>> {
+        Ok(Box::new(CharDeviceRootDirectory(self.0.clone(), self.1.clone())))
+    }
+
+    fn copy_entry(&mut self, _: &Path, _: &Path) -> io::Result<()> {
+        ioerr!(Unsupported)
+    }
+}
+
+impl<T: CharDevice + 'static> Directory2 for CharDeviceRootDirectory<T> {
+    fn open_entry(&mut self, name: &str) -> io::Result<Entry2> {
+        if self.0.eq(name) {
+            Ok(Entry2::File(Box::new(CharDeviceFile(self.1.clone()))))
+        } else {
+            ioerr!(NotFound)
+        }
+    }
+
+    fn create_file(&mut self, _: &str) -> io::Result<()> {
+        ioerr!(Unsupported)
+    }
+
+    fn create_directory(&mut self, _: &str) -> io::Result<()> {
+        ioerr!(Unsupported)
+    }
+
+    fn remove(&mut self, _: &str) -> io::Result<()> {
+        ioerr!(Unsupported)
+    }
+
+    fn list(&mut self) -> io::Result<Vec<String>> {
+        Ok(vec![self.0.clone()])
+    }
+
+    fn metadata(&mut self, _: &str) -> io::Result<Box<dyn Metadata2>> {
+        ioerr!(Unsupported)
+    }
+}
+
+impl<T: CharDevice + 'static> io::Seek for CharDeviceFile<T> {
+    fn seek(&mut self, _: io::SeekFrom) -> io::Result<u64> {
+        ioerr!(NotSeekable)
+    }
+}
+
+impl<T: CharDevice + 'static> io::Read for CharDeviceFile<T> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.0.read(buf)
+    }
+}
+
+impl<T: CharDevice + 'static> io::Write for CharDeviceFile<T> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.0.write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+impl<T: CharDevice + 'static> File2 for CharDeviceFile<T> {
+    fn duplicate(&mut self) -> io::Result<Box<dyn File2>> {
+        Ok(Box::new(CharDeviceFile(self.0.clone())))
+    }
+}
+
+impl<T: CharDevice + 'static> Drop for CharDeviceFile<T> {
+    fn drop(&mut self) {}
+}

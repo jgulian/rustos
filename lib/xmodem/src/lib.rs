@@ -1,7 +1,9 @@
-#![cfg_attr(feature = "no_std", no_std)]
+#![no_std]
 
 #![feature(decl_macro)]
 
+pub use progress::{Progress, ProgressFn};
+use read_ext::ReadExt;
 use shim::io;
 use shim::ioerr;
 
@@ -9,10 +11,6 @@ use shim::ioerr;
 mod tests;
 mod read_ext;
 mod progress;
-
-pub use progress::{Progress, ProgressFn};
-
-use read_ext::ReadExt;
 
 const SOH: u8 = 0x01;
 const EOT: u8 = 0x04;
@@ -104,7 +102,8 @@ impl Xmodem<()> {
                 match receiver.read_packet(&mut packet) {
                     Err(ref e) if e.kind() == io::ErrorKind::Interrupted => continue,
                     Err(e) => {
-                        return Err(e); },
+                        return Err(e);
+                    }
                     Ok(0) => break 'next_packet,
                     Ok(n) => {
                         received += n;

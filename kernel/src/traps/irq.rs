@@ -3,8 +3,8 @@ use core::ops::Index;
 
 use pi::interrupt::Interrupt;
 use pi::local_interrupt::LocalInterrupt;
-use crate::multiprocessing::mutex::Mutex;
 
+use crate::multiprocessing::mutex::Mutex;
 use crate::traps::TrapFrame;
 
 // Programmer Guide Chapter 10
@@ -17,8 +17,10 @@ type LocalIrqHandlers = [IrqHandlerMutex; LocalInterrupt::MAX];
 
 /// Global IRQ handler registry.
 pub struct GlobalIrq(GlobalIrqHandlers);
+
 /// Local (per-core) IRQ handler registry. (QA7: Chapter 4)
 pub struct LocalIrq(LocalIrqHandlers);
+
 /// Global FIQ handler registry. Our kerenl supports only one FIQ interrupt.
 pub struct Fiq(IrqHandlerMutex);
 
@@ -106,8 +108,8 @@ pub trait IrqHandlerRegistry<I> {
 /// A blanket implementation of `IrqHandlerRegistry` trait for all indexable
 /// struct that returns `IrqHandlerMutex`.
 impl<I, T> IrqHandlerRegistry<I> for T
-where
-    T: Index<I, Output = IrqHandlerMutex>,
+    where
+        T: Index<I, Output=IrqHandlerMutex>,
 {
     /// Register an irq handler for an interrupt.
     /// The caller should assure that `initialize()` has been called before calling this function.

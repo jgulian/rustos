@@ -1,11 +1,12 @@
 use core::alloc::{GlobalAlloc, Layout};
 use core::cmp::max;
 use core::fmt;
+
 use allocator::bin::BinAllocator;
 use allocator::GenericAllocator;
 use allocator::util::{align_down, align_up};
-
 use pi::atags::Atags;
+
 use crate::multiprocessing::mutex::Mutex;
 
 /// Thread-safe (locking) wrapper around a particular memory allocator.
@@ -67,11 +68,11 @@ pub fn memory_map() -> Option<(usize, usize)> {
     for atag in Atags::get() {
         match atag.mem() {
             Some(mem) => {
-                let start_unaligned_address= max(mem.start as usize, binary_end);
+                let start_unaligned_address = max(mem.start as usize, binary_end);
                 let start_address = align_up(start_unaligned_address, page_size);
                 let end_address = align_down((mem.size + mem.start) as usize, page_size);
-                return Some((start_address, end_address))
-            },
+                return Some((start_address, end_address));
+            }
             None => continue,
         }
     }

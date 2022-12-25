@@ -4,17 +4,17 @@
 #![cfg_attr(not(test), no_std)]
 #![cfg_attr(not(test), no_main)]
 
-#[cfg(not(test))]
-mod init;
-
 use core::fmt::Write;
 use core::slice::{from_raw_parts, from_raw_parts_mut};
-use xmodem::Xmodem;
 use core::time::Duration;
-use shim::io;
 use pi;
 use pi::timer;
 use pi::uart::MiniUart;
+use shim::io;
+use xmodem::Xmodem;
+
+#[cfg(not(test))]
+mod init;
 
 /// Start address of the binary to load and of the bootloader.
 const BINARY_START_ADDR: usize = 0x80000;
@@ -40,7 +40,7 @@ fn kmain() -> ! {
 
     let kernel_size = BOOTLOADER_START_ADDR - BINARY_START_ADDR;
     loop {
-        let kernel_location = unsafe {from_raw_parts_mut(BINARY_START, kernel_size)};
+        let kernel_location = unsafe { from_raw_parts_mut(BINARY_START, kernel_size) };
         match xmodem::Xmodem::receive(&mut uart, kernel_location) {
             Ok(_) => break,
             Err(e) => {

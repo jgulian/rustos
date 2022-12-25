@@ -1,5 +1,6 @@
-use crate::vfat::*;
 use core::fmt;
+
+use crate::vfat::*;
 
 use self::Status::*;
 
@@ -26,6 +27,7 @@ impl Status {
 }
 
 #[repr(C, packed)]
+#[derive(Default, Copy, Clone)]
 pub struct FatEntry(pub u32);
 
 impl From<Status> for FatEntry {

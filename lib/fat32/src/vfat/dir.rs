@@ -1,15 +1,16 @@
 use alloc::string::String;
 use alloc::vec::Vec;
+
 use log::info;
 
-use shim::const_assert_size;
-use shim::ffi::OsStr;
-use shim::io;
-
 use filesystem;
+
+use shim::const_assert_size;
+use shim::io;
 use shim::io::{Read, Seek, SeekFrom, Write};
+
 use crate::util::VecExt;
-use crate::vfat::{Date, file, Metadata, Timestamp};
+use crate::vfat::{Date, Metadata, Timestamp};
 use crate::vfat::{Cluster, Entry, File, VFatHandle};
 use crate::vfat::vfat::Chain;
 
@@ -123,10 +124,8 @@ impl<HANDLE: VFatHandle> Dir<HANDLE> {
     ///
     /// If `name` contains invalid UTF-8 characters, an error of `InvalidInput`
     /// is returned.
-    pub fn find<P: AsRef<OsStr>>(&mut self, name: P) -> io::Result<Entry<HANDLE>> {
+    pub fn find(&mut self, name: &str) -> io::Result<Entry<HANDLE>> {
         use filesystem::{Dir, Entry};
-        let name = name.as_ref().to_str()
-            .ok_or(io::Error::from(io::ErrorKind::InvalidInput))?;
 
         for entry in self.entries()? {
             if str::eq_ignore_ascii_case(entry.name(), name) {
@@ -144,7 +143,7 @@ impl<HANDLE: VFatHandle> filesystem::Dir for Dir<HANDLE> {
 
     fn entries(&mut self) -> io::Result<Self::Iter> {
         let mut data: Vec<u8> = Vec::new();
-        let read = self.chain.read_to_end(&mut data)?;
+        let _read = self.chain.read_to_end(&mut data)?;
 
         Ok(DirIter {
             vfat: self.vfat.clone(),
