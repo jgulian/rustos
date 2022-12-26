@@ -1,0 +1,8 @@
+[package]
+name = "formatted"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+shim = { path = "../shim" }
+formatted_derive = { path = "formatted_derive" }

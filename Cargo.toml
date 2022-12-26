@@ -5,20 +5,20 @@ strip = true
 
 [workspace]
 members = [
-    "kernel",
+    #"kernel",
 
     "dev/image",
 
-    "lib/aarch64",
-    "lib/allocator",
-    "lib/fat32",
-    "lib/filesystem",
-    "lib/jlib",
-    "lib/kernel_api",
-    "lib/pi",
+    #"lib/aarch64",
+    #"lib/allocator",
+    #"lib/fat32",
+    "lib/formatted",
+    "lib/formatted/formatted_derive",
+    #"lib/persistent",
+    #"lib/kernel_api",
+    #"lib/pi",
     "lib/shim",
-    "lib/volatile",
-    "lib/xmodem",
+    #"lib/volatile",
 
-    "user",
+    #"user",
 ]

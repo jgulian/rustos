@@ -58,7 +58,7 @@ impl PiVFatWrapper {
     }
 
     pub unsafe fn initialize(&self) {
-        let sd = sd::Sd::new().expect("filesystem failed to initialize");
+        let sd = sd::Sd::new().expect("persistent failed to initialize");
         let vfat = VFat::<PiVFatHandle>::from(sd).expect("failed to initialize vfat");
         (&mut *self.0.get()).replace(vfat);
     }

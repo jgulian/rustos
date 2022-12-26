@@ -4,7 +4,7 @@ cargo-features = ["per-package-target"]
 name = "image"
 version = "0.1.0"
 edition = "2021"
-forced-target = "x86_64-apple-darwin"
+forced-target = "x86_64-apple-darwin"   # TODO: remove
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }

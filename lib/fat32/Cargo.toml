@@ -12,7 +12,7 @@ authors = [
 edition = "2021"
 
 [dependencies]
-filesystem = { path = "../filesystem" }
+filesystem = { path = "../persistent" }
 shim = { path = "../shim", features = ["alloc"] }
 log = "0.4" #FIXME: remove
 
