@@ -100,21 +100,27 @@ fn generate_result_for_reads(
     data_ident: &proc_macro2::Ident,
     fields: Vec<(Field, FieldSetting)>,
 ) -> proc_macro2::TokenStream {
-    let mut result = quote!("{}{", data_ident);
-    fields.iter().for_each(|(field, _)|
-        result.extend(quote!("{},", field.ident.as_ref().expect("Field should have ident"))));
-    result.extend(quote!("}"));
-    result
+    let list: Vec<TokenStream2> = fields.iter().map(|(field, _)| {
+        field.ident.as_ref().unwrap().to_token_stream()
+    }).collect();
+
+    println!("list: {:?}", list);
+
+    quote! {
+        #data_ident {
+            #(#list),*
+        }
+    }
 }
 
 fn generate_impls(
     data_ident: &proc_macro2::Ident,
     fields: Vec<(Field, FieldSetting)>,
 ) -> proc_macro2::TokenStream {
-    let mut read_only = quote!(use shim::io::Read;);
-    let mut read_seek = quote!(use shim::io::{Read, Seek, SeekFrom};);
-    let mut write_only = quote!(use shim::io::Write;);
-    let mut write_seek = quote!(use shim::io::{Seek, SeekFrom, Write});
+    let mut read_only = quote!();
+    let mut read_seek = quote!();
+    let mut write_only = quote!();
+    let mut write_seek = quote!();
 
     fields.iter().for_each(|(field, settings)| {
         let field_ident = field.ident.as_ref().expect("field has no ident").clone();
@@ -172,19 +178,15 @@ fn generate_impls(
             None => {
                 read_only.extend(quote! {
                     let #field_ident = #type_name::load_readable(stream)?;
-
                 });
                 read_seek.extend(quote! {
                     let #field_ident = #type_name::load_readable_seekable(stream)?;
-
                 });
                 write_only.extend(quote! {
                     let #field_ident = #type_name::save_writable(stream)?;
-
                 });
                 write_seek.extend(quote! {
                     let #field_ident = #type_name::save_writable_seekable(stream)?;
-
                 });
             }
             Some(size) => {
@@ -193,47 +195,42 @@ fn generate_impls(
                 let from_bytes = format_ident!("from_{}_bytes", endianness_tokens);
                 let read_tokens = quote! {
                     let #field_name_data = [0u8; #size_formatted];
-                    stream.read_all(& #field_name_data );
+                    stream.read_all(& #field_name_data )?;
                     let #field_ident = #type_name::#from_bytes (& #field_name_data );
                 };
                 read_only.extend(read_tokens.clone());
                 read_seek.extend(read_tokens);
-                //write_only.extend(quote! {
-                //    let #field_ident = #type_name::save_writable(stream)?;
-                //});
-                //write_seek.extend(quote! {
-                //    let #field_ident = #type_name::save_writable_seekable(stream)?;
-                //});
-                //read_only.extend(read_tokens);
-                //read_seek.extend(read_tokens);
-                //write_only.extend(write_tokens);
-                //write_seek.extend(write_tokens);
+                let to_bytes = format_ident!("to_{}_bytes", endianness_tokens);
+                let write_tokens = quote! {
+                    let #field_name_data = self.#field_ident.#to_bytes();
+                    stream.write_all(& #field_name_data )?;
+                };
+                write_only.extend(write_tokens.clone());
+                write_seek.extend(write_tokens);
             }
         }
     });
 
     let read_result = generate_result_for_reads(data_ident, fields);
 
-    //let read_result = quote!("Ok( {} )", generate_result_for_reads(data_ident, fields));
-
     quote! {
-        impl formatted::Formatted for #data_ident {
-            fn load_readable<T: shim::io::Read>(stream: &mut T) -> Result<Self> {
+        impl Formatted for #data_ident {
+            fn load_readable<T: Read>(stream: &mut T) -> Result<Self> {
                 #read_only
-                //Ok( #read_result )
+                Ok(#read_result)
             }
 
-            fn load_readable_seekable<T: shim::io::Read + shim::io::Seek>(stream: &mut T) -> Result<Self> {
+            fn load_readable_seekable<T: Read + Seek>(stream: &mut T) -> Result<Self> {
                 #read_seek
-   //             #read_result
+                Ok(#read_result)
             }
 
-            fn save_writable<T: shim::io::Write>(&self, stream: &mut T) -> io::Result<()> {
+            fn save_writable<T: Write>(&self, stream: &mut T) -> Result<()> {
                 #write_only
                 Ok(())
             }
 
-            fn save_writable_seekable<T: shim::io::Write + shim::io::Seek>(&self, stream: &mut T) -> io::Result<()> {
+            fn save_writable_seekable<T: Write + Seek>(&self, stream: &mut T) -> Result<()> {
                 #write_seek
                 Ok(())
             }

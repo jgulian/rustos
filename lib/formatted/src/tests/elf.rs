@@ -1,12 +1,13 @@
-use formatted_derive::Formatted;
+use crate::Formatted;
+use shim::io::{Read, Seek, SeekFrom, Result, Write};
 
-#[derive(Formatted)]
+#[derive(formatted_derive::Formatted)]
 struct ElfTableInfo {
     #[endianness(big)] entry_size: u16,
     #[endianness(big)] entry_count: u16,
 }
 
-#[derive(Formatted)]
+#[derive(formatted_derive::Formatted)]
 struct ElfFileHeader {
     #[endianness(big)] magic_number: u32,
     class: u8,
