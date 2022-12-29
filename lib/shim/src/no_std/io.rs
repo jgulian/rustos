@@ -72,7 +72,7 @@ impl Error {
     }
 }
 
-impl core::fmt::Debug for Error {
+impl Debug for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         f.write_fmt(format_args!("{:?}: {}", self.kind, self.repr))
     }

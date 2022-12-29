@@ -1,13 +1,13 @@
 extern crate proc_macro;
 
-use proc_macro::{Ident, TokenStream};
+use proc_macro::TokenStream;
 use std::str::FromStr;
 
 use quote::{format_ident, quote, ToTokens};
-use syn::{Data, DeriveInput, Field, Fields, Lit, LitInt, Meta, MetaList, NestedMeta, parse_macro_input, Type};
+use syn::{Data, DeriveInput, Field, Fields, Lit, Meta, MetaList, NestedMeta, parse_macro_input, Type};
 use synstructure::macros::TokenStream2;
 
-#[proc_macro_derive(Formatted, attributes(endianness, padding, test))]
+#[proc_macro_derive(Format, attributes(endianness, padding))]
 pub fn derive_formatted(input: TokenStream) -> TokenStream {
     let derive_input = parse_macro_input!(input as DeriveInput);
     let impl_formatted = formatted_generator(&derive_input.ident, &derive_input.data);
@@ -104,8 +104,6 @@ fn generate_result_for_reads(
         field.ident.as_ref().unwrap().to_token_stream()
     }).collect();
 
-    println!("list: {:?}", list);
-
     quote! {
         #data_ident {
             #(#list),*
@@ -128,18 +126,18 @@ fn generate_impls(
         if let Some(padding) = settings.padding {
             let field_name_pad = format_ident!("{}_pad", field_ident);
             read_only.extend(quote! {
-                let #field_name_pad = [0u8; #padding];
-                stream.read_all(&#field_name_pad)?;
+                let mut #field_name_pad = [0u8; #padding];
+                stream.read_exact(#field_name_pad .as_mut())?;
             });
             read_seek.extend(quote! {
-                stream.seek(SeekFrom::Current(#padding))?;
+                stream.seek(SeekFrom::Current(#padding as i64))?;
             });
             write_only.extend(quote! {
                 let #field_name_pad = [0u8; #padding];
-                stream.write_all(&#field_name_pad)?;
+                stream.write_all(#field_name_pad .as_ref())?;
             });
             write_seek.extend(quote! {
-                stream.seek(SeekFrom::Current(#padding))?;
+                stream.seek(SeekFrom::Current(#padding as i64))?;
             });
         }
 
@@ -183,10 +181,10 @@ fn generate_impls(
                     let #field_ident = #type_name::load_readable_seekable(stream)?;
                 });
                 write_only.extend(quote! {
-                    let #field_ident = #type_name::save_writable(stream)?;
+                    self. #field_ident .save_writable(stream)?;
                 });
                 write_seek.extend(quote! {
-                    let #field_ident = #type_name::save_writable_seekable(stream)?;
+                    self. #field_ident .save_writable_seekable(stream)?;
                 });
             }
             Some(size) => {
@@ -194,16 +192,16 @@ fn generate_impls(
                     .expect("should be able to format number");
                 let from_bytes = format_ident!("from_{}_bytes", endianness_tokens);
                 let read_tokens = quote! {
-                    let #field_name_data = [0u8; #size_formatted];
-                    stream.read_all(& #field_name_data )?;
-                    let #field_ident = #type_name::#from_bytes (& #field_name_data );
+                    let mut #field_name_data = [0u8; #size_formatted];
+                    stream.read_exact(#field_name_data .as_mut())?;
+                    let #field_ident = #type_name::#from_bytes ( #field_name_data );
                 };
                 read_only.extend(read_tokens.clone());
                 read_seek.extend(read_tokens);
                 let to_bytes = format_ident!("to_{}_bytes", endianness_tokens);
                 let write_tokens = quote! {
-                    let #field_name_data = self.#field_ident.#to_bytes();
-                    stream.write_all(& #field_name_data )?;
+                    let #field_name_data = self.#field_ident .#to_bytes();
+                    stream.write_all(#field_name_data .as_ref())?;
                 };
                 write_only.extend(write_tokens.clone());
                 write_seek.extend(write_tokens);
@@ -214,7 +212,7 @@ fn generate_impls(
     let read_result = generate_result_for_reads(data_ident, fields);
 
     quote! {
-        impl Formatted for #data_ident {
+        impl Format for #data_ident {
             fn load_readable<T: Read>(stream: &mut T) -> Result<Self> {
                 #read_only
                 Ok(#read_result)
@@ -245,15 +243,15 @@ fn formatted_generator(data_ident: &proc_macro2::Ident, data: &Data) -> proc_mac
                 Fields::Named(fields) => {
                     generate_impls(data_ident, parse_fields(&mut fields.named.iter()))
                 }
-                Fields::Unnamed(_) => panic!("unnamed structs are not supported for formatted derivation"),
-                Fields::Unit => panic!("Unit structs are not supported for formatted derivation"),
+                Fields::Unnamed(_) => panic!("unnamed structs are not supported for format derivation"),
+                Fields::Unit => panic!("Unit structs are not supported for format derivation"),
             }
         }
         Data::Enum(_) => {
-            panic!("Unions are not supported for formatted derivation");
+            panic!("Unions are not supported for format derivation");
         }
         Data::Union(_) => {
-            panic!("Unions are not supported for formatted derivation");
+            panic!("Unions are not supported for format derivation");
         }
     }
 }

@@ -1,5 +1,5 @@
 [package]
-name = "formatted_derive"
+name = "format_derive"
 version = "0.1.0"
 edition = "2021"
 
