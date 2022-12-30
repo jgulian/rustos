@@ -66,7 +66,7 @@ pub struct Registers {
     core_timer_ms: Volatile<u32>,
     local_interrupt_routing: Volatile<u32>,
     __reserved3: u32,
-    //TODO: read docs more, was this removed?
+    //TODO: read documentation more, was this removed?
     axi_outstanding_counters: Volatile<u32>,
     axi_outstanding_irq: Volatile<u32>,
     local_timer_control: Volatile<u32>,

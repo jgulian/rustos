@@ -7,7 +7,7 @@ strip = true
 members = [
     #"kernel",
 
-    "dev/image",
+    "development/image",
 
     #"lib/aarch64",
     #"lib/allocator",

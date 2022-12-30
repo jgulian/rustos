@@ -16,12 +16,7 @@ use crate::path::Component::Parent;
 pub struct Path(Vec<Component>);
 
 #[derive(Clone, PartialEq, Debug)]
-pub enum Component {
-    Root,
-    Current,
-    Parent,
-    Child(String),
-}
+
 
 impl Path {
     pub fn new(path: &str) -> io::Result<Self> {
