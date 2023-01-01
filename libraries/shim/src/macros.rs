@@ -19,6 +19,13 @@ macro_rules! const_assert_eq {
     }
 }
 
+#[macro_export]
+macro_rules! const_assert_le {
+    ($x:expr, $($xs:expr),+) => {
+        const _: () = { $crate::const_assert!($($x < $xs),+); ()};
+    }
+}
+
 //
 // TODO. make it
 // 
