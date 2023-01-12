@@ -5,6 +5,8 @@ strip = true
 
 [workspace]
 members = [
+    "bootloader",
+
     #"kernel",
 
     "development/image",

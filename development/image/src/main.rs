@@ -1,47 +1,32 @@
+mod cli;
+
 use std::fs::File;
-use std::path::PathBuf;
-use clap::{Parser, Subcommand};
+use std::io::{Seek, SeekFrom, Write};
+use clap::Parser;
+use cli::ImageArgs;
+use crate::cli::ImageCommand::{Create, Format};
 
-/// Simple program to greet a person
-#[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
-struct ImageArgs {
-    /// The path of the disk image
-    path: PathBuf,
-
-    /// The partition to operate on
-    partition: u8,
-
-    /// The size of the sectors on the image
-    #[arg(short, long, default_value_t = 512)]
-    sector_size: u16,
-
-    /// The command to run
-    #[command(subcommand)]
-    command: ImageCommand,
-}
-
-#[derive(Subcommand, Debug)]
-enum ImageCommand {
-    /// Format
-    Format { filesystem: String, folder: PathBuf },
-}
-
-fn open_file(args: &ImageArgs) {
-    match File::options().read(true).write(true).open(&args.path) {
-        Ok(file) => {
-            // TODO: check MBR
-        }
-        Err(_) => {}
-    }
-}
+const BYTES_PER_MEGABYTE: u64 = 1000000;
 
 fn main() {
-    let args = ImageArgs::parse();
+    let ImageArgs {path, sector_size, command } = ImageArgs::parse();
 
-    let file = File::options()
-        .create_new(true)
-        .read(true)
-        .write(true)
-        .open(args.path).expect("Unable to open file");
+    match command {
+        Create { image_size_mb } => {
+            if image_size_mb == 0 {
+                panic!("Image must have positive size");
+            }
+            let file_size = image_size_mb * BYTES_PER_MEGABYTE;
+            if file_size % (sector_size as u64) == 0 {
+                panic!("File size must be divisible by sector size");
+            }
+
+            let mut file = File::create(path).expect("Issue creating file");
+            file.seek(SeekFrom::Start(file_size - 1)).expect("Unable to seek");
+            file.write(&[0]).expect("Unable to write to file");
+        }
+        Format { filesystem, partition, folder } => {
+
+        }
+    }
 }

@@ -1,4 +1,6 @@
-macro_rules! define_register_mask {
+//TODO: there is no readwrite, add this
+
+macro_rules! mask {
     ($bit:literal) => {
         (0b1 << $bit)
     }
@@ -7,111 +9,108 @@ macro_rules! define_register_mask {
     }
 }
 
-pub(crate) use define_register_mask;
+pub(crate) use mask;
 
-macro_rules! define_register_bits_read {
-    (Inner, $base:literal + $offset:literal, $size:ty, $name:ident,
-    $bits:literal$(..$bits_end:literal)?) => {{
-        use core::ptr::read_volatile;
-        let data = unsafe {
-            read_volatile(($base + $offset) as *const $size)
-        };
-
-        (data & define_register_mask!($bits$(..$bits_end)?)) >> $bits
-    }}
-    ($base:literal + $offset:literal, $size:ty/, $name:ident,
-    $bits:literal$(..$bits_end:literal)?) => {
-        pub fn read(&mut self) -> $size {
-            define_register_bits_read!(
-                Inner, $base + $offset, $size, $name, $bits$(..$bits_end)?
-            )
-        }
-    }
-    ($base:literal + $offset:literal, $size:ty/$bits_type:ty, $name:ident,
-    $bits:literal$(..$bits_end:literal)?) => {
-        pub fn read(&mut self) -> $bits_type {
-            define_register_bits_read!(
-                Inner, $base + $offset, $size, $name, $bits$(..$bits_end)?
-            ) as $bits_type
-        }
-    }
+macro_rules! field_type {
+    ($First:ident,) => { $First }
+    ($First:ident, $Second:ident) => { $Second }
+    ($First:ident,,) => { $First }
+    ($First:ident, $Second:ident,) => { $Second }
+    ($First:ident, $($Second:ident)?,$Third:ident) => { $Third }
 }
 
-pub(crate) use define_register_bits_read;
+pub(crate) use field_type;
 
-macro_rules! define_register_bits_write {
-    (Inner, $base:literal + $offset:literal, $size:ty, $name:ident,
-    $bits:literal$(..$bits_end:literal)?) => {
-        use core::ptr::write_volatile;
-        let mask = define_register_mask!($bits$(..$bits_end)?);
-        self.0 = (self.0 & !mask) | ((data << $bits) & mask);
-        unsafe {write_volatile(($base + $offset) as *const $size, self.0);}
-    }
-    ($base:literal + $offset:literal, $size:ty/, $name:ident,
-    $bits:literal$(..$bits_end:literal)?) => {
-        pub fn write(&mut self, data: $size) {
-            define_register_bits_write!(
-                Inner, $base + $offset, $size, $name, $bits$(..$bits_end)?
-            );
-        }
-    }
-    ($base:literal + $offset:literal, $size:ty/$bits_type:ty, $name:ident,
-    $bits:literal$(..$bits_end:literal)?) => {
-        pub fn write(&mut self, bits: $bits_type) {
-            let data = bits as $size;
-            define_register_bits_write!(
-                Inner, $base + $offset, $size, $name, $bits$(..$bits_end)?
-            );
-        }
-    }
+macro_rules! default_value {
+    ($RegisterType:ident,,) => {$RegisterType::default()}
+    ($RegisterType:ident,$FieldType:ident,) => {$FieldType::default()}
+    ($RegisterType:ident,$($FieldType:ident)?,$default:expr) => {$default}
 }
 
-pub(crate) use define_register_bits_write;
-
-macro_rules! define_register_bits_impl {
-    (Read, $base:literal + $offset:literal, $size:ty, $name:ident,
-    $bits:literal $(..$bits_end:literal)? $(, $bits_type:ty)?) => {
-        define_register_bits_read!($base + $offset, $size/$($bits_type)?, $name, $bits$(..$bits_end)?)
-    }
-    (Write, $base:literal + $offset:literal, $size:ty, $name:ident,
-    $bits:literal $(..$bits_end:literal)? $(, $bits_type:ty)?) => {
-        define_register_bits_write!($base + $offset, $size/$($bits_type)?, $name, $bits$(..$bits_end)?)
-    }
-    (ReadWrite, $base:literal + $offset:literal, $size:ty, $name:ident,
-    $bits:literal $(..$bits_end:literal)? $(, $bits_type:ty)?) => {
-        define_register_bits_read!($base + $offset, $size/$($bits_type)?, $name, $bits$(..$bits_end)?)
-        define_register_bits_write!($base + $offset, $size/$($bits_type)?, $name, $bits$(..$bits_end)?)
-    }
-}
-
-pub(crate) use define_register_bits_impl;
+pub(crate) use default_value;
 
 macro_rules! define_registers {
     ($module:ident, $base:literal, [
         $(
-            ($register:ident, $size:ty, $offset:literal): [
-                $(($name:ident, $bits:literal$(..$bits_end:literal)?, $RW:ident $(, $bits_type:ty)?),)*
+            ($Register:ident, $RegisterType:ident, $offset:literal): [
+                $(($field:ident, $bits:literal$(..$bits_end:literal)?, $ReadWrite:ident, {
+                    $(FieldType: $FieldType:ident,)?
+                    $(CustomType: $CustomType:ident {$($CTypeName:ident = $CTypeValue:literal,)+},)?
+                    $(DefaultValue: $DefaultValue:literal,)?
+                }),)*
             ],
-        )+
+        )*
     ]) => {
         mod $module {
-            $(
-            pub mod $register {
-                use crate::macros::registers::*;
-                
-                $(
-                    pub struct $name($size);
+            use core::default::Default;
+            use crate::macros::registers::*;
 
-                    impl $name {
-                        pub fn new() -> Self {
-                            Self ($size::default())
-                        }
-                        
-                        define_register_bits_impl!(
-                            $RW, $base + $offset, $size, $name, $bits$(..$bits_end)? $(, $bits_type)?
-                        )
+            $(
+
+            $(
+                $(
+                    #[repr($RegisterType)]
+                    pub enum $CustomType {
+                        $(
+                            $CTypeName = $CTypeValue,
+                        )+
                     }
-                )*
+                )?
+            )*
+
+            pub struct $Register {
+                $(
+                    pub $field: field_type!($RegisterType, $($FieldType)? , $($CustomType)?),
+                )+
+            }
+
+            impl Default for $Register {
+                fn default() -> Self {
+                    Self {
+                        $(
+                            $field: default_value!($RegisterType, $($FieldType)?, $($DefaultValue)?),
+                        )+
+                    }
+                }
+            }
+
+            impl $Register {
+                use crate::macros::registers::default_value;
+
+                const REGISTER_ADDRESS: *const $RegisterType = ($base + $offset) as *const $RegisterType;
+
+                pub unsafe fn read_raw() -> $RegisterType {
+                    core::ptr::read_volatile(REGISTER_ADDRESS)
+                }
+
+                pub unsafe fn write_raw(data: $RegisterType) {
+                    core::ptr::write_volatile(REGISTER_ADDRESS, data)
+                }
+
+                fn from_raw(value: $RegisterType) -> Self {
+                    Self {
+                        $(
+                            $field: ((value & mask!($bits$(..$bits_end)?)) >> $bits) as field_type!($RegisterType, $($FieldType)?),
+                        )+
+                    }
+                }
+
+                fn into_raw(self) -> $RegisterType {
+                    0 $(
+                        | (((self.$field as $RegisterType) << $bits) & mask!($bits$(..$bits_end)?))
+                    )+
+                }
+
+                pub fn read() -> Self {
+                    from_raw(unsafe {read_raw()})
+                }
+
+                pub fn write(self) {
+                    let data = into_raw();
+                    unsafe {
+                        write_raw(data);
+                    }
+                }
             }
             )*
         }

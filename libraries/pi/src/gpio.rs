@@ -21,30 +21,7 @@ pub enum Function {
 #[repr(C)]
 #[allow(non_snake_case)]
 struct Registers {
-    FSEL: [Volatile<u32>; 6],
-    __r0: Reserved<u32>,
-    SET: [WriteVolatile<u32>; 2],
-    __r1: Reserved<u32>,
-    CLR: [WriteVolatile<u32>; 2],
-    __r2: Reserved<u32>,
-    LEV: [ReadVolatile<u32>; 2],
-    __r3: Reserved<u32>,
-    EDS: [Volatile<u32>; 2],
-    __r4: Reserved<u32>,
-    REN: [Volatile<u32>; 2],
-    __r5: Reserved<u32>,
-    FEN: [Volatile<u32>; 2],
-    __r6: Reserved<u32>,
-    HEN: [Volatile<u32>; 2],
-    __r7: Reserved<u32>,
-    LEN: [Volatile<u32>; 2],
-    __r8: Reserved<u32>,
-    AREN: [Volatile<u32>; 2],
-    __r9: Reserved<u32>,
-    AFEN: [Volatile<u32>; 2],
-    __r10: Reserved<u32>,
-    PUD: Volatile<u32>,
-    PUDCLK: [Volatile<u32>; 2],
+
 }
 
 states! {

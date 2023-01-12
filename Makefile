@@ -4,6 +4,11 @@ KERN := kernel
 TARGET_DIR := target/aarch64-unknown-none/release/
 TARGET := $(TARGET_DIR)/$(KERN)
 BINARY := $(TARGET).bin
+
+BOOT := bootloader
+BOOT_TARGET := $(TARGET_DIR)/$(BOOT)
+BOOT_BINARY := $(BOOT_TARGET).bin
+
 SDCARD ?= $(ROOT)/user/fs.img
 USER_PROGRAMS := cat echo fib heap init shell stack
 
@@ -55,3 +60,13 @@ image:
 
 docs:
 	cd docs; mdbook serve --open
+
+boot-build:
+	@echo "+ Building build/$(KERN).elf [build/$@]"
+	@cargo build --bin kernel --release
+
+	@echo "+ Building build/$(KERN).bin [objcopy]"
+	@llvm-objcopy -O binary $(TARGET) $(BINARY)
+
+boot-qemu:
+	@(QEMU) $(QEMU_ARGS) $(BOOT)

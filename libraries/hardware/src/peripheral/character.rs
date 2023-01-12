@@ -1,8 +1,24 @@
 use shim::io;
 
 pub trait CharacterDevice {
-    fn read_byte(&mut self) -> io::Result<u8>;
-    fn write_byte(&mut self, byte: u8) -> io::Result<()>;
+    fn try_read_byte(&mut self) -> io::Result<Option<u8>>;
+    fn try_write_byte(&mut self, byte: u8) -> io::Result<Option<()>>;
+
+    fn can_read(&mut self) -> io::Result<bool>;
+    fn can_write(&mut self) -> io::Result<bool>;
+
+    fn read_byte(&mut self) -> io::Result<u8> {
+        loop {
+            if let Some(byte) = self.try_read_byte()? {
+                return Ok(byte);
+            }
+        }
+    }
+    fn write_byte(&mut self, byte: u8) -> io::Result<()> {
+        while self.try_write_byte(byte)?.is_none() {}
+        Ok(())
+    }
+
     fn flush(&mut self) -> io::Result<()>;
 }
 

@@ -1,19 +1,12 @@
-use core::any::TypeId;
+use crate::macros::registers::define_registers;
 
-struct Floating;
-
-struct PullDown;
-
-struct PullUp;
-
-
-
-#[inline(always)]
-fn set_gpio_function<const P: usize, const F: u32>() {
-    let type_id = TypeId::of::<T>();
-
-}
-
+define_registers!(uart_registers, 0x3f20_0000, [
+    (AuxIrq, u32, 0x00): [
+        (mini_uart_irq, 0, Read, {FieldType: bool, DefaultValue: false,}),
+        (spi_one_irq, 1, Read, {FieldType: bool, DefaultValue: false,}),
+        (spi_two_irq, 2, Read, {FieldType: bool, DefaultValue: false,}),
+    ],
+]);
 
 macro_rules! gpio {
     ($GpioPin:ident, $gpio_pin:ident, $pin:literal, $pull:ty, [
