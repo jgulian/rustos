@@ -102,13 +102,13 @@ macro_rules! define_registers {
                 }
 
                 pub fn read() -> Self {
-                    from_raw(unsafe {read_raw()})
+                    self.from_raw(unsafe {self.read_raw()})
                 }
 
                 pub fn write(self) {
-                    let data = into_raw();
+                    let data = self.into_raw();
                     unsafe {
-                        write_raw(data);
+                        self.write_raw(data);
                     }
                 }
             }

@@ -62,11 +62,8 @@ docs:
 	cd docs; mdbook serve --open
 
 boot-build:
-	@echo "+ Building build/$(KERN).elf [build/$@]"
-	@cargo build --bin kernel --release
+	@cargo build --bin $(BOOT) --release
+	@llvm-objcopy -O $(BOOT) $(BOOT_TARGET) $(BOOT_BINARY)
 
-	@echo "+ Building build/$(KERN).bin [objcopy]"
-	@llvm-objcopy -O binary $(TARGET) $(BINARY)
-
-boot-qemu:
-	@(QEMU) $(QEMU_ARGS) $(BOOT)
+boot-qemu: boot-build
+	$(QEMU) $(QEMU_ARGS) $(BOOT)

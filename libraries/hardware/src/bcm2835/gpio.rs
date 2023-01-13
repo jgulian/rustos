@@ -1,3 +1,4 @@
+use shim::io;
 use crate::macros::registers::define_registers;
 
 define_registers!(uart_registers, 0x3f20_0000, [
@@ -8,22 +9,51 @@ define_registers!(uart_registers, 0x3f20_0000, [
     ],
 ]);
 
+pub trait InputPin {
+    fn is_low() -> io::Result<bool>;
+    fn is_high() -> io::Result<bool>;
+}
+
+pub trait OutputPin {
+    fn pull_low() -> io::Result<()>;
+    fn pull_high() -> io::Result<()>;
+}
+
 macro_rules! gpio {
     ($GpioPin:ident, $gpio_pin:ident, $pin:literal, $pull:ty, [
         $($function:ty: $id:ident,)+
     ]) => {
         pub mod $gpio_pin {
             use core::marker::PhantomData;
+            use super::{InputPin, OutputPin};
 
-            #[warn(unused_imports)]
-            use super::{Floating, $pull, InputFunction, OutputFunction, $($function,)*
-            set_gpio_function};
+            pub struct Uninitialized;
+            
+            pub struct InputFunction;
+            
+            impl InputFunction {
+                const 
+            }
+            
+            pub struct OutputFunction;
+            
+            pub struct Alt0Function;
+            
+            pub struct Alt1Function;
+            
+            pub struct Alt2Function;
+            
+            pub struct Alt3Function;
+            
+            pub struct Alt4Function;
+            
+            pub struct Alt5Function;
 
             pub struct $GpioPin<MODE> {
                 _mode: PhantomData<MODE>,
             }
-
-            impl<MODE> $GpioPin<MODE> {
+            
+            impl $GpioPin<Uninitialized> {
                 pub fn input(self) -> $GpioPin<InputFunction> {
                     self.transition()
                 }
@@ -37,23 +67,28 @@ macro_rules! gpio {
                     self.transition()
                 }
                 )*
-
+                
                 #[inline(always)]
-                fn transition<T: GpioFunction>(self) -> $GpioPin<T> {
-                    set_gpio_function::<$pin, T>();
+                fn transition(self) -> $GpioPin<T> {
+                    set_gpio_function::<T>();
                     $GpioPin {
                         _mode: PhantomData,
                     }
                 }
             }
 
-            impl $GpioPin<InputFunction> {
-
+            //impl InputPin for $GpioPin<InputFunction> {
+            //    
+            //}
+            //
+            //impl OutputPin for $GpioPin<OutputFunction> {
+            //
+            //}
+            
+            fn set_gpio_function<T>() {
+                
             }
-
-            impl $GpioPin<OutputFunction> {
-
-            }
+            
         }
     }
 }
