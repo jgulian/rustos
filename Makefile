@@ -16,7 +16,7 @@ QEMU := qemu-system-aarch64
 QEMU_ARGS := -nographic -M raspi3b -serial null -serial mon:stdio \
 			 -drive file=$(SDCARD),format=raw,if=sd -kernel
 
-.PHONY: all build qemu transmit objdump nm check clean install test user image docs
+.PHONY: all build qemu transmit objdump nm check clean install test user image docs boot-build boot-qemu
 
 all: build
 

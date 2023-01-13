@@ -1,4 +1,5 @@
 //TODO: there is no readwrite, add this
+//TODO: do less writes with or
 
 macro_rules! mask {
     ($bit:literal) => {
@@ -61,7 +62,7 @@ macro_rules! define_registers {
             pub struct $Register {
                 $(
                     pub $field: field_type!($RegisterType, $($FieldType)? , $($CustomType)?),
-                )+
+                )*
             }
 
             impl Default for $Register {
@@ -69,46 +70,44 @@ macro_rules! define_registers {
                     Self {
                         $(
                             $field: default_value!($RegisterType, $($FieldType)?, $($DefaultValue)?),
-                        )+
+                        )*
                     }
                 }
             }
 
             impl $Register {
-                use crate::macros::registers::default_value;
-
-                const REGISTER_ADDRESS: *const $RegisterType = ($base + $offset) as *const $RegisterType;
+                const REGISTER_ADDRESS: *mut $RegisterType = ($base + $offset) as *mut $RegisterType;
 
                 pub unsafe fn read_raw() -> $RegisterType {
-                    core::ptr::read_volatile(REGISTER_ADDRESS)
+                    core::ptr::read_volatile(Self::REGISTER_ADDRESS)
                 }
 
                 pub unsafe fn write_raw(data: $RegisterType) {
-                    core::ptr::write_volatile(REGISTER_ADDRESS, data)
+                    core::ptr::write_volatile(Self::REGISTER_ADDRESS, data)
                 }
 
                 fn from_raw(value: $RegisterType) -> Self {
                     Self {
                         $(
                             $field: ((value & mask!($bits$(..$bits_end)?)) >> $bits) as field_type!($RegisterType, $($FieldType)?),
-                        )+
+                        )*
                     }
                 }
 
                 fn into_raw(self) -> $RegisterType {
                     0 $(
                         | (((self.$field as $RegisterType) << $bits) & mask!($bits$(..$bits_end)?))
-                    )+
+                    )*
                 }
 
                 pub fn read() -> Self {
-                    self.from_raw(unsafe {self.read_raw()})
+                    Self::from_raw(unsafe {Self::read_raw()})
                 }
 
                 pub fn write(self) {
                     let data = self.into_raw();
                     unsafe {
-                        self.write_raw(data);
+                        Self::write_raw(data);
                     }
                 }
             }
