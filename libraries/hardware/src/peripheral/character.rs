@@ -34,9 +34,9 @@ impl io::Read for dyn CharacterDevice {
 
 impl io::Write for dyn CharacterDevice {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        buf.into().fold(Ok(0), |amount_written_wrapped, byte| {
+        buf.into_iter().fold(Ok(0), |amount_written_wrapped, byte| {
             let amount_written = amount_written_wrapped?;
-            self.write_byte(byte)?;
+            self.write_byte(*byte)?;
             Ok(amount_written + 1)
         })
     }

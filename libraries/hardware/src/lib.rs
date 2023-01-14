@@ -1,6 +1,6 @@
 #![no_std]
 
-pub mod bcm2835;
+pub mod bcm2837;
 pub mod peripheral;
 pub mod manage;
 

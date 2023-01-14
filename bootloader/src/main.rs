@@ -1,6 +1,6 @@
 #![no_main]
 
-use hardware::bcm2835::uart::mini_uart::MiniUart;
+use hardware::bcm2837::uart::mini_uart::MiniUart;
 use hardware::peripheral::character::CharacterDevice;
 
 #[no_mangle]

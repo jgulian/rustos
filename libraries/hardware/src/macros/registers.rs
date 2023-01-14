@@ -4,31 +4,41 @@
 macro_rules! mask {
     ($bit:literal) => {
         (0b1 << $bit)
-    }
+    };
     ($bit_beg:literal..$bit_end:literal) => {
         ((1 << ($bit_end + 1)) - (1 << $bit_beg))
-    }
+    };
 }
 
 pub(crate) use mask;
 
 macro_rules! field_type {
-    ($First:ident,) => { $First }
-    ($First:ident, $Second:ident) => { $Second }
-    ($First:ident,,) => { $First }
-    ($First:ident, $Second:ident,) => { $Second }
-    ($First:ident, $($Second:ident)?,$Third:ident) => { $Third }
+    ($First:ty,) => { $First };
+    ($($First:ty)?, $Second:ty) => { $Second };
+    ($First:ty,,) => { $First };
+    ($($First:ty)?, $Second:ty,) => { $Second };
+    ($($First:ty)?, $($Second:ty)?,$Third:ty) => { $Third };
 }
 
 pub(crate) use field_type;
 
 macro_rules! default_value {
-    ($RegisterType:ident,,) => {$RegisterType::default()}
-    ($RegisterType:ident,$FieldType:ident,) => {$FieldType::default()}
-    ($RegisterType:ident,$($FieldType:ident)?,$default:expr) => {$default}
+    ($RegisterType:ident,,) => {$RegisterType::default()};
+    ($RegisterType:ident,$FieldType:ident,) => {$FieldType::default()};
+    ($RegisterType:ident,$($FieldType:ident)?,$default:expr) => {$default};
 }
 
 pub(crate) use default_value;
+
+macro_rules! into_field_type {
+    ($data:expr, bool,,) => { $data != 0 };
+    ($data:expr, $First:ty,bool,) => { $data != 0 };
+    ($data:expr, $First:ty,$($Second:ty)?,) => { $data as field_type!($First, $($Second)?) };
+    ($data:expr, $($First:ty)?, $($Second:ty)?,$Third:ty) => { <$Third>::from($data) };
+}
+
+
+pub(crate) use into_field_type;
 
 macro_rules! define_registers {
     ($module:ident, $base:literal, [
@@ -37,7 +47,7 @@ macro_rules! define_registers {
                 $(($field:ident, $bits:literal$(..$bits_end:literal)?, $ReadWrite:ident, {
                     $(FieldType: $FieldType:ident,)?
                     $(CustomType: $CustomType:ident {$($CTypeName:ident = $CTypeValue:literal,)+},)?
-                    $(DefaultValue: $DefaultValue:literal,)?
+                    $(DefaultValue: $DefaultValue:expr,)?
                 }),)*
             ],
         )*
@@ -55,6 +65,20 @@ macro_rules! define_registers {
                         $(
                             $CTypeName = $CTypeValue,
                         )+
+                    }
+
+                    impl From<$RegisterType> for $CustomType {
+                        fn from(item: $RegisterType) -> Self {
+                            match item {
+                                $(
+                                    $CTypeValue => $CustomType::$CTypeName,
+                                )+
+                                _ => {
+                                    // TODO: fail softly?
+                                    panic!("Invalid hardware description");
+                                }
+                            }
+                        }
                     }
                 )?
             )*
@@ -89,7 +113,7 @@ macro_rules! define_registers {
                 fn from_raw(value: $RegisterType) -> Self {
                     Self {
                         $(
-                            $field: ((value & mask!($bits$(..$bits_end)?)) >> $bits) as field_type!($RegisterType, $($FieldType)?),
+                            $field: into_field_type!(((value & mask!($bits$(..$bits_end)?)) >> $bits), $RegisterType, $($FieldType)?, $($CustomType)?),
                         )*
                     }
                 }
@@ -113,7 +137,7 @@ macro_rules! define_registers {
             }
             )*
         }
-    }
+    };
 }
 
 pub(crate) use define_registers;

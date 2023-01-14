@@ -1,9 +1,3 @@
-macro_rules! define_state {
-    ($((($data:ident, $T:ty),))*, $($value:ident,)*) => {
-
-    }
-}
-
 macro_rules! define_state_machine {
     ($name:ident, [$(($data:ident, $T:ty)$(,)?)*], {$($state:ident: {
         $($state_data:ident: $data_type:ty = $value:expr$(,)?)*}$(,)?)*
@@ -23,7 +17,7 @@ macro_rules! define_state_machine {
             )*
         }
         )*
-    }
+    };
 }
 
 pub(crate) use define_state_machine;

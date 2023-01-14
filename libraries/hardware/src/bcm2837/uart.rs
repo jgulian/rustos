@@ -21,13 +21,13 @@ define_registers!(uart_registers, 0x3f21_5000, [
             NoInterrupts = 0b00,
             TransmitHoldingRegisterEmpty = 0b01,
             ReceiverHoldsValidByte = 0b10,
-        }, }),
+        }, DefaultValue: InterruptId::NoInterrupts,}),
     ],
     (AuxMuLcr, u32, 0x4c): [
         (data_size, 0..1, ReadWrite, { CustomType: DataSize {
             Bits7 = 0b00,
             Bits8 = 0b11,
-        }, }),
+        }, DefaultValue: DataSize::Bits7,}),
     ],
     (AuxMuLsr, u32, 0x54): [
         (DataReady, 0, Read, {FieldType: bool, DefaultValue: false,}),
@@ -50,9 +50,10 @@ define_registers!(uart_registers, 0x3f21_5000, [
 ]);
 
 pub mod mini_uart {
-    use crate::devices::character::CharacterDevice;
     use crate::peripheral::character::CharacterDevice;
-    use super::{uart_registers, BitOperation};
+    use super::uart_registers;
+    use crate::bcm2837::gpio;
+    use gpio::{Gpio14, Gpio15, Gpio16, Gpio17};
 
     pub struct MiniUart;
 
@@ -63,6 +64,11 @@ pub mod mini_uart {
             let mut aux_enable = AuxEnable::default();
             aux_enable.mini_uart_enable = true;
             aux_enable.write();
+
+            Gpio14::new().txd1();
+            Gpio15::new().rxd1();
+            Gpio16::new().cts1();
+            Gpio17::new().rts1();
 
             let mut mini_uart_control = AuxMuControl::default();
             mini_uart_control.receiver_enable = false;
