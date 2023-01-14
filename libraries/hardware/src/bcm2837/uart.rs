@@ -14,7 +14,7 @@ define_registers!(uart_registers, 0x3f21_5000, [
     (AuxMuIo, u32, 0x40): [
         (data, 0..7, ReadWrite, {FieldType: u8, }),
     ],
-    (AuxMuIer, u32, 0x44): [],
+    //(AuxMuIer, u32, 0x44): [],
     (AuxMuIir, u32, 0x48): [
         (interrupt_pending, 0, Read, {FieldType: bool, }),
         (interrupt_id, 1..2, ReadWrite, { CustomType: InterruptId {
@@ -30,17 +30,17 @@ define_registers!(uart_registers, 0x3f21_5000, [
         }, DefaultValue: DataSize::Bits7,}),
     ],
     (AuxMuLsr, u32, 0x54): [
-        (DataReady, 0, Read, {FieldType: bool, DefaultValue: false,}),
-        (ReceiverOverrun, 1, ReadWrite, {FieldType: bool, DefaultValue: false,}),
-        (TransmitterEmpty, 5, Read, {FieldType: bool, DefaultValue: false,}),
-        (TransmitterIdle, 6, Read, {FieldType: bool, DefaultValue: false,}),
+        (data_ready, 0, Read, {FieldType: bool, DefaultValue: false,}),
+        (receiver_overrun, 1, ReadWrite, {FieldType: bool, DefaultValue: false,}),
+        (transmitter_empty, 5, Read, {FieldType: bool, DefaultValue: false,}),
+        (transmitter_idle, 6, Read, {FieldType: bool, DefaultValue: false,}),
     ],
     (AuxMuControl, u32, 0x60): [
         (receiver_enable, 0, ReadWrite, {FieldType: bool, DefaultValue: true,}),
         (transmitter_enable, 1, ReadWrite, {FieldType: bool, DefaultValue: true,}),
         (enable_receive_auto_flow_control, 2, ReadWrite, {FieldType: bool, DefaultValue: false,}),
         (enable_transmit_auto_flow_control, 3, ReadWrite, {FieldType: bool, DefaultValue: false,}),
-        (rts_AutoFlowLevel, 4..5, ReadWrite, {FieldType: bool, DefaultValue: false,}),
+        (rts_auto_flow_level, 4..5, ReadWrite, {FieldType: bool, DefaultValue: false,}),
         (rts_level_assert, 6, ReadWrite, {FieldType: bool, DefaultValue: false,}),
         (cts_level_assert, 7, ReadWrite, {FieldType: bool, DefaultValue: false,}),
     ],
@@ -113,11 +113,11 @@ pub mod mini_uart {
         }
 
         fn can_read(&mut self) -> shim::io::Result<bool> {
-            Ok(uart_registers::AuxMuLsr::read().DataReady)
+            Ok(uart_registers::AuxMuLsr::read().data_ready)
         }
 
         fn can_write(&mut self) -> shim::io::Result<bool> {
-            Ok(uart_registers::AuxMuLsr::read().TransmitterEmpty)
+            Ok(uart_registers::AuxMuLsr::read().transmitter_empty)
         }
 
         fn flush(&mut self) -> shim::io::Result<()> {

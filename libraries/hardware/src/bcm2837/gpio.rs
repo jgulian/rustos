@@ -258,16 +258,16 @@ pub trait OutputPin {
 
 mod gpio_functions {
     use crate::macros::states::define_state_machine;
-    define_state_machine!(GpioFunction, [(FunctionSelect, u8)], {
-        Uninitialized: {FunctionSelect: u8 = 0xff},
-        InputFunction: {FunctionSelect: u8 = 0b000},
-        OutputFunction: {FunctionSelect: u8 = 0b001},
-        Alt0Function: {FunctionSelect: u8 = 0b010},
-        Alt1Function: {FunctionSelect: u8 = 0b011},
-        Alt2Function: {FunctionSelect: u8 = 0b100},
-        Alt3Function: {FunctionSelect: u8 = 0b101},
-        Alt4Function: {FunctionSelect: u8 = 0b110},
-        Alt5Function: {FunctionSelect: u8 = 0b111},
+    define_state_machine!(GpioFunction, [(FUNCTION_SELECT, u8)], {
+        Uninitialized: {FUNCTION_SELECT: u8 = 0xff},
+        InputFunction: {FUNCTION_SELECT: u8 = 0b000},
+        OutputFunction: {FUNCTION_SELECT: u8 = 0b001},
+        Alt0Function: {FUNCTION_SELECT: u8 = 0b010},
+        Alt1Function: {FUNCTION_SELECT: u8 = 0b011},
+        Alt2Function: {FUNCTION_SELECT: u8 = 0b100},
+        Alt3Function: {FUNCTION_SELECT: u8 = 0b101},
+        Alt4Function: {FUNCTION_SELECT: u8 = 0b110},
+        Alt5Function: {FUNCTION_SELECT: u8 = 0b111},
     });
 }
 
@@ -310,7 +310,7 @@ macro_rules! gpio {
             #[inline(always)]
             fn transition<T: GpioFunction>(self) -> $GpioPin<T> {
                 let mut register = gpio_registers::$function_select::read();
-                register.$gpio_pin = T::FunctionSelect;
+                register.$gpio_pin = T::FUNCTION_SELECT;
                 register.write();
 
                 $GpioPin {

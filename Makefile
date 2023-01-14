@@ -6,7 +6,7 @@ TARGET := $(TARGET_DIR)/$(KERN)
 BINARY := $(TARGET).bin
 
 BOOT := bootloader
-BOOT_TARGET := $(TARGET_DIR)/$(BOOT)
+BOOT_TARGET := $(TARGET_DIR)$(BOOT)
 BOOT_BINARY := $(BOOT_TARGET).bin
 
 SDCARD ?= $(ROOT)/user/fs.img
@@ -63,7 +63,7 @@ docs:
 
 boot-build:
 	@cargo build --bin $(BOOT) --release
-	@llvm-objcopy -O $(BOOT) $(BOOT_TARGET) $(BOOT_BINARY)
+	@llvm-objcopy -O binary $(BOOT_TARGET) $(BOOT_BINARY)
 
 boot-qemu: boot-build
-	$(QEMU) $(QEMU_ARGS) $(BOOT)
+	$(QEMU) $(QEMU_ARGS) $(BOOT_BINARY)

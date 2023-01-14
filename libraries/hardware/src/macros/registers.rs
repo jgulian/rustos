@@ -102,14 +102,17 @@ macro_rules! define_registers {
             impl $Register {
                 const REGISTER_ADDRESS: *mut $RegisterType = ($base + $offset) as *mut $RegisterType;
 
+                #[allow(dead_code)]
                 pub unsafe fn read_raw() -> $RegisterType {
                     core::ptr::read_volatile(Self::REGISTER_ADDRESS)
                 }
 
+                #[allow(dead_code)]
                 pub unsafe fn write_raw(data: $RegisterType) {
                     core::ptr::write_volatile(Self::REGISTER_ADDRESS, data)
                 }
 
+                #[allow(dead_code)]
                 fn from_raw(value: $RegisterType) -> Self {
                     Self {
                         $(
@@ -118,16 +121,19 @@ macro_rules! define_registers {
                     }
                 }
 
+                #[allow(dead_code)]
                 fn into_raw(self) -> $RegisterType {
                     0 $(
                         | (((self.$field as $RegisterType) << $bits) & mask!($bits$(..$bits_end)?))
                     )*
                 }
 
+                #[allow(dead_code)]
                 pub fn read() -> Self {
                     Self::from_raw(unsafe {Self::read_raw()})
                 }
 
+                #[allow(dead_code)]
                 pub fn write(self) {
                     let data = self.into_raw();
                     unsafe {
