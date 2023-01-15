@@ -65,10 +65,10 @@ pub mod mini_uart {
             aux_enable.mini_uart_enable = true;
             aux_enable.write();
 
-            Gpio14::new().txd1();
-            Gpio15::new().rxd1();
-            Gpio16::new().cts1();
-            Gpio17::new().rts1();
+            let _ = Gpio14::new().txd1();
+            let _ = Gpio15::new().rxd1();
+            let _ = Gpio16::new().cts1();
+            let _ = Gpio17::new().rts1();
 
             let mut mini_uart_control = AuxMuControl::default();
             mini_uart_control.receiver_enable = false;
