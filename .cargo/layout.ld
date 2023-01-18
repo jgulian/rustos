@@ -1,5 +1,5 @@
 SECTIONS {
-  . = 0x80000; /* Raspbery Pi 3 Aarch64 (kernel8.img) load address */
+  . = 0x80000;
 
   /* start of the binary */
   __text_beg = .;
@@ -15,6 +15,7 @@ SECTIONS {
 
   .data : {
     *(.data .data.* .gnu.linkonce.d*)
+    BYTE(1)
   }
 
   .bss (NOLOAD) : {

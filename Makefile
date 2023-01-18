@@ -17,7 +17,8 @@ QEMU_ARGS := -nographic -M raspi3b -serial null -serial mon:stdio \
 			  -kernel
 # -drive file=$(SDCARD),format=raw,if=sd
 .PHONY: all build qemu transmit objdump nm check clean install test \
-	 	user image docs boot-build boot-qemu boot-qemu-gdb boot-qemu-asm
+	 	user image docs boot-build boot-qemu boot-qemu-gdb boot-qemu-asm \
+	 	boot-qemu-int
 
 all: build
 
@@ -75,3 +76,6 @@ boot-qemu-gdb: boot-build
 
 boot-qemu-asm: boot-build
 	$(QEMU) $(QEMU_ARGS) $(BOOT_BINARY) -d in_asm
+
+boot-qemu-int: boot-build
+	$(QEMU) $(QEMU_ARGS) $(BOOT_BINARY) -d int
