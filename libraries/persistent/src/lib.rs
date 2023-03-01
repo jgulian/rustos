@@ -1,17 +1,16 @@
-#![no_std]
-
-#![feature(decl_macro)]
+#![cfg_attr(feature = "no_std", no_std)]
 
 extern crate alloc;
 
-pub use self::devices::{BlockDevice, CharDevice};
-pub use self::vfs::VirtualFileSystem;
+cfg_if::cfg_if! {
+    if #[cfg(feature = "no_std")] {
+        mod no_std;
+        pub use self::no_std::*;
+    } else {
+        mod std;
+        pub use self::std::*;
+    }
+}
 
-pub mod devices;
-pub mod vfs;
-pub mod fs2;
-pub mod path;
-
-#[cfg(test)]
-mod tests;
+pub mod filesystem;
 

@@ -17,6 +17,7 @@ members = [
     "libraries/format",
     "libraries/format/format_derive",
     "libraries/hardware",
+    "libraries/persistent",
     #"lib/persistent",
     #"lib/kernel_api",
     #"lib/pi",
