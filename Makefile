@@ -20,7 +20,7 @@ build:
 	@cargo build --bin kernel --release
 
 	@echo "+ Building build/$(KERN).bin [objcopy]"
-	@llvm-objcopy -O binary $(TARGET) $(BINARY)
+	@objcopy -O binary $(TARGET) $(BINARY)
 
 check:
 	@cargo check
@@ -47,7 +47,7 @@ user:
 	@echo "+ Building user programs"
 	@for program in $(USER_PROGRAMS) ; do 											\
 		cargo build --bin $$program --release;											\
-		llvm-objcopy -O binary $(TARGET_DIR)/$$program $(TARGET_DIR)/$$program.bin;		\
+		objcopy -O binary $(TARGET_DIR)/$$program $(TARGET_DIR)/$$program.bin;		\
     done
 
 image:

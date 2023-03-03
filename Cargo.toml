@@ -1,7 +1,9 @@
 [profile.release]
 debug = true
 lto = false # TODO: this can be changed?
-strip = true
+#strip = true   # TODO: fix this on apple silicon
+
+
 
 [workspace]
 members = [
