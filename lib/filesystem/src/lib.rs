@@ -1,4 +1,4 @@
-#![no_std]
+#![cfg_attr(feature = "no_std", no_std)]
 
 #![feature(decl_macro)]
 
@@ -14,6 +14,7 @@ pub mod traits;
 pub mod metadata;
 pub mod vfs;
 pub mod fs2;
+pub mod mbr;
 pub mod path;
 
 #[cfg(test)]

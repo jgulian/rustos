@@ -7,5 +7,8 @@ pub trait Format: Sized {
     fn save_writable_seekable<T: Write + Seek>(&self, stream: &mut T) -> Result<()>;
 }
 
-// #[cfg(test)]
+//TODO: use custom errors as opposed to io errors
+//TODO: allow users to specify a default endianness?
+
+#[cfg(test)]
 pub mod tests;

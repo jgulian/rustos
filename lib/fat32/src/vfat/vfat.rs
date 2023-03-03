@@ -16,7 +16,6 @@ use filesystem::path::{Component, Path};
 use shim::{io, ioerr, newioerr};
 use shim::io::SeekFrom;
 
-use crate::mbr::MasterBootRecord;
 use crate::PartitionEntry;
 use crate::vfat::{BiosParameterBlock, CachedPartition, Partition};
 use crate::vfat::{Cluster, Dir, Entry, Error, FatEntry, File, Status};

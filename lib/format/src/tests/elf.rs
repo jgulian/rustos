@@ -28,6 +28,12 @@ struct ElfFileHeader {
     #[endianness(little)] section_name_index: u16,
 }
 
+#[derive(format_derive::Format, Debug)]
+struct ManyElfs {
+    headers: [ElfFileHeader; 4],
+    data: [u8; 256]
+}
+
 #[test]
 fn elf() {
     let sample_header = [0o312u8, 0o376u8, 0o272u8, 0o276u8, 0o000u8, 0o000u8, 0o000u8, 0o002u8, 0o001u8, 0o000u8, 0o000u8, 0o007u8, 0o000u8, 0o000u8, 0o000u8, 0o003,
@@ -38,4 +44,20 @@ fn elf() {
     let mut cursor = Cursor::new(sample_header);
     let header = ElfFileHeader::load_readable(&mut cursor);
     println!("header: {:?}", header);
+}
+
+#[test]
+fn many_elfs() {
+    let sample_header = [0o312u8, 0o376u8, 0o272u8, 0o276u8, 0o000u8, 0o000u8, 0o000u8, 0o002u8, 0o001u8, 0o000u8, 0o000u8, 0o007u8, 0o000u8, 0o000u8, 0o000u8, 0o003,
+        0o000u8, 0o000u8, 0o100u8, 0o000u8, 0o000u8, 0o011u8, 0o304u8, 0o160u8, 0o000u8, 0o000u8, 0o000u8, 0o016u8, 0o001u8, 0o000u8, 0o000u8, 0o014,
+        0o200u8, 0o000u8, 0o000u8, 0o002u8, 0o000u8, 0o012u8, 0o100u8, 0o000u8, 0o000u8, 0o011u8, 0o375u8, 0o360u8, 0o000u8, 0o000u8, 0o000u8, 0o016,
+        0o000u8, 0o000u8, 0o000u8, 0o000u8, 0o000u8, 0o000u8, 0o000u8, 0o000u8, 0o000u8, 0o000u8, 0o000u8, 0o000u8, 0o000u8, 0o000u8, 0o000u8, 0o000];
+
+    let mut among = sample_header.repeat(4);
+    among.extend(0..256u8);
+
+    let mut cursor = Cursor::new(among);
+    let many_elfs = ManyElfs::load_readable(&mut cursor);
+    println!("header: {:?}", many_elfs.header[0]);
+    println!("data: {:?}", many_elfs.data);
 }
