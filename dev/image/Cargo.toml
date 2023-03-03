@@ -1,0 +1,12 @@
+cargo-features = ["per-package-target"]
+
+[package]
+name = "image"
+version = "0.1.0"
+edition = "2021"
+forced-target = "aarch64-apple-darwin"   # TODO: remove
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+filesystem = { path = "../../lib/filesystem" }
+shim = { path = "../../lib/shim" }

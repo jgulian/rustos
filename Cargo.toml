@@ -3,10 +3,9 @@ debug = true
 lto = false # TODO: this can be changed?
 #strip = true   # TODO: fix this on apple silicon
 
-
-
 [workspace]
 members = [
+    "dev/image",
     "kernel",
     "lib/aarch64",
     "lib/allocator",
@@ -16,7 +15,6 @@ members = [
     "lib/kernel_api",
     "lib/pi",
     "lib/shim",
-    "lib/sync",
     "lib/volatile",
     "lib/xmodem",
     "user",

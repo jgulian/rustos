@@ -14,12 +14,11 @@ edition = "2021"
 [dependencies]
 aarch64 = { path = "../lib/aarch64/" }
 allocator = { path = "../lib/allocator" }
-fat32 = { path = "../lib/fat32/", features = ["no_std"] }
+fat32 = { path = "../lib/fat32/", features = [] }
 filesystem = { path = "../lib/filesystem/" }
 kernel_api = { path = "../lib/kernel_api", features = [] }
 pi = { path = "../lib/pi" }
-shim = { path = "../lib/shim", features = ["no_std", "alloc"] }
-sync = { path = "../lib/sync" }
+shim = { path = "../lib/shim", features = ["alloc"] }
 
 log = "0.4"
 

@@ -5,5 +5,7 @@ edition = "2021"
 
 [dependencies]
 shim = { path = "../shim", features = ["alloc"] }
-sync = { path = "../sync" }
 log = "0.4" #FIXME: remove
+
+[features]
+#no_std = ["shim/no_std"]

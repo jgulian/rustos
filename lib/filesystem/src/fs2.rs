@@ -48,11 +48,11 @@ pub trait FileSystem2 {
                     Component::Root => {
                         match wrapped_entry {
                             Ok(entry) => {
-                                return ioerr!(InvalidFilename);
+                                return ioerr!(InvalidInput);
                             }
                             Err(ref err) => {
                                 if err.kind() != NotFound {
-                                    return ioerr!(InvalidFilename);
+                                    return ioerr!(InvalidInput);
                                 }
                             }
                         }
@@ -60,11 +60,11 @@ pub trait FileSystem2 {
                         Ok(Entry2::Directory(self.root()?))
                     }
                     Component::Current | Component::Parent => {
-                        ioerr!(InvalidFilename)
+                        ioerr!(InvalidInput)
                     }
                     Component::Child(child) => {
                         match wrapped_entry? {
-                            Entry2::File(_) => ioerr!(InvalidFilename),
+                            Entry2::File(_) => ioerr!(InvalidInput),
                             Entry2::Directory(mut dir) => {
                                 dir.open_entry(child.as_str())
                             }

@@ -10,7 +10,6 @@ use core::ops::DerefMut;
 use log::info;
 
 use shim::{io, ioerr};
-use sync::Mutex;
 
 use crate::{File, FileSystem};
 use crate::fs2::{Directory2, Entry2, File2, FileSystem2, Metadata2};
@@ -180,7 +179,7 @@ impl<T: CharDevice + 'static> Directory2 for CharDeviceRootDirectory<T> {
 
 impl<T: CharDevice + 'static> io::Seek for CharDeviceFile<T> {
     fn seek(&mut self, _: io::SeekFrom) -> io::Result<u64> {
-        ioerr!(NotSeekable)
+        ioerr!(Unsupported)
     }
 }
 

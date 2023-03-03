@@ -2,17 +2,22 @@
 #![feature(str_internals)]
 #![feature(never_type)]
 
+#[cfg(feature = "alloc")]
 extern crate alloc;
 
-cfg_if::cfg_if! {
-    if #[cfg(feature = "no_std")] {
-        mod no_std;
-        pub use self::no_std::*;
-    } else {
-        mod std;
-        pub use self::std::*;
-    }
-}
+#[cfg(feature = "no_std")]
+mod no_std;
+
+#[cfg(feature = "no_std")]
+pub use self::no_std::io;
+
+#[cfg(not(feature = "no_std"))]
+mod std;
+#[cfg(not(feature = "no_std"))]
+pub use self::std::*;
+
+#[cfg(feature = "no_std")]
+compile_error!("This macro only accepts `foo` or `bar`");
 
 #[macro_use]
 pub mod macros;

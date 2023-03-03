@@ -51,4 +51,4 @@ user:
     done
 
 image:
-	cd user; ./build.sh
+	cargo run --bin image --target aarch64-apple-darwin test.img format fat32 0 test

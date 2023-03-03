@@ -9,6 +9,7 @@ use core::ops::Index;
 use log::info;
 
 use shim::{io, ioerr};
+use shim::io::{Error, ErrorKind};
 
 use crate::path::Component::Parent;
 
@@ -91,7 +92,7 @@ impl Path {
                             simplified.pop();
                         }
                         _ => {
-                            return ioerr!(InvalidFilename);
+                            return ioerr!(InvalidData);
                         }
                     }
                 }
@@ -130,7 +131,7 @@ impl TryFrom<&str> for Path {
                 }
                 _ => {
                     if !is_valid_entry(child) {
-                        return ioerr!(InvalidFilename);
+                        return ioerr!(InvalidData);
                     } else {
                         result.push(Component::Child(child.to_string()))
                     }

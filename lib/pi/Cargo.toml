@@ -15,4 +15,4 @@ edition = "2021"
 aarch64 = { path = "../aarch64" }
 volatile = { path = "../volatile" }
 filesystem = { path = "../filesystem" }
-shim = { path = "../shim", features = ["no_std"] }
+#shim = { path = "../shim", features = ["no_std"] }
