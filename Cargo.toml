@@ -11,6 +11,8 @@ members = [
     "lib/allocator",
     "lib/fat32",
     "lib/filesystem",
+    "lib/format",
+    "lib/format/format_derive",
     "lib/jlib",
     "lib/kernel_api",
     "lib/pi",

@@ -1,0 +1,13 @@
+[package]
+name = "format_derive"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = { features = ["full"] }
+proc-macro2 = "1.0"
+quote = "1.0"
+synstructure = "0.12.6"
