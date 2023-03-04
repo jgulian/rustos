@@ -20,16 +20,13 @@ pub(crate) enum FieldType {
 }
 
 #[derive(Copy, Clone, Debug)]
+#[derive(Default)]
 pub(crate) struct FieldSettings {
     pub(crate) endianness: Option<Endianness>,
     pub(crate) padding: Option<usize>,
 }
 
-impl Default for FieldSettings {
-    fn default() -> Self {
-        Self { endianness: None, padding: None }
-    }
-}
+
 
 #[derive(Copy, Clone, Debug)]
 pub enum Endianness { Native, Little, Big }

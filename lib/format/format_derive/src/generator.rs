@@ -1,9 +1,11 @@
 use proc_macro2::{TokenStream};
 use std::str::FromStr;
 use proc_macro2::Ident;
-use quote::{format_ident, ToTokens, quote};
+use quote::{format_ident, quote};
 
 use crate::parser::{Endianness, FieldSettings, FieldType, FormatField, FormatType};
+
+type TokenStreamTuple = (TokenStream, TokenStream, TokenStream, TokenStream);
 
 pub(crate) struct FormatImplGenerator {
     read: TokenStream,
@@ -39,31 +41,14 @@ impl FormatImplGenerator {
                 self.pad(pad);
             }
 
-            match field_type {
-                FieldType::CustomType(type_name) => {
-                    self.add_custom_type(unwrapped_name, type_name);
-                }
-                FieldType::PrimitiveType(type_name, size) => {
-                    self.add_primitive_type(unwrapped_name, field_settings, type_name, size);
-                }
-                FieldType::Array(sub_type, len) => {}
-            }
-        }
-    }
+            let (read, read_seek, write, write_seek) =
+                self.add_generic_type(field_type, field_settings, unwrapped_name, true);
 
-    fn add_custom_type(&mut self, name: Ident, type_name: Ident) {
-        self.read.extend(quote! {
-                    let #name = #type_name::load_readable(stream)?;
-                });
-        self.read_seek.extend(quote! {
-                    let #name = #type_name::load_readable_seekable(stream)?;
-                });
-        self.write.extend(quote! {
-                    self. #name .save_writable(stream)?;
-                });
-        self.write_seek.extend(quote! {
-                    self. #name .save_writable_seekable(stream)?;
-                });
+            self.read.extend(read);
+            self.read_seek.extend(read_seek);
+            self.write.extend(write);
+            self.write_seek.extend(write_seek);
+        }
     }
 
     fn pad(&mut self, pad: usize) {
@@ -86,7 +71,42 @@ impl FormatImplGenerator {
             });
     }
 
-    fn add_primitive_type(&mut self, name: Ident, field_settings: FieldSettings, type_name: Ident, size: usize) {
+    fn add_generic_type(&mut self, field_type: FieldType, field_settings: FieldSettings, name: Ident, on_self: bool) -> TokenStreamTuple {
+        match field_type {
+            FieldType::CustomType(type_name) =>
+                self.add_custom_type(name, type_name, on_self),
+            FieldType::PrimitiveType(type_name, size) =>
+                self.add_primitive_type(name, field_settings, type_name, size, on_self),
+            FieldType::Array(sub_type, len) => {
+                match sub_type.as_ref() {
+                    FieldType::PrimitiveType(type_name, 1)
+                    if type_name.clone().to_string().as_str() == "u8" =>
+                        self.add_u8_array_type(name, len, on_self),
+                    _ => self.add_generic_array_type(name, *sub_type, field_settings.endianness, len, on_self),
+                }
+            }
+        }
+    }
+
+    fn add_custom_type(&mut self, name: Ident, type_name: Ident, on_self: bool) -> TokenStreamTuple {
+        let write_name = Self::get_self_name(name.clone(), on_self);
+        (
+            quote! {
+                    let #name = #type_name::load_readable(stream)?;
+                },
+            quote! {
+                    let #name = #type_name::load_readable_seekable(stream)?;
+                },
+            quote! {
+                    #write_name .save_writable(stream)?;
+                },
+            quote! {
+                    #write_name .save_writable_seekable(stream)?;
+                }
+        )
+    }
+
+    fn add_primitive_type(&mut self, name: Ident, field_settings: FieldSettings, type_name: Ident, size: usize, on_self: bool) -> TokenStreamTuple {
         let name_data = format_ident!("{}_data", name);
         let size_formatted = TokenStream::from_str(format!("{}", size).as_str())
             .expect("should be able to format number");
@@ -98,15 +118,74 @@ impl FormatImplGenerator {
                     stream.read_exact(#name_data .as_mut())?;
                     let #name = #type_name::#from_bytes ( #name_data );
                 };
-        self.read.extend(read_tokens.clone());
-        self.read_seek.extend(read_tokens);
-
+        let write_name = Self::get_self_name(name, on_self);
         let write_tokens = quote! {
-                    let #name_data = self.#name .#to_bytes();
+                    let #name_data = #write_name .#to_bytes();
                     stream.write_all(#name_data .as_ref())?;
                 };
-        self.write.extend(write_tokens.clone());
-        self.write_seek.extend(write_tokens);
+
+        (read_tokens.clone(), read_tokens, write_tokens.clone(), write_tokens)
+    }
+
+    fn add_u8_array_type(&mut self, name: Ident, len: usize, on_self: bool) -> TokenStreamTuple {
+        let read_tokens = quote! {
+                    let mut #name = [0u8; #len];
+                    stream.read_exact(#name .as_mut())?;
+                };
+        let write_name = Self::get_self_name(name, on_self);
+        let write_tokens = quote! {
+                    stream.write_all(#write_name .as_ref())?;
+                };
+
+        (read_tokens.clone(), read_tokens, write_tokens.clone(), write_tokens)
+    }
+
+    fn add_generic_array_type(&mut self, name: Ident, sub_type: FieldType, endianness: Option<Endianness>, len: usize, on_self: bool) -> TokenStreamTuple {
+        let sub_field_settings = FieldSettings {endianness, padding: None};
+        let name_element = format_ident!("{}_element", name);
+
+        let (read, read_seek, write, write_seek) =
+            self.add_generic_type(sub_type, sub_field_settings, name_element.clone(), false);
+
+        let mut read_list = Vec::new();
+        read_list.extend((0..len).map(|_| read.clone()));
+        let mut read_seek_list = Vec::new();
+        read_seek_list.extend((0..len).map(|_| read_seek.clone()));
+
+        (
+            quote! {
+                    let #name = [
+                        #({#read_list #name_element}),*
+                    ];
+                },
+            quote! {
+                    let #name = [
+                        #({#read_seek_list #name_element}),*
+                    ];
+                },
+            quote! {
+                    for #name_element in &self.#name {
+                        #write
+                    }
+                },
+            quote! {
+                    for #name_element in &self.#name {
+                        #write_seek
+                    }
+                }
+        )
+    }
+
+    fn get_self_name(name: Ident, on_self: bool) -> TokenStream {
+        if on_self {
+            quote!{
+                self.#name
+            }
+        } else {
+            quote! {
+                #name
+            }
+        }
     }
 
     pub(crate) fn generate(&mut self, format_type: Ident) -> TokenStream {

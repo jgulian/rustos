@@ -16,9 +16,6 @@ mod std;
 #[cfg(not(feature = "no_std"))]
 pub use self::std::*;
 
-#[cfg(feature = "no_std")]
-compile_error!("This macro only accepts `foo` or `bar`");
-
 #[macro_use]
 pub mod macros;
 

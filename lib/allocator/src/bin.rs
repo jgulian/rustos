@@ -8,13 +8,13 @@ use crate::util::{align_down, align_up};
 const BIN_COUNT: usize = 20;
 
 fn log_two(number: usize) -> Option<usize> {
-    return if number == 0 {
+    if number == 0 {
         None
     } else if number == 1 {
         Some(0)
     } else {
         Some(log_two(number / 2)? + 1)
-    };
+    }
 }
 
 fn is_aligned(ptr: *mut usize, align: usize) -> bool {

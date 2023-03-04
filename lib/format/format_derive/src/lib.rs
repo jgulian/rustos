@@ -4,7 +4,7 @@ extern crate proc_macro;
 
 use proc_macro::TokenStream;
 
-use syn::{Data, DeriveInput, Fields, Lit, Meta, MetaList, NestedMeta, parse_macro_input, Type};
+use syn::{Data, DeriveInput, Fields, parse_macro_input};
 use syn::ext::IdentExt;
 
 use crate::generator::FormatImplGenerator;

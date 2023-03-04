@@ -6,9 +6,6 @@ extern crate alloc;
 #[cfg(not(feature = "no_std"))]
 extern crate core;
 
-#[cfg(not(target_endian = "little"))]
-compile_error!("only little endian platforms supported");
-
 #[cfg(test)]
 mod tests;
 mod util;
