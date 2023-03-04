@@ -72,7 +72,7 @@ impl Error {
     }
 }
 
-impl core::fmt::Debug for Error {
+impl Debug for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         f.write_fmt(format_args!("{:?}: {}", self.kind, self.repr))
     }
@@ -176,6 +176,15 @@ pub trait Write {
 pub struct Cursor<T> {
     data: T,
     position: u64,
+}
+
+impl<T> Cursor<T> {
+    pub fn new(data: T) -> Self {
+        Self {
+            data,
+            position: 0,
+        }
+    }
 }
 
 impl<T> Seek for Cursor<T> where T: AsRef<[u8]> {

@@ -1,3 +1,5 @@
+#![cfg_attr(feature = "no_std", no_std)]
+
 use shim::io::{Read, Seek, Result, Write};
 
 pub trait Format: Sized {

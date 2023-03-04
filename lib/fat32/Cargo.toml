@@ -20,4 +20,4 @@ log = "0.4" #FIXME: remove
 rand = "0.8.5"
 
 [features]
-#no_std = ["shim/no_std"]
+no_std = ["shim/no_std"]

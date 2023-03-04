@@ -1,10 +1,10 @@
 use shim::io;
 use crate::BlockDevice;
 use format::Format;
-use format_derive::StandardFormat;
-use shim::io::{Read, Write, Seek, Result};
+use format_derive::Format;
+use shim::io::{Read, Write, Seek, Result, Cursor};
 
-#[derive(Copy, Clone, StandardFormat)]
+#[derive(Copy, Clone, Format)]
 pub struct CHS {
     header: u8,
     sector: u8,
@@ -25,7 +25,7 @@ impl CHS {
     }
 }
 
-#[derive(Copy, Clone, StandardFormat)]
+#[derive(Copy, Clone, Format)]
 pub struct PartitionEntry {
     pub boot_indicator: u8,
     pub starting_chs: CHS,
@@ -35,7 +35,7 @@ pub struct PartitionEntry {
     pub total_sectors: u32,
 }
 
-#[derive(Copy, Clone, StandardFormat)]
+#[derive(Copy, Clone, Format)]
 pub struct MasterBootRecord {
     pub bootstrap: [u8; 436],
     pub disk_id: [u8; 10],
@@ -70,10 +70,10 @@ impl MasterBootRecord {
         device.read_sector(0, &mut buffer).map_err(|e|
             io::Error::from(io::ErrorKind::Interrupted))?;
 
-        let master_boot_record = MasterBootRecord;
+        let master_boot_record = MasterBootRecord::load_readable_seekable(&mut Cursor::new(buffer.as_mut_slice()))?;
 
-        if master_boot_record.valid_bootsector[0] != 0x55 ||
-            master_boot_record.valid_bootsector[1] != 0xAA {
+        if master_boot_record.valid_boot_sector[0] != 0x55 ||
+            master_boot_record.valid_boot_sector[1] != 0xAA {
             return Err(io::Error::from(io::ErrorKind::Interrupted));
         }
 

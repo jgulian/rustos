@@ -1,4 +1,5 @@
 use shim::io;
+use filesystem::mbr;
 
 #[derive(Debug)]
 pub enum Error {

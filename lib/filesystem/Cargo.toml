@@ -10,4 +10,4 @@ format_derive = { path = "../format/format_derive" }
 log = "0.4" #FIXME: remove
 
 [features]
-no_std = ["shim/no_std"]
+no_std = ["shim/no_std", "format/no_std"]

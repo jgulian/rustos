@@ -151,6 +151,7 @@ impl FormatImplGenerator {
         read_list.extend((0..len).map(|_| read.clone()));
         let mut read_seek_list = Vec::new();
         read_seek_list.extend((0..len).map(|_| read_seek.clone()));
+        let write_name = Self::get_self_name(name.clone(), on_self);
 
         (
             quote! {
@@ -164,12 +165,12 @@ impl FormatImplGenerator {
                     ];
                 },
             quote! {
-                    for #name_element in &self.#name {
+                    for #name_element in &#write_name {
                         #write
                     }
                 },
             quote! {
-                    for #name_element in &self.#name {
+                    for #name_element in &#write_name {
                         #write_seek
                     }
                 }

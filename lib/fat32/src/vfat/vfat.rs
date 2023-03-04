@@ -5,6 +5,7 @@ use core::{fmt, mem};
 use core::cmp::min;
 use core::fmt::{Debug, Formatter};
 use core::marker::PhantomData;
+use filesystem::mbr::{MasterBootRecord, PartitionEntry};
 
 
 use log::info;
@@ -16,7 +17,6 @@ use filesystem::path::{Component, Path};
 use shim::{io, ioerr, newioerr};
 use shim::io::SeekFrom;
 
-use crate::PartitionEntry;
 use crate::vfat::{BiosParameterBlock, CachedPartition, Partition};
 use crate::vfat::{Cluster, Dir, Entry, Error, FatEntry, File, Status};
 
