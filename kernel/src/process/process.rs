@@ -264,8 +264,6 @@ impl Process {
 
         let stack = self.vmap.alloc(Process::get_stack_base(), PagePerm::RW);
         let mut stack_data = Vec::new();
-        info!("args bytes {:?}", &(arguments.len() as u64).to_be_bytes());
-        info!("args len {:x}", arguments.len());
 
         //TODO: clean this
         stack_data.extend_from_slice(&(arguments.len() as u64).to_be_bytes());

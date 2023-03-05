@@ -17,7 +17,6 @@ fn main() {
     duplicate(console, 1).expect("unable to duplicate console");
     duplicate(console, 2).expect("unable to duplicate console");
 
-    println!("init");
     loop {
         println!("init: starting shell");
         let shell_pid = fork().expect("unable to fork");

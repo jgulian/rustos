@@ -75,7 +75,7 @@ unsafe impl GlobalAlloc for GlobalAllocator {
             }
 
             if *beg & (layout.align() - 1) != 0 {
-                *beg = *beg & (!(layout.align() - 1)) + layout.align();
+                *beg = (*beg & (!(layout.align() - 1))) + layout.align();
             }
 
             let location = *beg as *mut u8;
@@ -93,6 +93,8 @@ pub static ALLOCATOR: GlobalAllocator = GlobalAllocator::new();
 
 pub struct ArgumentIterator(usize, usize);
 
+// TODO: remove
+#[warn(dead_code)]
 pub fn get_arguments() -> ArgumentIterator {
     let usize_size = mem::size_of::<usize>();
     let argument_count_bytes = unsafe { *((usize::MAX - usize_size + 1) as *const [u8; 8]) };
