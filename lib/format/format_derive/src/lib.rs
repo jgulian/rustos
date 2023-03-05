@@ -17,7 +17,6 @@ mod parser;
 pub fn derive_format(input: TokenStream) -> TokenStream {
     let derive_input = parse_macro_input!(input as DeriveInput);
     let impl_formatted = format_generator(&derive_input.ident, &derive_input.data);
-    println!("{}", impl_formatted);
     proc_macro::TokenStream::from(impl_formatted)
 }
 

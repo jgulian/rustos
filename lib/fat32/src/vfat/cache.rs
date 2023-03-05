@@ -106,6 +106,18 @@ impl CachedPartition {
         Ok(new_index)
     }
 
+    fn save_from_cache(&mut self, cache_entry: CacheEntry) {
+        if let Some(physical_sector) = self.virtual_to_physical(cache_entry.virtual_sector) {
+            let device_sector_size = self.device.sector_size() as usize;
+            for i in 0..self.factor() as usize {
+                let slice = &cache_entry.data[device_sector_size * i..device_sector_size * (i + 1)];
+                //TODO: handle error or something.
+                self.device.write_sector(physical_sector + i as u64, slice);
+            }
+        }
+
+    }
+
     fn cache_location_or_load(&mut self, virtual_sector: u64) -> io::Result<usize> {
         let cache_location = match self.cache_location(virtual_sector) {
             None => self.load_to_cache(virtual_sector)?,
@@ -157,6 +169,14 @@ impl BlockDevice for CachedPartition {
 
     fn flush_sector(&mut self, _n: u64) -> io::Result<()> {
         unimplemented!("this is not implemented")
+    }
+}
+
+impl Drop for CachedPartition {
+    fn drop(&mut self) {
+        while let Some(entry) = self.cache.pop() {
+            self.save_from_cache(entry);
+        }
     }
 }
 

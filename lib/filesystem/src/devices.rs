@@ -13,6 +13,7 @@ use shim::{io, ioerr};
 
 use crate::{File, FileSystem};
 use crate::fs2::{Directory2, Entry2, File2, FileSystem2, Metadata2};
+use crate::mbr::PartitionEntry;
 use crate::path::Path;
 
 /// Trait implemented by devices that can be read/written in sector
@@ -143,6 +144,10 @@ impl<T: CharDevice + 'static> FileSystem2 for CharDeviceFileSystem<T> {
     }
 
     fn copy_entry(&mut self, _: &Path, _: &Path) -> io::Result<()> {
+        ioerr!(Unsupported)
+    }
+
+    fn format(device: &mut dyn BlockDevice, partition: &mut PartitionEntry, sector_size: usize) -> io::Result<()> where Self: Sized {
         ioerr!(Unsupported)
     }
 }

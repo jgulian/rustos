@@ -13,6 +13,7 @@ edition = "2021"
 
 [dependencies]
 filesystem = { path = "../filesystem" }
+format = { path = "../format" }
 shim = { path = "../shim", features = ["alloc"] }
 log = "0.4" #FIXME: remove
 

@@ -1,14 +1,13 @@
 use shim::io;
 use crate::BlockDevice;
 use format::Format;
-use format_derive::Format;
 use shim::io::{Read, Write, Seek, Result, Cursor};
 
-#[derive(Copy, Clone, Format)]
+#[derive(Copy, Clone, Debug, Format)]
 pub struct CHS {
-    header: u8,
-    sector: u8,
-    cylinder: u8,
+    pub header: u8,
+    pub sector: u8,
+    pub cylinder: u8,
 }
 
 impl CHS {
@@ -25,7 +24,7 @@ impl CHS {
     }
 }
 
-#[derive(Copy, Clone, Format)]
+#[derive(Copy, Clone, Debug, Format)]
 pub struct PartitionEntry {
     pub boot_indicator: u8,
     pub starting_chs: CHS,
@@ -35,7 +34,7 @@ pub struct PartitionEntry {
     pub total_sectors: u32,
 }
 
-#[derive(Copy, Clone, Format)]
+#[derive(Copy, Clone, Debug, Format)]
 pub struct MasterBootRecord {
     pub bootstrap: [u8; 436],
     pub disk_id: [u8; 10],

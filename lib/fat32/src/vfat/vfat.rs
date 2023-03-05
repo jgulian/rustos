@@ -5,6 +5,7 @@ use core::{fmt, mem};
 use core::cmp::min;
 use core::fmt::{Debug, Formatter};
 use core::marker::PhantomData;
+use std::io::Cursor;
 use filesystem::mbr::{MasterBootRecord, PartitionEntry};
 
 
@@ -238,7 +239,7 @@ pub(crate) struct Chain<HANDLE: VFatHandle> {
 
 impl<HANDLE: VFatHandle> Chain<HANDLE> {
     pub(crate) fn new(vfat: HANDLE) -> io::Result<Self> {
-        let cluster = vfat.lock(|vfat| {
+        let cluster = vfat.lock(|vfat| -> io::Result<Cluster> {
             let cluster = vfat.next_free_cluster()?;
             vfat.update_fat_entry(cluster, Status::new_eoc())?;
             Ok(cluster)
@@ -566,6 +567,11 @@ impl<HANDLE: VFatHandle> Directory2 for Dir<HANDLE> where HANDLE: 'static {
     }
 }
 
+const DEFAULT_BOOT_CODE_HEAD: [u8; 129] = *b"\x0e\x1f\xbe\x77\x7c\xac\x22\xc0\x74\x0b\x56\xb4\x0e\
+\xbb\x07\x00\xcd\x10\x5e\xeb\xf0\x32\xe4\xcd\x16\xcd\x19\xeb\xfe\
+This is not a bootable disk.  Please insert a bootable floppy and\r\npress any key to try again \
+... \r\n";
+
 impl<'a, HANDLE: VFatHandle> FileSystem2 for HandleReference<'a, HANDLE> where HANDLE: 'static {
     fn root(&mut self) -> io::Result<Box<dyn Directory2>> {
         let root_cluster = self.0.lock(|vfat| vfat.root_cluster());
@@ -581,5 +587,74 @@ impl<'a, HANDLE: VFatHandle> FileSystem2 for HandleReference<'a, HANDLE> where H
 
     fn copy_entry(&mut self, _source: &Path, _destination: &Path) -> io::Result<()> {
         todo!()
+    }
+
+    fn format(device: &mut dyn BlockDevice, partition: &mut PartitionEntry, sector_size: usize) -> io::Result<()> where Self: Sized {
+        partition.partition_type = 0xb;
+
+        let mut boot_code = [0u8; 420];
+        boot_code[..DEFAULT_BOOT_CODE_HEAD.len()].copy_from_slice(&DEFAULT_BOOT_CODE_HEAD);
+
+        // TODO: make it have the correct size and location
+        // currently they've just been reversed
+
+        let bpb = BiosParameterBlock {
+            jump_instructions: [235, 88, 144],
+            oem_identifier: *b"rustmkft",
+            bytes_per_sector: sector_size as u16,
+            sectors_per_cluster: 1,
+            reserved_sectors: 32,
+            number_of_fats: 2,
+            max_num_of_dirs: 0,
+            total_logical_sectors: 0,
+            media_desciptor_type: 248,
+            sectors_per_fat_one: 0,
+            sectors_per_track: 32,
+            number_of_heads: 64,
+            number_of_hidden_sectors: 0,
+            total_logical_sectors_extended: 247952,
+            sectors_per_fat_two: 1908,
+            flags: 0,
+            version: 0,
+            root_cluster: 2,
+            sector_of_fsinfo: 1,
+            sector_of_backup: 6,
+            reserved: [0; 12],
+            drive_number: 128,
+            nt_flags: 0,
+            signature: 41,
+            serial_number: 3173764726,
+            label_string: *b"NO NAME    ",
+            system_identifier: *b"FAT32   ",
+            boot_code,
+            bp_signature: [0x55, 0xaa],
+        };
+
+        let mut bpb_data: Vec<u8> = Vec::new();
+        bpb_data.reserve_exact(sector_size);
+
+        use format::Format;
+        bpb.save_writable_seekable(&mut Cursor::new(&mut bpb_data));
+        device.write_sector(partition.relative_sector as u64, bpb_data.as_slice())?;
+
+        let mut zero: Vec<u8> = vec![0u8; sector_size];
+        let mut fat_empty: Vec<u8> = vec![0u8; sector_size];
+        fat_empty[0x0..0x4].copy_from_slice(&0xfff_fff8_u32.to_le_bytes());
+        fat_empty[0x4..0x8].copy_from_slice(&0xfff_ffff_u32.to_le_bytes());
+        fat_empty[0x8..0xc].copy_from_slice(&0xfff_fff8_u32.to_le_bytes());
+
+        println!("{:x?}", fat_empty);
+
+        for i in 1..(bpb.reserved_sectors as u32 + bpb.sectors_per_fat_two * bpb.number_of_fats as u32) {
+            let buffer = if (i > bpb.reserved_sectors as u32) &&
+                (i - bpb.reserved_sectors as u32) % bpb.sectors_per_fat_two != 0 {
+                zero.as_slice()
+            } else {
+                fat_empty.as_slice()
+            };
+            device.write_sector((partition.relative_sector + i) as u64, buffer)?;
+        }
+
+        Ok(())
     }
 }

@@ -8,13 +8,15 @@ use alloc::vec::Vec;
 use core::borrow::{Borrow, BorrowMut};
 use core::cell::RefCell;
 use core::ops::{Deref, DerefMut};
+use std::io::{Error, ErrorKind};
 
 use log::info;
 
 use shim::{io, ioerr, newioerr};
 
-use crate::fs2;
+use crate::{BlockDevice, fs2};
 use crate::fs2::{Directory2, Entry2, FileSystem2, Metadata2};
+use crate::mbr::PartitionEntry;
 use crate::path::{Component, Path};
 
 struct Mount {
@@ -55,6 +57,10 @@ impl FileSystem2 for VirtualFileSystem {
 
     fn copy_entry(&mut self, source: &Path, destination: &Path) -> io::Result<()> {
         todo!()
+    }
+
+    fn format(device: &mut dyn BlockDevice, partition: &mut PartitionEntry, sector_size: usize) -> io::Result<()> where Self: Sized {
+        Err(Error::from(ErrorKind::Unsupported))
     }
 }
 

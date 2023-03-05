@@ -156,6 +156,8 @@ impl<HANDLE: VFatHandle> filesystem::Dir for Dir<HANDLE> {
     fn append(&mut self, entry: Self::Entry) -> io::Result<()> {
         use filesystem::Entry;
 
+        println!("append jere");
+
         let mut bytes: Vec<u8> = Vec::new();
         self.chain.seek(SeekFrom::Start(0))?;
         self.chain.read_to_end(&mut bytes)?;
@@ -165,8 +167,6 @@ impl<HANDLE: VFatHandle> filesystem::Dir for Dir<HANDLE> {
         while unsafe { entries[i].unknown.named } != 0 {
             i += 1;
         }
-
-        info!("old bytes {}", (i * core::mem::size_of::<VFatDirEntry>()));
 
         while i < entries.len() {
             entries.remove(i);
@@ -193,12 +193,11 @@ impl<HANDLE: VFatHandle> filesystem::Dir for Dir<HANDLE> {
         for (i, c) in entry.name().as_bytes().iter().take(8).enumerate() {
             regular_dir_entry.name[i] = c.to_ascii_uppercase();
         }
-        info!("actual name {:?}", regular_dir_entry.name);
 
         entries.push(VFatDirEntry { regular: regular_dir_entry });
 
         bytes = unsafe { entries.cast() };
-        info!("here 3 new bytes {} {}", bytes.len(), bytes[core::mem::size_of::<VFatDirEntry>() * 3]);
+
         //TODO: we should be able to get away with seeking to new data.
         self.chain.seek(SeekFrom::Start(0))?;
         self.chain.write_all(bytes.as_slice())?;

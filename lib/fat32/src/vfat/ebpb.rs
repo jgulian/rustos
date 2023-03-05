@@ -1,13 +1,15 @@
 use core::{fmt, mem};
 
 use filesystem::BlockDevice;
+use format::Format;
 use shim::const_assert_size;
 
 use crate::vfat::Error;
 
-#[repr(C, packed)]
+//TODO: go through all repr C and remove
+#[derive(Format)]
 pub struct BiosParameterBlock {
-    __reserved_one: [u8; 3],
+    pub jump_instructions: [u8; 3],
     pub oem_identifier: [u8; 8],
     pub bytes_per_sector: u16,
     pub sectors_per_cluster: u8,
@@ -27,9 +29,9 @@ pub struct BiosParameterBlock {
     pub root_cluster: u32,
     pub sector_of_fsinfo: u16,
     pub sector_of_backup: u16,
-    __reserved_two: [u8; 12],
+    pub reserved: [u8; 12],
     pub drive_number: u8,
-    __reserved_three: u8,
+    pub nt_flags: u8,
     pub signature: u8,
     pub serial_number: u32,
     pub label_string: [u8; 11],
@@ -50,9 +52,9 @@ impl BiosParameterBlock {
     pub fn from<T: BlockDevice>(mut device: T, sector: u64) -> Result<BiosParameterBlock, Error> {
         let mut buffer: [u8; 512] = [0; 512];
         device.read_sector(sector, &mut buffer).map_err(|e| Error::Io(e))?;
-        let bios_parameter_block: BiosParameterBlock = unsafe {
-            mem::transmute(buffer)
-        };
+
+        use format::Format;
+        let bios_parameter_block: BiosParameterBlock = BiosParameterBlock::load_slice(&buffer)?;
 
         if bios_parameter_block.bp_signature[0] != 0x55 ||
             bios_parameter_block.bp_signature[1] != 0xAA {

@@ -198,22 +198,22 @@ impl FormatImplGenerator {
 
         quote! {
         impl Format for #format_type {
-            fn load_readable<T: Read>(stream: &mut T) -> Result<Self> {
+            fn load_readable<T: shim::io::Read>(stream: &mut T) -> shim::io::Result<Self> {
                 #read
                 Ok(Self { #(#field_list),* })
             }
 
-            fn load_readable_seekable<T: Read + Seek>(stream: &mut T) -> Result<Self> {
+            fn load_readable_seekable<T: shim::io::Read + shim::io::Seek>(stream: &mut T) -> shim::io::Result<Self> {
                 #read_seek
                 Ok(Self { #(#field_list),* })
             }
 
-            fn save_writable<T: Write>(&self, stream: &mut T) -> Result<()> {
+            fn save_writable<T: shim::io::Write>(&self, stream: &mut T) -> shim::io::Result<()> {
                 #write
                 Ok(())
             }
 
-            fn save_writable_seekable<T: Write + Seek>(&self, stream: &mut T) -> Result<()> {
+            fn save_writable_seekable<T: shim::io::Write + shim::io::Seek>(&self, stream: &mut T) -> shim::io::Result<()> {
                 #write_seek
                 Ok(())
             }

@@ -5,7 +5,9 @@ edition = "2021"
 
 [dependencies]
 shim = { path = "../shim" }
-format_derive = { path = "format_derive" }
+format_derive = { path = "./format_derive", optional = true }
 
 [features]
+default = ["derive"]
 no_std = ["shim/no_std"]
+derive = ["format_derive"]

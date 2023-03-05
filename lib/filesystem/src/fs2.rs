@@ -7,8 +7,9 @@ use log::info;
 
 use shim::{io, ioerr, newioerr};
 use shim::io::ErrorKind::NotFound;
+use crate::mbr::PartitionEntry;
 
-use crate::Metadata;
+use crate::{BlockDevice, Metadata};
 use crate::path::{Component, Path};
 
 pub trait Metadata2 {}
@@ -89,6 +90,8 @@ pub trait FileSystem2 {
         //}
         todo!()
     }
+
+    fn format(device: &mut dyn BlockDevice, partition: &mut PartitionEntry, sector_size: usize) -> io::Result<()> where Self: Sized;
 }
 
 pub enum Entry2 {

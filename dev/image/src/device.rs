@@ -3,15 +3,15 @@ use std::io;
 use std::io::{Read, Seek, SeekFrom, Write};
 use filesystem::BlockDevice;
 
-struct ImageFile(File, u16);
+pub(crate) struct ImageFile(File, u16);
 
 impl ImageFile {
-    pub fn new(file: File, sector_size: u16) -> ImageFile {
+    pub(crate) fn new(file: File, sector_size: u16) -> ImageFile {
         Self(file, sector_size)
     }
 
     fn seek_to_sector(&mut self, sector: u64) -> io::Result<u64> {
-        self.0.seek(SeekFrom::Start((self.1 as u64 * sector) as u64))
+        self.0.seek(SeekFrom::Start((self.1 as u64 * sector)))
     }
 
     fn truncate_buffer_length<'a>(&self, buffer: &'a [u8]) -> &'a [u8] {
@@ -32,21 +32,21 @@ impl ImageFile {
 }
 
 impl BlockDevice for ImageFile {
-    fn read_sector(&mut self, n: u64, buf: &mut [u8]) -> shim::io::Result<usize> {
+    fn read_sector(&mut self, n: u64, buf: &mut [u8]) -> io::Result<usize> {
         self.seek_to_sector(n)?;
         let buffer = self.truncate_mut_buffer_length(buf);
         self.0.read_exact(buffer)?;
         Ok(self.1 as usize)
     }
 
-    fn write_sector(&mut self, n: u64, buf: &[u8]) -> shim::io::Result<usize> {
+    fn write_sector(&mut self, n: u64, buf: &[u8]) -> io::Result<usize> {
         self.seek_to_sector(n)?;
         let buffer = self.truncate_buffer_length(buf);
         self.0.write_all(buffer)?;
         Ok(self.1 as usize)
     }
 
-    fn flush_sector(&mut self, _: u64) -> shim::io::Result<()> {
+    fn flush_sector(&mut self, _: u64) -> io::Result<()> {
         self.0.sync_all()?;
         Ok(())
     }

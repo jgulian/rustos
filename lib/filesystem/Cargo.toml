@@ -6,7 +6,6 @@ edition = "2021"
 [dependencies]
 shim = { path = "../shim", features = ["alloc"] }
 format = { path = "../format" }
-format_derive = { path = "../format/format_derive" }
 log = "0.4" #FIXME: remove
 
 [features]
