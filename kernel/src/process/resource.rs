@@ -6,6 +6,7 @@ use core::fmt::Formatter;
 
 use filesystem::fs2::File2;
 use kernel_api::{OsError, OsResult};
+use crate::console::kprintln;
 
 #[derive(Clone, Copy, PartialOrd, PartialEq, Debug)]
 pub struct ResourceId(u64);
@@ -128,9 +129,9 @@ impl ResourceList {
     pub(crate) fn get(&mut self, id: ResourceId) -> OsResult<&mut Resource> {
         self.list.iter_mut().filter_map(|resource| {
             if resource.id == id {
-                None
-            } else {
                 Some(&mut resource.resource)
+            } else {
+                None
             }
         }).next().ok_or(OsError::UnknownResourceId)
     }

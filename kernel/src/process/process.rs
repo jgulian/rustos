@@ -17,6 +17,7 @@ use shim::{io, newioerr};
 use shim::io::{Write};
 
 use crate::{FILESYSTEM, VMM};
+use crate::console::kprintln;
 use crate::memory::*;
 use crate::param::*;
 use crate::process::{Stack, State};
