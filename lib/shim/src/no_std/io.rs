@@ -238,6 +238,12 @@ impl Read for Cursor<&mut [u8]> {
     }
 }
 
+impl Read for Cursor<&mut Vec<u8>> {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
+        read_with_buf(self.data.as_mut_slice(), &mut self.position, buf)
+    }
+}
+
 // FIXME: use copy_from_slice
 
 impl Write for &mut [u8] {
@@ -283,6 +289,17 @@ impl Write for Cursor<Box<[u8]>> {
 impl Write for Cursor<&mut [u8]> {
     fn write(&mut self, buf: &[u8]) -> Result<usize> {
         write_with_buf(self.data, &mut self.position, buf)
+    }
+
+    fn flush(&mut self) -> Result<()> {
+        Ok(())
+    }
+}
+
+
+impl Write for Cursor<&mut Vec<u8>> {
+    fn write(&mut self, buf: &[u8]) -> Result<usize> {
+        write_with_buf(self.data.as_mut_slice(), &mut self.position, buf)
     }
 
     fn flush(&mut self) -> Result<()> {

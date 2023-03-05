@@ -52,7 +52,7 @@ const_assert_size!(VFatRegularDirEntry, 32);
 
 //FIXME: use u16?
 #[repr(C, packed)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct VFatLfnDirEntry {
     order: u8,
     name_one: [u8; 10],
@@ -143,6 +143,7 @@ impl<HANDLE: VFatHandle> filesystem::Dir for Dir<HANDLE> {
 
     fn entries(&mut self) -> io::Result<Self::Iter> {
         let mut data: Vec<u8> = Vec::new();
+        self.chain.seek(SeekFrom::Start(0))?;
         let _read = self.chain.read_to_end(&mut data)?;
 
         Ok(DirIter {
@@ -155,8 +156,6 @@ impl<HANDLE: VFatHandle> filesystem::Dir for Dir<HANDLE> {
 
     fn append(&mut self, entry: Self::Entry) -> io::Result<()> {
         use filesystem::Entry;
-
-        println!("append jere");
 
         let mut bytes: Vec<u8> = Vec::new();
         self.chain.seek(SeekFrom::Start(0))?;
@@ -173,20 +172,23 @@ impl<HANDLE: VFatHandle> filesystem::Dir for Dir<HANDLE> {
         }
 
         for lfn in serialize_lfns(entry.name()) {
+            //println!("{:?}", lfn);
             entries.push(VFatDirEntry { long_filename: lfn });
         }
+
+        let first_cluster: u32 = entry.first_cluster().into();
 
         let mut regular_dir_entry = VFatRegularDirEntry {
             name: [0; 8],
             extension: [0; 3],
-            attributes: 0,
+            attributes: if entry.is_dir() { 0x10 } else { 0 },
             __nt_reserved: 0,
             created_time_tenth: 0,
             created_time: Default::default(),
             last_access: Default::default(),
-            first_cluster_high: 0,
+            first_cluster_high: (first_cluster >> 16) as u16,
             last_modification: Default::default(),
-            first_cluster_low: 0,
+            first_cluster_low: first_cluster as u16,
             file_size: 0,
         };
 
@@ -351,7 +353,9 @@ fn parse_name(long_file_names: &mut Vec<VFatLfnDirEntry>) -> String {
 }
 
 fn serialize_lfns(name: &str) -> Vec<VFatLfnDirEntry> {
-    name.as_bytes().chunks(26).enumerate().map(|(i, chunk)| {
+    // TODO: I don't think this should be const 13 because I'm pretty sure it depends on the length
+    // of the code.
+    name.as_bytes().chunks(13).enumerate().map(|(i, chunk)| {
         VFatLfnDirEntry::new(i as u8 + 1, chunk)
     }).collect()
 }

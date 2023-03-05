@@ -10,4 +10,5 @@ format_derive = { path = "./format_derive", optional = true }
 [features]
 default = ["derive"]
 no_std = ["shim/no_std"]
+alloc = []
 derive = ["format_derive"]

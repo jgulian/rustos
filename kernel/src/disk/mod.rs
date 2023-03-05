@@ -8,12 +8,13 @@ use core::fmt::{self, Debug};
 
 use fat32::vfat::{HandleReference, VFat, VFatHandle};
 use filesystem;
-use filesystem::devices::CharDeviceFileSystem;
+use filesystem::devices::{BlockDevice, CharDeviceFileSystem};
 use filesystem::fs2::{Directory2, FileSystem2};
 use filesystem::path::Path;
 use filesystem::{CharDevice, VirtualFileSystem};
+use filesystem::mbr::PartitionEntry;
 use pi::uart::MiniUart;
-use shim::{io, newioerr};
+use shim::{io, ioerr, newioerr};
 use shim::io::{Read, Write};
 
 
@@ -82,6 +83,10 @@ impl<'a> FileSystem2 for DiskFileSystem<'a> {
     fn copy_entry(&mut self, source: &Path, destination: &Path) -> io::Result<()> {
         HandleReference(self.0).copy_entry(source, destination)
     }
+
+    fn format(device: &mut dyn BlockDevice, partition: &mut PartitionEntry, sector_size: usize) -> io::Result<()> {
+        ioerr!(Unsupported)
+    }
 }
 
 pub struct FileSystem(Mutex<Option<VirtualFileSystem>>);
@@ -125,6 +130,10 @@ impl FileSystem2 for &FileSystem {
 
     fn copy_entry(&mut self, source: &Path, destination: &Path) -> io::Result<()> {
         self.0.lock().as_mut().ok_or(newioerr!(Unsupported))?.copy_entry(source, destination)
+    }
+
+    fn format(device: &mut dyn BlockDevice, partition: &mut PartitionEntry, sector_size: usize) -> io::Result<()> {
+        ioerr!(Unsupported)
     }
 }
 

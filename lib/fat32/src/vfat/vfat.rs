@@ -5,7 +5,6 @@ use core::{fmt, mem};
 use core::cmp::min;
 use core::fmt::{Debug, Formatter};
 use core::marker::PhantomData;
-use std::io::Cursor;
 use filesystem::mbr::{MasterBootRecord, PartitionEntry};
 
 
@@ -16,7 +15,7 @@ use filesystem::Dir as DirTrait;
 use filesystem::fs2::{Directory2, Entry2, File2, FileSystem2, Metadata2};
 use filesystem::path::{Component, Path};
 use shim::{io, ioerr, newioerr};
-use shim::io::SeekFrom;
+use shim::io::{SeekFrom, Cursor};
 
 use crate::vfat::{BiosParameterBlock, CachedPartition, Partition};
 use crate::vfat::{Cluster, Dir, Entry, Error, FatEntry, File, Status};
@@ -159,7 +158,6 @@ impl<HANDLE: VFatHandle> VFat<HANDLE> {
         }
 
         if amount_written < buf.len() {
-            info!("but here 3");
             let buffer = &buf[amount_written..];
             self.update_sector(current_sector, 0, buffer)?;
             amount_written += buffer.len();
@@ -242,6 +240,10 @@ impl<HANDLE: VFatHandle> Chain<HANDLE> {
         let cluster = vfat.lock(|vfat| -> io::Result<Cluster> {
             let cluster = vfat.next_free_cluster()?;
             vfat.update_fat_entry(cluster, Status::new_eoc())?;
+
+            let zero = vec![0u8; vfat.bytes_per_cluster()];
+            vfat.write_cluster(cluster, 0, zero.as_slice())?;
+
             Ok(cluster)
         })?;
         Ok(Chain {
@@ -266,6 +268,8 @@ impl<HANDLE: VFatHandle> Chain<HANDLE> {
     pub(crate) fn position(&self) -> u64 {
         self.position
     }
+
+    pub(crate) fn first_cluster(&self) -> Cluster { self.first_cluster }
 }
 
 /// Read for ChainOffset
@@ -318,33 +322,34 @@ impl<HANDLE: VFatHandle> io::Write for Chain<HANDLE> {
             let bytes_per_cluster = vfat.bytes_per_cluster();
             let mut current_cluster = self.current_cluster;
             let mut cluster_offset = self.position as usize % bytes_per_cluster;
-            let mut exhausted = self.exhausted;
             let mut amount_written = 0;
 
-            while !exhausted && amount_written < buf.len() {
-                let end_of_buffer = min(buf.len(), bytes_per_cluster - cluster_offset);
+            while amount_written < buf.len() {
+                let end_of_buffer = min(buf.len(), bytes_per_cluster - cluster_offset + amount_written);
                 let buffer = &buf[amount_written..end_of_buffer];
                 let read = vfat.write_cluster(current_cluster, cluster_offset as u64, buffer)?;
                 amount_written += read;
                 cluster_offset += read;
-                if read == bytes_per_cluster {
+                if cluster_offset == bytes_per_cluster {
                     cluster_offset = 0;
                     match vfat.next_cluster(current_cluster)? {
                         Some(next_cluster) => {
                             current_cluster = next_cluster;
                         }
                         None => {
-                            exhausted = true;
+                            let new_cluster = vfat.next_free_cluster()?;
+                            vfat.update_fat_entry(current_cluster, Status::Data(new_cluster))?;
+                            vfat.update_fat_entry(new_cluster, Status::new_eoc())?;
+                            current_cluster = new_cluster;
                         }
                     }
                 } else if read > bytes_per_cluster {
-                    panic!("read more bytes within cluster than exist within cluster");
+                    panic!("wrote more bytes within cluster than exist within cluster");
                 }
             }
 
             self.position += amount_written as u64;
             self.current_cluster = current_cluster;
-            self.exhausted = exhausted;
 
             Ok(amount_written)
         })
@@ -643,9 +648,7 @@ impl<'a, HANDLE: VFatHandle> FileSystem2 for HandleReference<'a, HANDLE> where H
         fat_empty[0x4..0x8].copy_from_slice(&0xfff_ffff_u32.to_le_bytes());
         fat_empty[0x8..0xc].copy_from_slice(&0xfff_fff8_u32.to_le_bytes());
 
-        println!("{:x?}", fat_empty);
-
-        for i in 1..(bpb.reserved_sectors as u32 + bpb.sectors_per_fat_two * bpb.number_of_fats as u32) {
+        for i in 1..(bpb.reserved_sectors as u32 + bpb.sectors_per_fat_two * bpb.number_of_fats as u32 + 3) {
             let buffer = if (i > bpb.reserved_sectors as u32) &&
                 (i - bpb.reserved_sectors as u32) % bpb.sectors_per_fat_two != 0 {
                 zero.as_slice()

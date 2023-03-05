@@ -1,9 +1,10 @@
 ROOT := $(shell git rev-parse --show-toplevel)
 
 KERN := kernel
-TARGET_DIR := target/aarch64-unknown-none/release/
+TARGET_DIR := target/aarch64-unknown-none/release
 TARGET := $(TARGET_DIR)/$(KERN)
 BINARY := $(TARGET).bin
+USER_DIRECTORY := $(TARGET_DIR)/user
 SDCARD ?= $(ROOT)/user/fs.img
 USER_PROGRAMS := cat echo fib heap init shell stack
 
@@ -44,12 +45,17 @@ clean:
 	cargo clean
 
 user:
+	@rm -rf $(USER_DIRECTORY)
+	@mkdir $(USER_DIRECTORY)
 	@echo "+ Building user programs"
 	@for program in $(USER_PROGRAMS) ; do 											\
 		cargo build --bin $$program --release;											\
-		objcopy -O binary $(TARGET_DIR)/$$program $(TARGET_DIR)/$$program.bin;		\
+		objcopy -O binary $(TARGET_DIR)/$$program $(USER_DIRECTORY)/$$program;		\
     done
 
-image:
-	cargo run --target aarch64-apple-darwin --bin image test.img create
-	cargo run --target aarch64-apple-darwin --bin image test.img format fat32 0 test
+image: user
+	rm -f $(SDCARD)
+	cargo run --target aarch64-apple-darwin --package image --bin image $(SDCARD) create
+	ls $(USER_DIRECTORY)
+	cargo run --target aarch64-apple-darwin --package image --bin image $(SDCARD) format fat32 0 $(USER_DIRECTORY)
+	qemu-img resize $(SDCARD) 128M

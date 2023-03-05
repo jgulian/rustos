@@ -2,7 +2,7 @@ use alloc::string::String;
 
 use filesystem;
 
-use crate::vfat::{Dir, File, Metadata, VFatHandle};
+use crate::vfat::{Cluster, Dir, File, Metadata, VFatHandle};
 use crate::vfat::vfat::Chain;
 
 // You can change this definition if you want
@@ -92,5 +92,12 @@ impl<HANDLE: VFatHandle> Entry<HANDLE> {
             metadata: Default::default(),
             chain,
         })
+    }
+    
+    pub(crate) fn first_cluster(&self) -> Cluster {
+        match &self {
+            Entry::File(file) => file.chain.first_cluster(),
+            Entry::Dir(dir) => dir.chain.first_cluster(),
+        }
     }
 }

@@ -9,13 +9,14 @@ use std::fs::{File, read_dir};
 use std::io;
 use std::io::{copy, Cursor, Error, ErrorKind, Seek, SeekFrom, Write};
 use std::io::ErrorKind::InvalidInput;
-use std::path::Path;
+use std::path::PathBuf;
 use std::rc::Rc;
 use clap::Parser;
 use cli::ImageArgs;
 use fat32::vfat::{HandleReference, VFat, VFatHandle};
 use filesystem::fs2::FileSystem2;
 use filesystem::mbr::{CHS, MasterBootRecord, PartitionEntry};
+use filesystem::path::{Component, Path};
 use crate::cli::FileSystem;
 use crate::cli::ImageCommand::{Create, Format};
 use crate::device::ImageFile;
@@ -27,22 +28,22 @@ fn main() {
 
     match command {
         Create { image_size_mb } => {
-            create_image(&path, sector_size, image_size_mb).expect("command failed");
+            create_image(path, sector_size, image_size_mb).expect("command failed");
         }
         Format { filesystem, partition, folder } => {
-            format_image(&path, sector_size, filesystem, partition, &folder).expect("command failed");
+            format_image(&path, sector_size, filesystem, partition, folder).expect("command failed");
         }
     }
 }
 
-fn create_image<P: AsRef<Path>>(path: &P, sector_size: u16, image_size_mb: u64) -> io::Result<File> {
+fn create_image(path: PathBuf, sector_size: u16, image_size_mb: u64) -> io::Result<File> {
     if image_size_mb == 0 {
-        return Err(Error::new(ErrorKind::InvalidInput, "Image must have positive size"));
+        return Err(Error::new(InvalidInput, "Image must have positive size"));
     }
 
     let file_size = image_size_mb * BYTES_PER_MEGABYTE;
     if file_size % (sector_size as u64) != 0 {
-        return Err(Error::new(ErrorKind::InvalidInput, "File size must be divisible by sector size"));
+        return Err(Error::new(InvalidInput, "File size must be divisible by sector size"));
     }
 
     let mut file = File::create(path)?;
@@ -70,13 +71,12 @@ fn create_image<P: AsRef<Path>>(path: &P, sector_size: u16, image_size_mb: u64) 
     Ok(file)
 }
 
-fn format_image<'a, P: AsRef<Path>>(path: &P, sector_size: u16, filesystem: FileSystem, partition: u8, folder: &P) -> io::Result<()> {
+fn format_image<'a>(path: &PathBuf, sector_size: u16, filesystem: FileSystem, partition: u8, folder: PathBuf) -> io::Result<()> {
     if partition >= 4 {
         return Err(Error::new(ErrorKind::InvalidInput, "Invalid partition"));
     }
 
     use format::Format;
-
 
     let mut image = File::options().read(true).write(true).open(path)?;
     let mut master_boot_record: MasterBootRecord = MasterBootRecord::load_readable_seekable(&mut image)?;
@@ -129,8 +129,8 @@ impl VFatHandle for BasicHandle {
     }
 }
 
-fn add_directory_to_filesystem<'a, P: AsRef<Path>>(handle_reference: &mut HandleReference<'a, BasicHandle>, folder: &P, image_path: filesystem::path::Path) -> io::Result<()> {
-    let directory_entries = read_dir(folder)?;
+fn add_directory_to_filesystem(handle_reference: &mut HandleReference<BasicHandle>, folder: PathBuf, image_path: Path) -> io::Result<()> {
+    let directory_entries = read_dir(folder.clone())?;
 
     let mut image_directory = FileSystem2::open(handle_reference, &image_path)?
         .into_directory().ok_or(Error::from(ErrorKind::Unsupported))?;
@@ -144,6 +144,7 @@ fn add_directory_to_filesystem<'a, P: AsRef<Path>>(handle_reference: &mut Handle
             .ok_or(Error::from(ErrorKind::Unsupported))?;
 
         if file_type.is_file() {
+            println!("copying {}", directory_entry.path().display());
             image_directory.create_file(entry_name)?;
             let mut file = image_directory.open_entry(entry_name)?.into_file()
                 .ok_or(Error::from(ErrorKind::Unsupported))?;
@@ -151,6 +152,16 @@ fn add_directory_to_filesystem<'a, P: AsRef<Path>>(handle_reference: &mut Handle
             let mut real_file = File::open(&directory_entry.path())?;
             copy(&mut real_file, &mut file)?;
         } else if file_type.is_dir() {
+            println!("going into {}", directory_entry.path().display());
+            let mut sub_folder = folder.clone();
+            sub_folder.push(PathBuf::from(entry_name));
+
+            let mut sub_image_path = image_path.clone();
+            sub_image_path.append_child(entry_name);
+            println!("opening {}", sub_image_path);
+            image_directory.create_directory(entry_name)?;
+
+            add_directory_to_filesystem(handle_reference, sub_folder, sub_image_path)?;
         } else {
             return Err(Error::new(InvalidInput, "Folder contains invalid file type"));
         }

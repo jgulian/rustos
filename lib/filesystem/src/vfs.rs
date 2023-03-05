@@ -8,11 +8,9 @@ use alloc::vec::Vec;
 use core::borrow::{Borrow, BorrowMut};
 use core::cell::RefCell;
 use core::ops::{Deref, DerefMut};
-use std::io::{Error, ErrorKind};
-
-use log::info;
 
 use shim::{io, ioerr, newioerr};
+use shim::io::{Error, ErrorKind};
 
 use crate::{BlockDevice, fs2};
 use crate::fs2::{Directory2, Entry2, FileSystem2, Metadata2};
