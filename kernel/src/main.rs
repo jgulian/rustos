@@ -15,9 +15,6 @@ extern crate alloc;
 #[macro_use]
 extern crate log;
 
-
-
-
 use console::kprintln;
 use disk::FileSystem;
 

@@ -11,6 +11,7 @@ use allocator::util::{align_down, align_up};
 use shim::{const_assert_size, io, ioerr};
 
 use crate::ALLOCATOR;
+use crate::console::kprintln;
 use crate::memory::{PhysicalAddr, VirtualAddr};
 use crate::param::*;
 
@@ -65,6 +66,50 @@ impl L3Entry {
     pub fn address(&self) -> usize {
         (self.0.get_value(RawL3Entry::ADDR) as usize) << PAGE_ALIGN
     }
+
+    pub fn permissions(&self) -> PagePermissions {
+        kprintln!("{} {}", self.0.get_value(RawL3Entry::AP), self.0.get_value(RawL3Entry::XN));
+        match (self.0.get_value(RawL3Entry::AP), self.0.get_value(RawL3Entry::XN)) {
+            (EntryPerm::USER_RW, EntryNx::Nx) => PagePermissions::RW,
+            (EntryPerm::USER_RO, EntryNx::Nx) => PagePermissions::RO,
+            (EntryPerm::USER_RW, EntryNx::Ex) => PagePermissions::RWX,
+            (EntryPerm::USER_RO, EntryNx::Ex) => PagePermissions::RX,
+            _ => {
+                panic!("Invalid page permission type.")
+            }
+        }
+    }
+
+    pub fn set_permissions(&mut self, permissions: PagePermissions) {
+        match permissions {
+            PagePermissions::RW | PagePermissions::RWX => {
+                self.0.set_value(EntryPerm::USER_RW, RawL3Entry::AP);
+            }
+            PagePermissions::RO | PagePermissions::RX => {
+                self.0.set_value(EntryPerm::USER_RO, RawL3Entry::AP);
+            }
+        }
+
+        match permissions {
+            PagePermissions::RWX | PagePermissions::RX => {
+                self.0.set_value(EntryNx::Ex, RawL3Entry::XN);
+            }
+            PagePermissions::RW | PagePermissions::RO => {
+                self.0.set_value(EntryNx::Nx, RawL3Entry::XN);
+            }
+        }
+    }
+
+    pub fn set_cow(&mut self, cow: bool) {
+        match cow {
+            true => self.0.set_value(EntryCow::Cow, RawL3Entry::COW),
+            false => self.0.set_value(EntryCow::Own, RawL3Entry::COW),
+        };
+    }
+
+    pub fn cow(&self) -> bool {
+        self.0.get_value(RawL3Entry::COW) > 0
+    }
 }
 
 impl From<u64> for L3Entry {
@@ -73,17 +118,21 @@ impl From<u64> for L3Entry {
     }
 }
 
+impl From<RawL3Entry> for L3Entry {
+    fn from(value: RawL3Entry) -> Self {
+        Self(value)
+    }
+}
+
+impl Into<RawL3Entry> for L3Entry {
+    fn into(self) -> RawL3Entry {
+        self.0
+    }
+}
+
 impl fmt::Display for L3Entry {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        f.debug_struct("L3Entry")
-            .field("addr", &self.0.get_value(RawL3Entry::ADDR))
-            .field("af", &self.0.get_value(RawL3Entry::AF))
-            .field("sh", &self.0.get_value(RawL3Entry::SH))
-            .field("ap", &self.0.get_value(RawL3Entry::AP))
-            .field("attr", &self.0.get_value(RawL3Entry::ATTR))
-            .field("type", &self.0.get_value(RawL3Entry::TYPE))
-            .field("valid", &self.0.get_value(RawL3Entry::VALID))
-            .finish()
+        fmt::Debug::fmt(self, f)
     }
 }
 
@@ -190,9 +239,9 @@ impl PageTable {
 
     /// Set the given RawL3Entry `entry` to the L3Entry indicated by the given virtual
     /// address.
-    pub fn set_entry(&mut self, va: VirtualAddr, entry: RawL3Entry) -> &mut Self {
+    pub fn set_entry(&mut self, va: VirtualAddr, entry: L3Entry) -> &mut Self {
         let (l2, l3) = PageTable::locate(va);
-        self.l3[l2].entries[l3].0 = entry;
+        self.l3[l2].entries[l3].0 = entry.into();
         self
     }
 
@@ -242,7 +291,7 @@ impl KernPageTable {
             entry.set_value(EntryType::Table, RawL3Entry::TYPE);
             entry.set_value(EntryValid::Valid, RawL3Entry::VALID);
             entry.set_value(0b1_u64, RawL3Entry::AF);
-            page_table.set_entry(VirtualAddr::from(address), entry);
+            page_table.set_entry(VirtualAddr::from(address), L3Entry::from(entry));
         }
 
         let device_start = align_down(IO_BASE, PAGE_ALIGN);
@@ -259,17 +308,18 @@ impl KernPageTable {
             entry.set_value(EntryType::Table, RawL3Entry::TYPE);
             entry.set_value(EntryValid::Valid, RawL3Entry::VALID);
             entry.set_value(0b1_u64, RawL3Entry::AF);
-            page_table.set_entry(VirtualAddr::from(address), entry);
+            page_table.set_entry(VirtualAddr::from(address), L3Entry::from(entry));
         }
 
         KernPageTable(page_table)
     }
 }
 
-pub enum PagePerm {
+pub enum PagePermissions {
     RW,
     RO,
     RWX,
+    RX,
 }
 
 pub struct UserPageTable(Box<PageTable>);
@@ -292,8 +342,7 @@ impl UserPageTable {
     /// Panics if allocator fails to allocate a page.
     ///
     /// TODO. use Result<T> and make it failurable
-    /// TODO. use perm properly
-    pub fn alloc(&mut self, mut va: VirtualAddr, _perm: PagePerm) -> &mut [u8] {
+    pub fn alloc(&mut self, mut va: VirtualAddr, permissions: PagePermissions, cow: bool) -> &mut [u8] {
         if (va.as_ptr() as usize) < USER_IMG_BASE {
             panic!("invalid virtual address");
         }
@@ -307,15 +356,17 @@ impl UserPageTable {
         let page = unsafe { ALLOCATOR.alloc(Page::layout()) };
         let address = page as u64;
 
-        let mut entry = RawL3Entry::new(0);
-        entry.set_value(address >> PAGE_ALIGN, RawL3Entry::ADDR);
-        entry.set_value(EntrySh::ISh as u64, RawL3Entry::SH);
-        entry.set_value(EntryPerm::USER_RW, RawL3Entry::AP);
-        entry.set_value(EntryAttr::Mem, RawL3Entry::ATTR);
-        entry.set_value(EntryType::Table, RawL3Entry::TYPE);
-        entry.set_value(EntryValid::Valid, RawL3Entry::VALID);
-        entry.set_value(0b1_u64, RawL3Entry::AF);
-        self.0.set_entry(va, entry);
+        let mut raw_l3_entry = RawL3Entry::new(0);
+        raw_l3_entry.set_value(address >> PAGE_ALIGN, RawL3Entry::ADDR);
+        raw_l3_entry.set_value(EntrySh::ISh as u64, RawL3Entry::SH);
+        raw_l3_entry.set_value(EntryAttr::Mem, RawL3Entry::ATTR);
+        raw_l3_entry.set_value(EntryType::Table, RawL3Entry::TYPE);
+        raw_l3_entry.set_value(EntryValid::Valid, RawL3Entry::VALID);
+        raw_l3_entry.set_value(0b1_u64, RawL3Entry::AF);
+        let mut l3_entry = L3Entry::from(raw_l3_entry);
+        l3_entry.set_permissions(permissions);
+        l3_entry.set_cow(cow);
+        self.0.set_entry(va, l3_entry);
 
         return unsafe { core::slice::from_raw_parts_mut(page, PAGE_SIZE) };
     }
@@ -332,19 +383,18 @@ impl UserPageTable {
         }
     }
 
-    pub fn allocated_iter(&mut self) -> impl Iterator<Item=(VirtualAddr, &L3Entry)> {
-        self.allocated_l3_table(0)
-            .chain(self.allocated_l3_table(1))
-            .chain(self.allocated_l3_table(2))
-            .filter(|(_, entry)| entry.is_valid())
-    }
-
-    fn allocated_l3_table(&self, table: usize) -> impl Iterator<Item=(VirtualAddr, &L3Entry)> {
-        self.l3[table].entries.iter().enumerate().map(move |(i, entry)| {
-            let address = USER_IMG_BASE +
-                ((table & ((1 << 14) - 1)) << 29 | (i & ((1 << 14) - 1)) << 16);
-            let va = VirtualAddr::from(address);
-            (va, entry)
+    pub fn allocated(&mut self) -> impl Iterator<Item=(PhysicalAddr, VirtualAddr, &mut L3Entry)> {
+        self.l3.iter_mut().enumerate().flat_map(|(i, table)| {
+            table.entries.iter_mut().enumerate().filter_map(move |(j, l3_entry)| {
+                let physical_address = PhysicalAddr::from(l3_entry.address());
+                let virtual_address = VirtualAddr::from(
+                    USER_IMG_BASE + ((i & ((1 << 14) - 1)) << 29 | (j & ((1 << 14) - 1)) << 16));
+                if l3_entry.is_valid() {
+                    Some((physical_address, virtual_address, l3_entry))
+                } else {
+                    None
+                }
+            })
         })
     }
 }

@@ -38,6 +38,20 @@ pub mod EntrySh {
 
 #[allow(non_snake_case)]
 #[allow(non_upper_case_globals)]
+pub mod EntryNx {
+    pub const Ex: u64 = 0b0;
+    pub const Nx: u64 = 0b1;
+}
+
+#[allow(non_snake_case)]
+#[allow(non_upper_case_globals)]
+pub mod EntryCow {
+    pub const Own: u64 = 0b0;
+    pub const Cow: u64 = 0b1;
+}
+
+#[allow(non_snake_case)]
+#[allow(non_upper_case_globals)]
 pub mod EntryAttr {
     pub const Mem: u64 = 0b000;
     pub const Dev: u64 = 0b001;
@@ -62,6 +76,8 @@ defbit!(
     RawL3Entry,
     [
         ADDR[47 - 16],
+        COW[55 - 55],
+        XN[54 - 54],
         AF[10 - 10],
         SH[09 - 08],
         AP[07 - 06],

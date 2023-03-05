@@ -8,7 +8,7 @@ use kernel_api::OsError::BadAddress;
 use pi::timer;
 
 use crate::{kprintln, SCHEDULER};
-use crate::memory::{PagePerm, VirtualAddr};
+use crate::memory::{PagePermissions, VirtualAddr};
 use crate::param::{PAGE_SIZE, USER_IMG_BASE};
 use crate::process::{ResourceId, State};
 use crate::traps::TrapFrame;
@@ -156,7 +156,7 @@ pub fn sys_sbrk(tf: &mut TrapFrame) -> OsResult<()> {
     let result = SCHEDULER.on_process(tf, |process| -> OsResult<(u64, u64)> {
         //TODO: pick a better heap base / allow more sbrks / something might be wrong with is_valid
         let heap_base = USER_IMG_BASE + PAGE_SIZE;
-        process.vmap.alloc(VirtualAddr::from(heap_base), PagePerm::RW);
+        process.vmap.alloc(VirtualAddr::from(heap_base), PagePermissions::RW, false);
         Ok((heap_base as u64, PAGE_SIZE as u64))
     })??;
 

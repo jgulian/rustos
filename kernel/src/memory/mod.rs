@@ -1,3 +1,4 @@
+use alloc::collections::BTreeMap;
 use core::arch::asm;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
@@ -17,6 +18,7 @@ pub struct VMManager {
     kern_pt: Mutex<Option<KernPageTable>>,
     kern_pt_addr: AtomicUsize,
     ready_core_cnt: AtomicUsize,
+    frame_reference_counts: Mutex<BTreeMap<PhysicalAddr, usize>>,
 }
 
 impl VMManager {
@@ -29,6 +31,7 @@ impl VMManager {
             kern_pt: Mutex::new(None),
             kern_pt_addr: AtomicUsize::new(0),
             ready_core_cnt: AtomicUsize::new(0),
+            frame_reference_counts: Mutex::new(BTreeMap::new()),
         }
     }
 
@@ -118,5 +121,30 @@ impl VMManager {
     /// Returns the base address of the kernel2 page table as `PhysicalAddr`.
     pub fn get_baddr(&self) -> PhysicalAddr {
         self.kern_pt.lock().as_ref().unwrap().get_baddr()
+    }
+
+    pub fn pin_frame(&self, physical_address: PhysicalAddr) {
+        let mut reference_counts = self.frame_reference_counts.lock();
+        let new_reference_count = reference_counts.get(&physical_address)
+            .map(|x| *x).unwrap_or(0usize) + 1;
+        reference_counts.insert( physical_address, new_reference_count);
+    }
+
+    pub fn unpin_frame(&self, physical_address: PhysicalAddr) -> bool {
+        let mut reference_counts = self.frame_reference_counts.lock();
+        let new_reference_count = reference_counts.get(&physical_address)
+            .map(|x| *x).unwrap_or(0usize) - 1;
+        if new_reference_count == 0 {
+            reference_counts.remove(&physical_address);
+            true
+        } else {
+            reference_counts.insert( physical_address, new_reference_count);
+            false
+        }
+    }
+
+    pub fn get_frame_pin_count(&self, physical_address: PhysicalAddr) -> usize  {
+        self.frame_reference_counts.lock()
+            .get(&physical_address).map(|x| *x).unwrap_or(0usize)
     }
 }

@@ -25,7 +25,7 @@ impl VirtualAddr {
 }
 
 /// A physical address.
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Ord, PartialOrd, Eq)]
 pub struct PhysicalAddr(usize);
 
 macro_rules! impl_for {
