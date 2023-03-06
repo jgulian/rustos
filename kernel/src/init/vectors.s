@@ -65,7 +65,7 @@ context_save:
 
     PUSH16 xzr, lr
 
-    bl handle_exception
+    bl receive_exception
 
     POP16 lr, xzr
 

@@ -30,7 +30,6 @@ pub fn sys_sleep(tf: &mut TrapFrame) -> OsResult<()> {
         let passed = sleep_until < current_time;
         if passed {
             let millis: u64 = (current_time - started).as_millis() as u64;
-            kprintln!("{}", millis);
             process.context.xs[0] = millis;
             process.context.xs[8] = 0;
         }
@@ -156,7 +155,7 @@ pub fn sys_sbrk(tf: &mut TrapFrame) -> OsResult<()> {
     let result = SCHEDULER.on_process(tf, |process| -> OsResult<(u64, u64)> {
         //TODO: pick a better heap base / allow more sbrks / something might be wrong with is_valid
         let heap_base = USER_IMG_BASE + PAGE_SIZE;
-        process.vmap.alloc(VirtualAddr::from(heap_base), PagePermissions::RW, false);
+        process.vmap.alloc(VirtualAddr::from(heap_base), PagePermissions::RW);
         Ok((heap_base as u64, PAGE_SIZE as u64))
     })??;
 

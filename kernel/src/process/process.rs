@@ -98,8 +98,8 @@ impl Process {
     /// permission to load file's contents.
     fn do_load(pn: &Path) -> OsResult<Process> {
         let mut process = Process::new()?;
-        process.vmap.alloc(Process::get_stack_base(), PagePermissions::RW, false);
-        let user_image = process.vmap.alloc(Process::get_image_base(), PagePermissions::RWX, false);
+        process.vmap.alloc(Process::get_stack_base(), PagePermissions::RW);
+        let user_image = process.vmap.alloc(Process::get_image_base(), PagePermissions::RWX);
 
         let mut file = FILESYSTEM.borrow().open(pn)
             .map_err(|_| OsError::IoError)?
@@ -239,30 +239,18 @@ impl Process {
         new_process.context.ttbr1 = new_process.vmap.get_baddr().as_u64();
         new_process.context.tpidr = id;
 
-        for (physical_address, virtual_address, l3_entry) in self.vmap.allocated() {
-            kprintln!("phys: {:?}, virt: {:?}", physical_address, virtual_address);
-            let permissions = match l3_entry.permissions() {
-                PagePermissions::RW => {
-                    l3_entry.set_permissions(PagePermissions::RO);
-                    l3_entry.set_cow(true);
-                    VMM.pin_frame(physical_address);
-                    PagePermissions::RO
-                },
-                PagePermissions::RO => PagePermissions::RO,
-                PagePermissions::RWX => {
-                    l3_entry.set_permissions(PagePermissions::RX);
-                    l3_entry.set_cow(true);
-                    VMM.pin_frame(physical_address);
-                    PagePermissions::RX
-                },
-                PagePermissions::RX => PagePermissions::RX,
-            };
-            VMM.pin_frame(physical_address);
-
-            let page = new_process.vmap.alloc(virtual_address, permissions, true);
-            let source = unsafe { from_raw_parts(l3_entry.address() as *const u8, PAGE_SIZE) };
-            page.copy_from_slice(source);
+        if cfg!(feature = "cow_fork") {
+            self.vmap.allocated().try_for_each(|(virtual_address, l3_entry)| {
+                new_process.vmap.cow(virtual_address, l3_entry)
+            })?;
+        } else {
+            for (virtual_address, l3_entry) in self.vmap.allocated() {
+                let page = new_process.vmap.alloc(virtual_address, l3_entry.permissions());
+                let source = unsafe { from_raw_parts(l3_entry.address() as *const u8, PAGE_SIZE) };
+                page.copy_from_slice(source);
+            }
         }
+
 
         Ok(new_process)
     }
@@ -280,12 +268,14 @@ impl Process {
         let mut program_file = FILESYSTEM.borrow().open(&absolute_path)?
             .into_file().ok_or(newioerr!(InvalidFilename))?;
 
+        info!("Execute");
+
         self.vmap = Box::new(UserPageTable::new());
 
-        let stack = self.vmap.alloc(Process::get_stack_base(), PagePermissions::RW, false);
+        let stack = self.vmap.alloc(Process::get_stack_base(), PagePermissions::RW);
         let mut stack_data = Vec::new();
 
-        //TODO: clean this
+        // TODO: clean this; actually this is just broken
         stack_data.extend_from_slice(&(arguments.len() as u64).to_be_bytes());
         stack_data.extend_from_slice(&(environment.len() as u64).to_be_bytes());
         arguments.split(|x| *x == 0).for_each(|arg|
@@ -297,7 +287,7 @@ impl Process {
         stack_data.reverse();
         stack[stack_size - stack_data.len()..].copy_from_slice(stack_data.as_slice());
 
-        let user_image = self.vmap.alloc(Process::get_image_base(), PagePermissions::RWX, true);
+        let user_image = self.vmap.alloc(Process::get_image_base(), PagePermissions::RW);
         program_file.read(user_image)?;
 
         self.context.sp = Process::get_stack_top().as_u64() - (stack_data.len() as u64);

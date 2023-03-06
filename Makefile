@@ -6,7 +6,7 @@ TARGET := $(TARGET_DIR)/$(KERN)
 BINARY := $(TARGET).bin
 USER_DIRECTORY := $(TARGET_DIR)/user
 SDCARD ?= $(ROOT)/user/fs.img
-USER_PROGRAMS := cat echo fib heap init shell stack
+USER_PROGRAMS := cat echo fib heap init shell stack test
 
 QEMU := qemu-system-aarch64
 QEMU_ARGS := -nographic -M raspi3b -serial null -serial mon:stdio \
@@ -48,8 +48,8 @@ user:
 	@rm -rf $(USER_DIRECTORY)
 	@mkdir $(USER_DIRECTORY)
 	@echo "+ Building user programs"
-	@for program in $(USER_PROGRAMS) ; do 											\
-		cargo build --bin $$program --release;											\
+	for program in $(USER_PROGRAMS) ; do 											\
+		cargo build --bin $$program --release &&											\
 		objcopy -O binary $(TARGET_DIR)/$$program $(USER_DIRECTORY)/$$program;		\
     done
 
