@@ -17,7 +17,7 @@ use shim::{io, newioerr};
 use shim::io::{Write};
 
 use crate::{FILESYSTEM, VMM};
-use crate::console::kprintln;
+
 use crate::memory::*;
 use crate::param::*;
 use crate::process::{Stack, State};
@@ -59,7 +59,7 @@ impl Process {
     pub fn new() -> OsResult<Process> {
         let stack = Stack::new().ok_or(OsError::NoMemory)?;
         Ok(Process {
-            context: Box::new(Default::default()),
+            context: Box::default(),
             stack,
             vmap: Box::new(UserPageTable::new()),
             state: State::Ready,
@@ -153,10 +153,8 @@ impl Process {
             let mut poll = mem::replace(p, Box::new(|_| false));
             if poll(self) {
                 self.state = State::Ready;
-            } else {
-                if let State::Waiting(pr) = &mut self.state {
-                    let _ = mem::replace(pr, poll);
-                }
+            } else if let State::Waiting(pr) = &mut self.state {
+                let _ = mem::replace(pr, poll);
             }
         }
 
@@ -268,8 +266,6 @@ impl Process {
         let mut program_file = FILESYSTEM.borrow().open(&absolute_path)?
             .into_file().ok_or(newioerr!(InvalidFilename))?;
 
-        info!("Execute");
-
         self.vmap = Box::new(UserPageTable::new());
 
         let stack = self.vmap.alloc(Process::get_stack_base(), PagePermissions::RW);
@@ -287,7 +283,7 @@ impl Process {
         stack_data.reverse();
         stack[stack_size - stack_data.len()..].copy_from_slice(stack_data.as_slice());
 
-        let user_image = self.vmap.alloc(Process::get_image_base(), PagePermissions::RW);
+        let user_image = self.vmap.alloc(Process::get_image_base(), PagePermissions::RWX);
         program_file.read(user_image)?;
 
         self.context.sp = Process::get_stack_top().as_u64() - (stack_data.len() as u64);

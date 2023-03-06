@@ -6,7 +6,7 @@ extern crate alloc;
 
 use alloc::boxed::Box;
 use alloc::string::{String, ToString};
-use kernel_api::{print, println};
+use kernel_api::{println};
 use kernel_api::syscall::{exit, fork, getpid, wait};
 
 use crate::user::get_arguments;
@@ -36,11 +36,11 @@ fn fork_tree_test() {
     fork_tree(&mut String::new());
 }
 
-fn fork_tree(mut current: &mut String) {
+fn fork_tree(current: &mut String) {
     println!("{}: I am '{}'", getpid().expect("getpid failed"), current);
 
-    fork_tree_child(&mut current, '0');
-    fork_tree_child(&mut current, '1');
+    fork_tree_child(current, '0');
+    fork_tree_child(current, '1');
 }
 
 fn fork_tree_child(current: &mut String, branch: char) {

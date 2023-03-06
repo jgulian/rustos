@@ -199,7 +199,7 @@ impl Scheduler {
     fn add(&mut self, mut process: Process) -> Option<Id> {
         let new_pid = self.new_pid()?;
 
-        (*process.context).tpidr = new_pid;
+        process.context.tpidr = new_pid;
         self.processes.push_back(process);
 
         self.last_id = Some(new_pid);
@@ -219,12 +219,12 @@ impl Scheduler {
 
     fn new_pid(&mut self) -> Option<Id> {
         self.last_id = match self.last_id {
-            None => Some(Id::from(0u64)),
+            None => Some(0u64),
             Some(pid) => {
                 if pid == u64::MAX {
                     return None;
                 }
-                Some(Id::from(pid + 1))
+                Some(pid + 1)
             }
         };
 
@@ -311,11 +311,11 @@ impl Scheduler {
 impl fmt::Debug for Scheduler {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let len = self.processes.len();
-        write!(f, "  [Scheduler] {} processes in the queue\n", len)?;
+        writeln!(f, "  [Scheduler] {} processes in the queue", len)?;
         for i in 0..len {
-            write!(
+            writeln!(
                 f,
-                "    queue[{}]: proc({:3})-{:?} \n",
+                "    queue[{}]: proc({:3})-{:?} ",
                 i, self.processes[i].context.tpidr, self.processes[i].state
             )?;
         }

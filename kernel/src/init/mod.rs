@@ -71,7 +71,7 @@ unsafe fn switch_to_el1() {
 
     if current_el() == 2 {
         // set the stack-pointer for EL1
-        SP_EL1.set(SP.get() as u64);
+        SP_EL1.set(SP.get());
 
         // enable CNTP for EL1/EL0 (ref: D7.5.2, D7.5.13)
         // NOTE: This doesn't actually enable the counter stream.

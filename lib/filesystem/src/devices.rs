@@ -48,7 +48,7 @@ pub trait BlockDevice: Send {
         let sector_size = self.sector_size() as usize;
 
         let start = vec.len();
-        vec.reserve(sector_size);
+        vec.resize(sector_size, 0);
 
         unsafe {
             vec.set_len(start + sector_size);

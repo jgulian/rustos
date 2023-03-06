@@ -51,7 +51,7 @@ impl<T> Mutex<T> {
 
         //TODO: Review
         if !self.lock.compare_and_swap(false, true, ordering) {
-            Some(MutexGuard { lock: &self })
+            Some(MutexGuard { lock: self })
         } else {
             None
         }

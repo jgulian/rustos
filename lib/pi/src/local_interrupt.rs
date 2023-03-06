@@ -28,7 +28,7 @@ impl LocalInterrupt {
     pub const MAX: usize = 12;
 
     pub fn iter() -> impl Iterator<Item=LocalInterrupt> {
-        (0..LocalInterrupt::MAX).map(|n| LocalInterrupt::from(n))
+        (0..LocalInterrupt::MAX).map(LocalInterrupt::from)
     }
 }
 
@@ -89,7 +89,7 @@ impl LocalController {
     /// Returns a new handle to the interrupt controller.
     pub fn new(core: usize) -> LocalController {
         LocalController {
-            core: core,
+            core,
             registers: unsafe { &mut *(INT_BASE as *mut Registers) },
         }
     }

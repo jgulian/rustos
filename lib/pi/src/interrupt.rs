@@ -23,8 +23,7 @@ impl Interrupt {
     pub fn iter() -> impl Iterator<Item=Interrupt> {
         use Interrupt::*;
         [Timer1, Timer3, Usb, Gpio0, Gpio1, Gpio2, Gpio3, Uart]
-            .iter()
-            .map(|int| *int)
+            .iter().copied()
     }
 
     pub fn register(&self) -> (usize, u32) {

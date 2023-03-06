@@ -7,7 +7,7 @@ extern crate alloc;
 
 use kernel_api::println;
 use kernel_api::syscall::{File, open, write};
-use shim::io::{Read, Write};
+use shim::io::{Read};
 
 use crate::user::get_arguments;
 
@@ -30,7 +30,7 @@ fn cat(mut file: File) {
 }
 
 fn main() {
-    match get_arguments().skip(1).next() {
+    match get_arguments().nth(1) {
         Some(file) => {
             match open(file.trim_matches(0 as char)) {
                 Ok(id) => {

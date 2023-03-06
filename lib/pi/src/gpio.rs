@@ -91,7 +91,7 @@ impl Gpio<Uninitialized> {
 
         Gpio {
             registers: unsafe { &mut *(GPIO_BASE as *mut Registers) },
-            pin: pin,
+            pin,
             _state: PhantomData,
         }
     }

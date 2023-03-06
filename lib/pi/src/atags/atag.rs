@@ -44,7 +44,7 @@ impl From<&'static raw::Atag> for Atag {
             match (atag.tag, &atag.kind) {
                 (raw::Atag::CORE, &raw::Kind { core }) => Atag::Core(core),
                 (raw::Atag::MEM, &raw::Kind { mem }) => Atag::Mem(mem),
-                (raw::Atag::CMDLINE, &raw::Kind { ref cmd }) => Atag::Cmd({
+                (raw::Atag::CMDLINE, raw::Kind { cmd }) => Atag::Cmd({
                     let mut size: usize = 0;
                     let initial_byte: *const u8 = &cmd.cmd;
                     let mut byte: *const u8 = initial_byte;

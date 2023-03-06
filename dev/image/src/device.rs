@@ -11,7 +11,7 @@ impl ImageFile {
     }
 
     fn seek_to_sector(&mut self, sector: u64) -> io::Result<u64> {
-        self.0.seek(SeekFrom::Start((self.1 as u64 * sector)))
+        self.0.seek(SeekFrom::Start(self.1 as u64 * sector))
     }
 
     fn truncate_buffer_length<'a>(&self, buffer: &'a [u8]) -> &'a [u8] {

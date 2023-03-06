@@ -61,7 +61,7 @@ impl PiVFatWrapper {
     pub unsafe fn initialize(&self) {
         let sd = sd::Sd::new().expect("filesystem failed to initialize");
         let vfat = VFat::<PiVFatHandle>::from(sd).expect("failed to initialize vfat");
-        (&mut *self.0.get()).replace(vfat);
+        (*self.0.get()).replace(vfat);
     }
 
     fn handle(&self) -> &PiVFatHandle {
@@ -84,7 +84,7 @@ impl<'a> FileSystem2 for DiskFileSystem<'a> {
         HandleReference(self.0).copy_entry(source, destination)
     }
 
-    fn format(device: &mut dyn BlockDevice, partition: &mut PartitionEntry, sector_size: usize) -> io::Result<()> {
+    fn format(_device: &mut dyn BlockDevice, _partition: &mut PartitionEntry, _sector_size: usize) -> io::Result<()> {
         ioerr!(Unsupported)
     }
 }
@@ -132,7 +132,7 @@ impl FileSystem2 for &FileSystem {
         self.0.lock().as_mut().ok_or(newioerr!(Unsupported))?.copy_entry(source, destination)
     }
 
-    fn format(device: &mut dyn BlockDevice, partition: &mut PartitionEntry, sector_size: usize) -> io::Result<()> {
+    fn format(_device: &mut dyn BlockDevice, _partition: &mut PartitionEntry, _sector_size: usize) -> io::Result<()> {
         ioerr!(Unsupported)
     }
 }

@@ -1,4 +1,4 @@
-use core::arch::asm;
+
 use core::fmt;
 use core::fmt::Formatter;
 
@@ -12,7 +12,7 @@ use crate::multiprocessing::per_core::local_irq;
 use crate::process::State;
 use crate::traps::irq::IrqHandlerRegistry;
 use crate::traps::memory::handle_memory_abort;
-use crate::traps::syndrome::{AbortData, FaultStatusCode};
+
 
 pub use self::frame::TrapFrame;
 use self::syndrome::Syndrome;

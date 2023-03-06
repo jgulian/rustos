@@ -4,10 +4,10 @@ mod device;
 #[cfg(test)]
 mod tests;
 
-use std::borrow::{Borrow, BorrowMut};
+use std::borrow::{Borrow};
 use std::fs::{File, read_dir};
 use std::io;
-use std::io::{copy, Cursor, Error, ErrorKind, Seek, SeekFrom, Write};
+use std::io::{copy, Error, ErrorKind, Seek, SeekFrom, Write};
 use std::io::ErrorKind::InvalidInput;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -16,7 +16,7 @@ use cli::ImageArgs;
 use fat32::vfat::{HandleReference, VFat, VFatHandle};
 use filesystem::fs2::FileSystem2;
 use filesystem::mbr::{CHS, MasterBootRecord, PartitionEntry};
-use filesystem::path::{Component, Path};
+use filesystem::path::{Path};
 use crate::cli::FileSystem;
 use crate::cli::ImageCommand::{Create, Format};
 use crate::device::ImageFile;
@@ -71,7 +71,7 @@ fn create_image(path: PathBuf, sector_size: u16, image_size_mb: u64) -> io::Resu
     Ok(file)
 }
 
-fn format_image<'a>(path: &PathBuf, sector_size: u16, filesystem: FileSystem, partition: u8, folder: PathBuf) -> io::Result<()> {
+fn format_image<'a>(path: &PathBuf, sector_size: u16, _filesystem: FileSystem, partition: u8, folder: PathBuf) -> io::Result<()> {
     if partition >= 4 {
         return Err(Error::new(ErrorKind::InvalidInput, "Invalid partition"));
     }

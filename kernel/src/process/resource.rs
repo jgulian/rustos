@@ -6,7 +6,7 @@ use core::fmt::Formatter;
 
 use filesystem::fs2::File2;
 use kernel_api::{OsError, OsResult};
-use crate::console::kprintln;
+
 
 #[derive(Clone, Copy, PartialOrd, PartialEq, Debug)]
 pub struct ResourceId(u64);
@@ -17,9 +17,9 @@ impl From<u64> for ResourceId {
     }
 }
 
-impl Into<u64> for ResourceId {
-    fn into(self) -> u64 {
-        self.0
+impl From<ResourceId> for u64 {
+    fn from(val: ResourceId) -> Self {
+        val.0
     }
 }
 

@@ -5,7 +5,7 @@
 
 extern crate alloc;
 
-use alloc::string::ToString;
+
 
 use kernel_api::println;
 use kernel_api::syscall::{duplicate, execute, fork, open, wait};

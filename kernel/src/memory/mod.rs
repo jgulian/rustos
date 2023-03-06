@@ -62,27 +62,24 @@ impl VMManager {
 
         // (ref. D7.2.70: Memory Attribute Indirection Register)
         MAIR_EL1.set(
-            (0xFF << 0) |// AttrIdx=0: normal, IWBWA, OWBWA, NTR
+            0xFF |// AttrIdx=0: normal, IWBWA, OWBWA, NTR
                 (0x04 << 8) |// AttrIdx=1: device, nGnRE (must be OSH too)
                 (0x44 << 16), // AttrIdx=2: non cacheable
         );
 
         // (ref. D7.2.91: Translation Control Register)
         TCR_EL1.set(
-            (0b00 << 37) | // TBI=0, no tagging
-                (ips << 32) | // IPS
+            (ips << 32) | // IPS
                 (0b11 << 30) | // TG1=64k
                 (0b11 << 28) | // SH1=3 inner
                 (0b01 << 26) | // ORGN1=1 write back
-                (0b01 << 24) | // IRGN1=1 write back
-                (0b0 << 23) | // EPD1 enables higher half
+                (0b01 << 24) | // EPD1 enables higher half
                 ((USER_MASK_BITS as u64) << 16) | // T1SZ=34 (1GB)
                 (0b01 << 14) | // TG0=64k
                 (0b11 << 12) | // SH0=3 inner
                 (0b01 << 10) | // ORGN0=1 write back
-                (0b01 << 8) | // IRGN0=1 write back
-                (0b0 << 7) | // EPD0 enables lower half
-                ((KERNEL_MASK_BITS as u64) << 0), // T0SZ=31 (8GB)
+                (0b01 << 8) | // EPD0 enables lower half
+                (KERNEL_MASK_BITS as u64), // T0SZ=31 (8GB)
         );
         isb();
 
@@ -125,15 +122,13 @@ impl VMManager {
 
     pub fn pin_frame(&self, physical_address: PhysicalAddr) {
         let mut reference_counts = self.frame_reference_counts.lock();
-        let new_reference_count = reference_counts.get(&physical_address)
-            .map(|x| *x).unwrap_or(0usize) + 1;
+        let new_reference_count = reference_counts.get(&physical_address).copied().unwrap_or(0usize) + 1;
         reference_counts.insert( physical_address, new_reference_count);
     }
 
     pub fn unpin_frame(&self, physical_address: PhysicalAddr) -> bool {
         let mut reference_counts = self.frame_reference_counts.lock();
-        let new_reference_count = reference_counts.get(&physical_address)
-            .map(|x| *x).unwrap_or(0usize) - 1;
+        let new_reference_count = reference_counts.get(&physical_address).copied().unwrap_or(0usize) - 1;
         if new_reference_count == 0 {
             reference_counts.remove(&physical_address);
             true
@@ -145,6 +140,6 @@ impl VMManager {
 
     pub fn get_frame_pin_count(&self, physical_address: PhysicalAddr) -> usize  {
         self.frame_reference_counts.lock()
-            .get(&physical_address).map(|x| *x).unwrap_or(0usize)
+            .get(&physical_address).copied().unwrap_or(0usize)
     }
 }

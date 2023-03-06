@@ -7,7 +7,7 @@ use kernel_api::*;
 use kernel_api::OsError::BadAddress;
 use pi::timer;
 
-use crate::{kprintln, SCHEDULER};
+use crate::{SCHEDULER};
 use crate::memory::{PagePermissions, VirtualAddr};
 use crate::param::{PAGE_SIZE, USER_IMG_BASE};
 use crate::process::{ResourceId, State};
@@ -23,7 +23,7 @@ use crate::traps::TrapFrame;
 pub fn sys_sleep(tf: &mut TrapFrame) -> OsResult<()> {
     let ms = tf.xs[0];
     let started = timer::current_time();
-    let sleep_until = started + Duration::from_millis(ms as u64);
+    let sleep_until = started + Duration::from_millis(ms);
 
     let waiting = State::Waiting(Box::new(move |process| {
         let current_time = timer::current_time();

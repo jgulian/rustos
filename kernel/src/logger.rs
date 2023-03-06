@@ -23,7 +23,7 @@ impl log::Log for KernelLogger {
 pub unsafe fn init_logger() {
     log::set_logger_racy(&LOGGER)
         .map(|()| {
-            log::set_max_level(if let Some(_) = option_env!("VERBOSE_BUILD") {
+            log::set_max_level(if option_env!("VERBOSE_BUILD").is_some() {
                 LevelFilter::Trace
             } else {
                 LevelFilter::Debug

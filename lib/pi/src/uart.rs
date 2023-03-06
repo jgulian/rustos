@@ -1,7 +1,7 @@
 use core::fmt;
 use core::time::Duration;
 
-use filesystem::CharDevice;
+
 use shim::io;
 use shim::ioerr;
 use volatile::{Reserved, Volatile};

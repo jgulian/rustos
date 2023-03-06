@@ -4,7 +4,7 @@ use core::alloc::{GlobalAlloc, Layout};
 use core::fmt::Formatter;
 use core::iter::Chain;
 use core::ops::{Deref, DerefMut, Sub};
-use core::ptr::{slice_from_raw_parts, slice_from_raw_parts_mut};
+
 use core::slice;
 use core::slice::Iter;
 
@@ -14,7 +14,7 @@ use kernel_api::{OsError, OsResult};
 use shim::{const_assert_size, io, ioerr};
 
 use crate::{ALLOCATOR, VMM};
-use crate::console::kprintln;
+
 use crate::memory::{PhysicalAddr, VirtualAddr};
 use crate::param::*;
 
@@ -126,9 +126,9 @@ impl From<RawL3Entry> for L3Entry {
     }
 }
 
-impl Into<RawL3Entry> for L3Entry {
-    fn into(self) -> RawL3Entry {
-        self.0
+impl From<L3Entry> for RawL3Entry {
+    fn from(val: L3Entry) -> Self {
+        val.0
     }
 }
 
@@ -292,8 +292,8 @@ impl KernPageTable {
             let address = page_start + PAGE_SIZE * i;
             let mut entry = RawL3Entry::new(0);
             entry.set_value(address as u64 >> PAGE_ALIGN, RawL3Entry::ADDR);
-            entry.set_value(EntrySh::ISh as u64, RawL3Entry::SH);
-            entry.set_value(EntryPerm::KERN_RW as u64, RawL3Entry::AP);
+            entry.set_value(EntrySh::ISh, RawL3Entry::SH);
+            entry.set_value(EntryPerm::KERN_RW, RawL3Entry::AP);
             entry.set_value(EntryAttr::Mem, RawL3Entry::ATTR);
             entry.set_value(EntryType::Table, RawL3Entry::TYPE);
             entry.set_value(EntryValid::Valid, RawL3Entry::VALID);
@@ -309,8 +309,8 @@ impl KernPageTable {
             let address = device_start + PAGE_SIZE * i;
             let mut entry = RawL3Entry::new(0);
             entry.set_value(address as u64 >> PAGE_ALIGN, RawL3Entry::ADDR);
-            entry.set_value(EntrySh::OSh as u64, RawL3Entry::SH);
-            entry.set_value(EntryPerm::KERN_RW as u64, RawL3Entry::AP);
+            entry.set_value(EntrySh::OSh, RawL3Entry::SH);
+            entry.set_value(EntryPerm::KERN_RW, RawL3Entry::AP);
             entry.set_value(EntryAttr::Dev, RawL3Entry::ATTR);
             entry.set_value(EntryType::Table, RawL3Entry::TYPE);
             entry.set_value(EntryValid::Valid, RawL3Entry::VALID);
@@ -335,9 +335,7 @@ impl UserPageTable {
     /// Returns a new `UserPageTable` containing a `PageTable` created with
     /// `USER_RW` permission.
     pub fn new() -> UserPageTable {
-        UserPageTable {
-            0: PageTable::new(EntryPerm::USER_RW)
-        }
+        UserPageTable(PageTable::new(EntryPerm::USER_RW))
     }
 
     /// Allocates a page and set an L3 entry translates given virtual address to the
@@ -365,7 +363,7 @@ impl UserPageTable {
 
         let mut raw_l3_entry = RawL3Entry::new(0);
         raw_l3_entry.set_value(address >> PAGE_ALIGN, RawL3Entry::ADDR);
-        raw_l3_entry.set_value(EntrySh::ISh as u64, RawL3Entry::SH);
+        raw_l3_entry.set_value(EntrySh::ISh, RawL3Entry::SH);
         raw_l3_entry.set_value(EntryAttr::Mem, RawL3Entry::ATTR);
         raw_l3_entry.set_value(EntryType::Table, RawL3Entry::TYPE);
         raw_l3_entry.set_value(EntryValid::Valid, RawL3Entry::VALID);
@@ -470,7 +468,7 @@ impl UserPageTable {
     }
 
     pub fn translate(&self, virtual_address: VirtualAddr) -> io::Result<PhysicalAddr> {
-        let page_aligned = VirtualAddr::from(virtual_address.page_aligned());
+        let page_aligned = virtual_address.page_aligned();
         let (l2_index, l3_index) = PageTable::locate(page_aligned);
         let l3_entry = &self.l3[l2_index].entries[l3_index];
         if l3_entry.is_valid() {

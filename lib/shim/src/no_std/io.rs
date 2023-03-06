@@ -1,5 +1,8 @@
+#[cfg(feature = "alloc")]
 use alloc::boxed::Box;
+#[cfg(feature = "alloc")]
 use alloc::vec::Vec;
+
 use core::{cmp, result};
 use core::fmt::{Debug, Formatter};
 
@@ -132,6 +135,7 @@ pub trait Read {
         Ok(())
     }
 
+    #[cfg(feature = "alloc")]
     fn read_to_end(&mut self, buf: &mut Vec<u8>) -> Result<usize> {
         let starting_size = buf.len();
         while {
@@ -220,12 +224,14 @@ fn read_with_buf(buf: &mut [u8], position: &mut u64, target: &mut [u8]) -> Resul
     Ok(read)
 }
 
+#[cfg(feature = "alloc")]
 impl Read for Cursor<Box<[u8]>> {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
         read_with_buf((*self.data).as_mut(), &mut self.position, buf)
     }
 }
 
+#[cfg(feature = "alloc")]
 impl Read for Cursor<Vec<u8>> {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
         read_with_buf(self.data.as_mut_slice(), &mut self.position, buf)
@@ -238,6 +244,7 @@ impl Read for Cursor<&mut [u8]> {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl Read for Cursor<&mut Vec<u8>> {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
         read_with_buf(self.data.as_mut_slice(), &mut self.position, buf)
@@ -266,6 +273,7 @@ fn write_with_buf(buf: &mut [u8], position: &mut u64, target: &[u8]) -> Result<u
     Ok(written)
 }
 
+#[cfg(feature = "alloc")]
 impl Write for Cursor<Vec<u8>> {
     fn write(&mut self, buf: &[u8]) -> Result<usize> {
         write_with_buf(self.data.as_mut_slice(), &mut self.position, buf)
@@ -276,6 +284,7 @@ impl Write for Cursor<Vec<u8>> {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl Write for Cursor<Box<[u8]>> {
     fn write(&mut self, buf: &[u8]) -> Result<usize> {
         write_with_buf((*self.data).as_mut(), &mut self.position, buf)
@@ -296,7 +305,7 @@ impl Write for Cursor<&mut [u8]> {
     }
 }
 
-
+#[cfg(feature = "alloc")]
 impl Write for Cursor<&mut Vec<u8>> {
     fn write(&mut self, buf: &[u8]) -> Result<usize> {
         write_with_buf(self.data.as_mut_slice(), &mut self.position, buf)
