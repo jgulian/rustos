@@ -3,8 +3,6 @@
 #[cfg(feature = "no_std")]
 extern crate alloc;
 
-extern crate core;
-
 pub(crate) mod cluster;
 pub(crate) mod fat;
 pub(crate) mod ebpb;
