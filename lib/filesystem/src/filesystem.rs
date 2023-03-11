@@ -19,7 +19,26 @@ use crate::path::{Component, Path};
 type BoxedFile = Box<dyn File>;
 type BoxedDirectory = Box<dyn Directory>;
 
-pub trait Metadata {}
+pub trait Timestamp {
+    fn year(&self) -> usize;
+    fn month(&self) -> u8;
+    fn day(&self) -> u8;
+    fn hour(&self) -> u8;
+    fn minute(&self) -> u8;
+    fn second(&self) -> u8;
+}
+
+pub trait Metadata {
+    fn read_only(&self) -> bool;
+
+    fn hidden(&self) -> bool;
+
+    fn created(&self) -> Box<dyn Timestamp>;
+
+    fn accessed(&self) -> Box<dyn Timestamp>;
+
+    fn modified(&self) -> Box<dyn Timestamp>;
+}
 
 pub trait File: io::Seek + io::Read + io::Write {}
 
@@ -76,18 +95,16 @@ impl Entry {
 }
 
 pub trait Filesystem {
-
-
     fn root(&mut self) -> io::Result<BoxedDirectory>;
 
     fn open(&mut self, path: &Path) -> io::Result<Entry> {
-        let mut components = vec![];
+        let mut components = Vec::new();
 
         for component in path.components() {
             match component {
                 Component::Root => {
                     components.push(Entry::Directory(self.root()?));
-                },
+                }
                 Component::Parent => {
                     components.pop().ok_or(io::Error::from(io::ErrorKind::NotFound))?;
                 }
@@ -97,7 +114,7 @@ pub trait Filesystem {
                         .ok_or(io::Error::from(io::ErrorKind::NotFound))
                         .map(|entry| entry.as_directory()?.open_entry(child.as_str()))??;
                     components.push(new_entry);
-                },
+                }
             }
         }
 

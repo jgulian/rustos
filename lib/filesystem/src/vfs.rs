@@ -34,13 +34,13 @@ struct Mount {
 #[derive(Clone)]
 struct Mounts(Arc<RefCell<Vec<Mount>>>);
 
-pub struct VirtualFileSystem {
+pub struct VirtualFilesystem {
     mounts: Mounts,
 }
 
-impl VirtualFileSystem {
+impl VirtualFilesystem {
     pub fn new() -> Self {
-        VirtualFileSystem {
+        VirtualFilesystem {
             mounts: Mounts(Arc::new(RefCell::new(Vec::new()))),
         }
     }
@@ -53,7 +53,7 @@ impl VirtualFileSystem {
     }
 }
 
-impl Filesystem for VirtualFileSystem {
+impl Filesystem for VirtualFilesystem {
     fn root(&mut self) -> io::Result<Box<dyn Directory>> {
         Ok(Box::new(VFSDirectory {
             path: Path::default(),
@@ -112,13 +112,13 @@ impl Directory for VFSDirectory {
 
     fn list(&mut self) -> io::Result<Vec<String>> {
         self.mounts.0.as_ref().borrow_mut().iter_mut()
-            .try_fold(vec![], |mut result: Vec<String>, mount| {
+            .try_fold(Vec::new(), |mut result: Vec<String>, mount| {
                 match self.path.relative_from(&mount.mount_point) {
                     Some(sub_path) => {
                         let entries = mount.filesystem.open(&sub_path)
                             .and_then(|entry| entry.into_directory())
                             .map(|mut directory| directory.list())
-                            .unwrap_or(Ok(vec![]))?;
+                            .unwrap_or(Ok(Vec::new()))?;
                         result.extend(entries.into_iter());
                     }
                     None => {}

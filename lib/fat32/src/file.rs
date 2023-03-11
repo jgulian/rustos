@@ -1,20 +1,21 @@
+
 use alloc::string::String;
 
 use filesystem;
 use shim::io::{self, SeekFrom};
-
-use crate::vfat::{Cluster, Metadata, Status, VFatHandle};
-use crate::vfat::vfat::Chain;
+use crate::chain::Chain;
+use crate::cluster::Cluster;
+use crate::fat::Status;
 
 #[derive(Debug, Clone)]
-pub struct File<HANDLE: VFatHandle> {
-    pub name: String,
-    pub metadata: Metadata,
-    pub file_size: u32,
-    pub(crate) chain: Chain<HANDLE>,
+pub struct File {
+    name: String,
+    metadata: Metadata,
+    file_size: u64,
+    chain: Chain,
 }
 
-impl<HANDLE: VFatHandle> File<HANDLE> {
+impl File {
     fn new(vfat: HANDLE, name: String) -> io::Result<Self> {
         let cluster = vfat.lock(|vfat| -> io::Result<Cluster> {
             let cluster = vfat.next_free_cluster()?;
@@ -31,17 +32,7 @@ impl<HANDLE: VFatHandle> File<HANDLE> {
     }
 }
 
-impl<HANDLE: VFatHandle> filesystem::File for File<HANDLE> {
-    fn sync(&mut self) -> io::Result<()> {
-        unimplemented!("not required")
-    }
-
-    fn size(&self) -> u64 {
-        self.file_size as u64
-    }
-}
-
-impl<HANDLE: VFatHandle> io::Write for File<HANDLE> {
+impl io::Write for File {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.chain.write(buf)
     }
@@ -52,13 +43,13 @@ impl<HANDLE: VFatHandle> io::Write for File<HANDLE> {
 }
 
 
-impl<HANDLE: VFatHandle> io::Read for File<HANDLE> {
+impl io::Read for File {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.chain.read(buf)
     }
 }
 
-impl<HANDLE: VFatHandle> io::Seek for File<HANDLE> {
+impl io::Seek for File {
     /// Seek to offset `pos` in the file.
     ///
     /// A seek to the end of the file is allowed. A seek _beyond_ the end of the
@@ -72,7 +63,7 @@ impl<HANDLE: VFatHandle> io::Seek for File<HANDLE> {
     ///
     /// Seeking before the start of a file or beyond the end of the file results
     /// in an `InvalidInput` error.
-    fn seek(&mut self, _pos: SeekFrom) -> io::Result<u64> {
-        unimplemented!("File::seek()")
+    fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
+        self.chain.seek(pos)
     }
 }

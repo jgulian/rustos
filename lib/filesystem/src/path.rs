@@ -1,7 +1,11 @@
 #[cfg(feature = "no_std")]
 use alloc::string::String;
+#[cfg(feature = "no_std")]
+use alloc::vec::Vec;
 #[cfg(not(feature = "no_std"))]
 use std::string::String;
+#[cfg(not(feature = "no_std"))]
+use std::vec::Vec;
 
 use core::fmt::{Display, Formatter};
 
@@ -18,7 +22,7 @@ pub struct Path(String);
 
 impl Path {
     fn new(components: Vec<Component>) -> Path {
-        let mut path = Path("".to_string());
+        let mut path = Path(String::new());
         for component in components {
             path.push_component(component)
         }

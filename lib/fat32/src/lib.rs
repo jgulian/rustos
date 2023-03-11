@@ -1,14 +1,15 @@
-#![feature(decl_macro)]
 #![cfg_attr(feature = "no_std", no_std)]
 
-#[macro_use]
+#[cfg(feature = "no_std")]
 extern crate alloc;
-#[cfg(not(feature = "no_std"))]
+
 extern crate core;
 
-#[cfg(test)]
-mod tests;
-mod util;
-
-pub mod vfat;
+pub(crate) mod cluster;
+pub(crate) mod fat;
+pub(crate) mod ebpb;
+pub(crate) mod file;
+pub(crate) mod metadata;
+pub(crate) mod chain;
+pub(crate) mod vfat;
 

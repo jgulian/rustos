@@ -1,8 +1,9 @@
+
+use alloc::boxed::Box;
 use core::fmt::{Debug, Formatter};
-use shim::io;
 use format::Format;
-use shim::io::Cursor;
 use crate::device::BlockDevice;
+use crate::error::FilesystemError;
 
 #[derive(Copy, Clone, Format)]
 pub struct CHS {
@@ -53,21 +54,10 @@ pub struct MasterBootRecord {
     pub valid_boot_sector: [u8; 2],
 }
 
-#[derive(Debug)]
-pub enum MbrError {
-    /// There was an I/O error while reading the MBR.
-    Io(io::Error),
-    /// Partition `.0` (0-indexed) contains an invalid or unknown boot indicator.
-    UnknownBootIndicator(u8),
-    /// The MBR magic signature was invalid.
-    BadSignature,
-}
+impl TryFrom<&mut Box<dyn BlockDevice>> for MasterBootRecord {
+    type Error = FilesystemError;
 
-//TODO: use MBRError again
 
-pub type MbrResult<T> = core::result::Result<T, MbrError>;
-
-impl MasterBootRecord {
     /// Reads and returns the master boot record (MBR) from `device`.
     ///
     /// # Errors
@@ -76,21 +66,20 @@ impl MasterBootRecord {
     /// Returns `UnknownBootIndicator(n)` if partition `n` contains an invalid
     /// boot indicator. Returns `Io(err)` if the I/O error `err` occured while
     /// reading the MBR.
-    pub fn from(device: &mut dyn BlockDevice) -> MbrResult<MasterBootRecord> {
+    fn try_from(value: &mut Box<dyn BlockDevice>) -> Result<Self, Self::Error> {
         let mut buffer: [u8; 512] = [0; 512];
-        device.read_block(0, &mut buffer).map_err(|e| MbrError::Io(e))?;
+        value.read_block(0, &mut buffer)?;
 
-        let master_boot_record = MasterBootRecord::load_readable_seekable(&mut Cursor::new(buffer.as_mut_slice()))
-            .map_err(|e| MbrError::Io(e))?;
+        let master_boot_record = MasterBootRecord::load_slice(&buffer)?;
 
         if master_boot_record.valid_boot_sector[0] != 0x55 ||
             master_boot_record.valid_boot_sector[1] != 0xAA {
-            return Err(MbrError::BadSignature);
+            return Err(FilesystemError::BadSignature);
         }
 
         for (i, partition) in master_boot_record.partition_table.iter().enumerate() {
             if partition.boot_indicator != 0 && partition.boot_indicator != 0x80 {
-                return Err(MbrError::UnknownBootIndicator(i as u8));
+                return Err(FilesystemError::UnknownBootIndicator(i as u8));
             }
         }
 

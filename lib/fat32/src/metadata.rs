@@ -1,10 +1,11 @@
+use alloc::boxed::Box;
+use core::borrow::Borrow;
 use core::fmt;
 use core::fmt::Formatter;
 
 use filesystem;
 
 /// A date as represented in FAT32 on-disk structures.
-#[repr(C, packed)]
 #[derive(Default, Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Date(u16);
 
@@ -23,7 +24,6 @@ impl Date {
 }
 
 /// Time as represented in FAT32 on-disk structures.
-#[repr(C, packed)]
 #[derive(Default, Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Time(u16);
 
@@ -41,16 +41,11 @@ impl Time {
     }
 }
 
-/// File attributes as represented in FAT32 on-disk structures.
-#[repr(C, packed)]
-#[derive(Default, Debug, Copy, Clone, PartialEq, Eq)]
-pub struct Attributes(u8);
-
 /// A structure containing a date and time.
-#[derive(Default, Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Default, Copy, Clone, PartialEq, Eq)]
 pub struct Timestamp {
-    pub time: Time,
-    pub date: Date,
+    time: Time,
+    date: Date,
 }
 
 impl From<Date> for Timestamp {
@@ -62,7 +57,7 @@ impl From<Date> for Timestamp {
     }
 }
 
-impl filesystem::Timestamp for Timestamp {
+impl filesystem::filesystem::Timestamp for Timestamp {
     fn year(&self) -> usize {
         self.date.year()
     }
@@ -88,9 +83,9 @@ impl filesystem::Timestamp for Timestamp {
     }
 }
 
-impl fmt::Display for Timestamp {
+impl fmt::Debug for Timestamp {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        use filesystem::Timestamp;
+        use filesystem::filesystem::Timestamp;
         f.debug_struct("Timestamp")
             .field("year", &self.year())
             .field("month", &self.month())
@@ -103,7 +98,7 @@ impl fmt::Display for Timestamp {
 }
 
 /// Metadata for a directory entry.
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Clone)]
 pub struct Metadata {
     pub attributes: u8,
     pub created: Timestamp,
@@ -111,9 +106,7 @@ pub struct Metadata {
     pub last_modification: Timestamp,
 }
 
-impl filesystem::Metadata for Metadata {
-    type Timestamp = Timestamp;
-
+impl filesystem::filesystem::Metadata for Metadata {
     fn read_only(&self) -> bool {
         self.attributes & (0b1) > 0
     }
@@ -122,28 +115,28 @@ impl filesystem::Metadata for Metadata {
         self.attributes & (0b10) > 0
     }
 
-    fn created(&self) -> Self::Timestamp {
-        self.created
+    fn created(&self) -> Box<dyn filesystem::filesystem::Timestamp> {
+        Box::new(self.created)
     }
 
-    fn accessed(&self) -> Self::Timestamp {
-        self.last_access
+    fn accessed(&self) -> Box<dyn filesystem::filesystem::Timestamp> {
+        Box::new(self.last_access)
     }
 
-    fn modified(&self) -> Self::Timestamp {
-        self.last_modification
+    fn modified(&self) -> Box<dyn filesystem::filesystem::Timestamp> {
+        Box::new(self.last_modification)
     }
 }
 
-impl fmt::Display for Metadata {
+impl fmt::Debug for Metadata {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        use filesystem::Metadata;
+        use filesystem::filesystem::Metadata;
         f.debug_struct("Metadata")
             .field("read_only", &self.read_only())
             .field("hidden", &self.hidden())
-            .field("created", &self.created())
-            .field("accessed", &self.accessed())
-            .field("modified", &self.modified())
+            //.field("created", self.created().borrow())
+            //.field("accessed", self.accessed().borrow())
+            //.field("modified", self.modified().borrow())
             .finish()
     }
 }

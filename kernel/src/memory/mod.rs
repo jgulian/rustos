@@ -123,14 +123,7 @@ impl VMManager {
 
     pub fn pin_frame(&self, physical_address: PhysicalAddr) {
         let mut reference_counts = self.frame_reference_counts.lock();
-        match reference_counts.entry(physical_address) {
-            Entry::Occupied(mut entry) => {
-                *entry.get_mut() = entry.get() + 1;
-            }
-            Entry::Vacant(entry) => {
-                entry.insert(1);
-            }
-        }
+        *reference_counts.entry(physical_address).or_insert(0) += 1;
     }
 
     pub fn unpin_frame(&self, physical_address: PhysicalAddr) -> bool {
