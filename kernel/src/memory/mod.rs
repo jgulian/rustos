@@ -1,3 +1,4 @@
+use alloc::collections::btree_map::Entry;
 use alloc::collections::BTreeMap;
 use core::arch::asm;
 use core::sync::atomic::{AtomicUsize, Ordering};
@@ -122,19 +123,32 @@ impl VMManager {
 
     pub fn pin_frame(&self, physical_address: PhysicalAddr) {
         let mut reference_counts = self.frame_reference_counts.lock();
-        let new_reference_count = reference_counts.get(&physical_address).copied().unwrap_or(0usize) + 1;
-        reference_counts.insert( physical_address, new_reference_count);
+        match reference_counts.entry(physical_address) {
+            Entry::Occupied(mut entry) => {
+                *entry.get_mut() = entry.get() + 1;
+            }
+            Entry::Vacant(entry) => {
+                entry.insert(1);
+            }
+        }
     }
 
     pub fn unpin_frame(&self, physical_address: PhysicalAddr) -> bool {
         let mut reference_counts = self.frame_reference_counts.lock();
-        let new_reference_count = reference_counts.get(&physical_address).copied().unwrap_or(0usize) - 1;
-        if new_reference_count == 0 {
-            reference_counts.remove(&physical_address);
-            true
-        } else {
-            reference_counts.insert( physical_address, new_reference_count);
-            false
+        match reference_counts.entry(physical_address) {
+            Entry::Occupied(mut e) => {
+                match *e.get() {
+                    1 => {
+                        e.remove();
+                        true
+                    }
+                    x => {
+                        *e.get_mut() = x - 1;
+                        false
+                    }
+                }
+            }
+            Entry::Vacant(_) => {}
         }
     }
 

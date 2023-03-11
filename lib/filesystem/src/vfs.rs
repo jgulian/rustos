@@ -1,30 +1,38 @@
+#[cfg(feature = "no_std")]
 use alloc::boxed::Box;
-use alloc::rc::Rc;
+#[cfg(feature = "no_std")]
 use alloc::string::String;
-use alloc::string::ToString;
+#[cfg(feature = "no_std")]
 use alloc::sync::Arc;
-use alloc::vec;
+#[cfg(feature = "no_std")]
 use alloc::vec::Vec;
-use core::borrow::{Borrow, BorrowMut};
+#[cfg(not(feature = "no_std"))]
+use std::boxed::Box;
+#[cfg(not(feature = "no_std"))]
+use std::string::String;
+#[cfg(not(feature = "no_std"))]
+use std::sync::Arc;
+#[cfg(not(feature = "no_std"))]
+use std::vec::Vec;
+
 use core::cell::RefCell;
-use core::ops::{Deref, DerefMut};
 
 use shim::{io, ioerr, newioerr};
 use shim::io::{Error, ErrorKind};
-
-use crate::{BlockDevice, fs2};
-use crate::fs2::{Directory2, Entry2, FileSystem2, Metadata2};
+use crate::device::BlockDevice;
+use crate::filesystem::{Directory, Entry, File, Filesystem, Metadata};
 use crate::mbr::PartitionEntry;
-use crate::path::{Component, Path};
+
+use crate::path::Path;
 
 struct Mount {
     mount_point: Path,
-    filesystem: Box<dyn FileSystem2>,
+    filesystem: Box<dyn Filesystem>,
 }
 
 //TODO: this is not thread safe
 #[derive(Clone)]
-struct Mounts(Arc<RefCell<Vec::<Mount>>>);
+struct Mounts(Arc<RefCell<Vec<Mount>>>);
 
 pub struct VirtualFileSystem {
     mounts: Mounts,
@@ -37,7 +45,7 @@ impl VirtualFileSystem {
         }
     }
 
-    pub fn mount(&mut self, mount_point: Path, filesystem: Box<dyn FileSystem2>) {
+    pub fn mount(&mut self, mount_point: Path, filesystem: Box<dyn Filesystem>) {
         self.mounts.0.as_ref().borrow_mut().push(Mount {
             mount_point,
             filesystem,
@@ -45,19 +53,15 @@ impl VirtualFileSystem {
     }
 }
 
-impl FileSystem2 for VirtualFileSystem {
-    fn root(&mut self) -> io::Result<Box<dyn Directory2>> {
+impl Filesystem for VirtualFileSystem {
+    fn root(&mut self) -> io::Result<Box<dyn Directory>> {
         Ok(Box::new(VFSDirectory {
-            path: Path::root(),
+            path: Path::default(),
             mounts: self.mounts.clone(),
         }))
     }
 
-    fn copy_entry(&mut self, source: &Path, destination: &Path) -> io::Result<()> {
-        todo!()
-    }
-
-    fn format(device: &mut dyn BlockDevice, partition: &mut PartitionEntry, sector_size: usize) -> io::Result<()> where Self: Sized {
+    fn format(_: &mut dyn BlockDevice, _: &mut PartitionEntry, _: usize) -> io::Result<()> where Self: Sized {
         Err(Error::from(ErrorKind::Unsupported))
     }
 }
@@ -67,38 +71,38 @@ struct VFSDirectory {
     mounts: Mounts,
 }
 
-impl Directory2 for VFSDirectory {
-    fn open_entry(&mut self, name: &str) -> io::Result<Entry2> {
+impl Directory for VFSDirectory {
+    fn open_entry(&mut self, name: &str) -> io::Result<Entry> {
         let mut new_path = self.path.clone();
-        new_path.append_child(name.to_string());
+        new_path.join_str(name);
 
         let mounts = self.mounts.clone();
-        let result = mounts.0.as_ref().borrow_mut().iter_mut()
+        let mut mounts_borrow = mounts.0.as_ref().borrow_mut();
+        mounts_borrow.iter_mut()
             .filter(|mount| mount.mount_point.starts_with(&self.path))
-            .find_map(|mount| -> Option<Entry2> {
+            .find_map(|mount| -> Option<Entry> {
                 if mount.mount_point == self.path {
                     let mut thing = mount.filesystem.root().ok()?;
                     thing.open_entry(name).ok()
                 } else if mount.mount_point.starts_with(&new_path) {
-                    Some(Entry2::Directory(Box::new(VFSDirectory {
+                    Some(Entry::Directory(Box::new(VFSDirectory {
                         path: new_path.clone(),
                         mounts: self.mounts.clone(),
                     })))
                 } else {
                     None
                 }
-            }).ok_or(newioerr!(NotFound));
-        result
+            }).ok_or(newioerr!(NotFound))
     }
 
-    fn create_file(&mut self, name: &str) -> io::Result<()> {
+    fn create_file(&mut self, name: &str) -> io::Result<Box<dyn File>> {
         self.mounts.0.as_ref().borrow_mut().iter_mut()
             .filter(|mount| mount.mount_point == self.path)
             .next().map(|mount| mount.filesystem.root()?.create_file(name))
             .unwrap_or(ioerr!(Unsupported))
     }
 
-    fn create_directory(&mut self, name: &str) -> io::Result<()> {
+    fn create_directory(&mut self, _: &str) -> io::Result<Box<dyn Directory>> {
         ioerr!(Unsupported)
     }
 
@@ -108,33 +112,23 @@ impl Directory2 for VFSDirectory {
 
     fn list(&mut self) -> io::Result<Vec<String>> {
         self.mounts.0.as_ref().borrow_mut().iter_mut()
-            .filter(|mount| mount.mount_point.starts_with(&self.path))
-            .fold(Ok(Vec::new()), |wrapped_result, mount| {
-                let mut result = wrapped_result?;
-
-                if let Some(component) = mount.mount_point.at(self.path.len() + 1) {
-                    match component {
-                        Component::Child(child) => {
-                            result.push(child)
-                        }
-                        _ => {}
+            .try_fold(vec![], |mut result: Vec<String>, mount| {
+                match self.path.relative_from(&mount.mount_point) {
+                    Some(sub_path) => {
+                        let entries = mount.filesystem.open(&sub_path)
+                            .and_then(|entry| entry.into_directory())
+                            .map(|mut directory| directory.list())
+                            .unwrap_or(Ok(vec![]))?;
+                        result.extend(entries.into_iter());
                     }
-                } else {
-                    if let Ok(mut fs) = mount.filesystem.root() {
-                        result.extend(fs.list()?.iter().map(|s| s.clone()))
-                    }
+                    None => {}
                 }
 
                 Ok(result)
             })
     }
 
-    fn metadata(&mut self, _: &str) -> io::Result<Box<dyn Metadata2>> {
+    fn metadata(&mut self, _: &str) -> io::Result<Box<dyn Metadata>> {
         ioerr!(Unsupported)
     }
 }
-
-//TODO: remove
-unsafe impl Sync for VirtualFileSystem {}
-
-unsafe impl Send for VirtualFileSystem {}

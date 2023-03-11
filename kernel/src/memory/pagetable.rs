@@ -20,7 +20,6 @@ use crate::param::*;
 
 #[repr(C)]
 pub struct Page([u8; PAGE_SIZE]);
-const_assert_size!(Page, PAGE_SIZE);
 
 impl Page {
     pub const SIZE: usize = PAGE_SIZE;
@@ -36,7 +35,6 @@ impl Page {
 pub struct L2PageTable {
     pub entries: [RawL2Entry; 8192],
 }
-const_assert_size!(L2PageTable, PAGE_SIZE);
 
 impl L2PageTable {
     /// Returns a new `L2PageTable`

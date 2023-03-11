@@ -1,0 +1,111 @@
+#[cfg(feature = "no_std")]
+use alloc::boxed::Box;
+#[cfg(feature = "no_std")]
+use alloc::string::String;
+#[cfg(feature = "no_std")]
+use alloc::vec::Vec;
+#[cfg(not(feature = "no_std"))]
+use std::boxed::Box;
+#[cfg(not(feature = "no_std"))]
+use std::string::String;
+#[cfg(not(feature = "no_std"))]
+use std::vec::Vec;
+
+use shim::io;
+use crate::device::BlockDevice;
+use crate::mbr::PartitionEntry;
+use crate::path::{Component, Path};
+
+type BoxedFile = Box<dyn File>;
+type BoxedDirectory = Box<dyn Directory>;
+
+pub trait Metadata {}
+
+pub trait File: io::Seek + io::Read + io::Write {}
+
+pub trait Directory {
+    fn open_entry(&mut self, name: &str) -> io::Result<Entry>;
+    fn create_file(&mut self, name: &str) -> io::Result<BoxedFile>;
+    fn create_directory(&mut self, name: &str) -> io::Result<BoxedDirectory>;
+    fn remove(&mut self, name: &str) -> io::Result<()>;
+    fn list(&mut self) -> io::Result<Vec<String>>;
+    fn metadata(&mut self, name: &str) -> io::Result<Box<dyn Metadata>>;
+
+    fn exists(&mut self, name: &str) -> io::Result<bool> {
+        match self.open_entry(name) {
+            Ok(_) => Ok(true),
+            Err(ref e) if e.kind() == io::ErrorKind::NotFound => Ok(false),
+            Err(e) => Err(e)
+        }
+    }
+}
+
+pub enum Entry {
+    File(BoxedFile),
+    Directory(BoxedDirectory),
+}
+
+impl Entry {
+    pub fn into_file(self) -> io::Result<BoxedFile> {
+        match self {
+            Entry::File(file) => Ok(file),
+            Entry::Directory(_) => Err(io::Error::from(io::ErrorKind::InvalidData)),
+        }
+    }
+
+    pub fn into_directory(self) -> io::Result<BoxedDirectory> {
+        match self {
+            Entry::File(_) => Err(io::Error::from(io::ErrorKind::InvalidData)),
+            Entry::Directory(directory) => Ok(directory),
+        }
+    }
+
+    pub fn as_file(&mut self) -> io::Result<&mut BoxedFile> {
+        match self {
+            Entry::File(file) => Ok(file),
+            Entry::Directory(_) => Err(io::Error::from(io::ErrorKind::InvalidData)),
+        }
+    }
+
+    pub fn as_directory(&mut self) -> io::Result<&mut BoxedDirectory> {
+        match self {
+            Entry::File(_) => Err(io::Error::from(io::ErrorKind::InvalidData)),
+            Entry::Directory(directory) => Ok(directory),
+        }
+    }
+}
+
+pub trait Filesystem {
+
+
+    fn root(&mut self) -> io::Result<BoxedDirectory>;
+
+    fn open(&mut self, path: &Path) -> io::Result<Entry> {
+        let mut components = vec![];
+
+        for component in path.components() {
+            match component {
+                Component::Root => {
+                    components.push(Entry::Directory(self.root()?));
+                },
+                Component::Parent => {
+                    components.pop().ok_or(io::Error::from(io::ErrorKind::NotFound))?;
+                }
+                Component::Current => {}
+                Component::Child(child) => {
+                    let new_entry = components.last_mut()
+                        .ok_or(io::Error::from(io::ErrorKind::NotFound))
+                        .map(|entry| entry.as_directory()?.open_entry(child.as_str()))??;
+                    components.push(new_entry);
+                },
+            }
+        }
+
+        components.pop()
+            .map(|entry| Ok(entry))
+            .unwrap_or(Err(io::Error::from(io::ErrorKind::NotFound)))
+    }
+
+    fn format(device: &mut dyn BlockDevice, partition: &mut PartitionEntry, sector_size: usize) -> io::Result<()> where Self: Sized;
+}
+

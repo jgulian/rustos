@@ -2,21 +2,14 @@
 
 #![feature(decl_macro)]
 
+#[cfg(feature = "no_std")]
 extern crate alloc;
 
-pub use self::devices::{BlockDevice, CharDevice};
-pub use self::metadata::{Metadata, Timestamp};
-pub use self::traits::{Dir, Entry, File, FileSystem};
-pub use self::vfs::VirtualFileSystem;
-
-pub mod devices;
-pub mod traits;
-pub mod metadata;
-pub mod vfs;
-pub mod fs2;
+pub mod device;
+pub mod filesystem;
 pub mod mbr;
 pub mod path;
+pub mod vfs;
 
 #[cfg(test)]
 mod tests;
-
