@@ -13,7 +13,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use clap::Parser;
 use cli::ImageArgs;
-use fat32::vfat::{HandleReference, VFat, VFatHandle};
+use fat32::virtual_fat::{HandleReference, VirtualFat, VFatHandle};
 use filesystem::fs2::FileSystem2;
 use filesystem::mbr::{CHS, MasterBootRecord, PartitionEntry};
 use filesystem::path::{Path};
@@ -98,7 +98,7 @@ fn format_image<'a>(path: &PathBuf, sector_size: u16, _filesystem: FileSystem, p
     HandleReference::<'a, BasicHandle>::format(&mut image_file, partition_entry, sector_size as usize)?;
 
     // TODO: obviously add more when more are supported
-    let vfat_handle = VFat::<BasicHandle>::from(image_file)
+    let vfat_handle = VirtualFat::<BasicHandle>::from(image_file)
         .map_err(|_| Error::from(ErrorKind::Other))?;
     let mut handle_reference = HandleReference(&vfat_handle);
 
@@ -108,21 +108,21 @@ fn format_image<'a>(path: &PathBuf, sector_size: u16, _filesystem: FileSystem, p
 }
 
 #[derive(Clone, Debug)]
-struct BasicHandle(Rc<VFat<Self>>);
+struct BasicHandle(Rc<VirtualFat<Self>>);
 
 unsafe impl Sync for BasicHandle {}
 unsafe impl Send for BasicHandle {}
 
 impl VFatHandle for BasicHandle {
-    fn new(val: VFat<Self>) -> Self {
+    fn new(val: VirtualFat<Self>) -> Self {
         BasicHandle(Rc::new(val))
     }
 
-    fn lock<R>(&self, f: impl FnOnce(&mut VFat<Self>) -> R) -> R {
+    fn lock<R>(&self, f: impl FnOnce(&mut VirtualFat<Self>) -> R) -> R {
         //TODO: this is to work around vfat impl; CHANGE vfat impl
         unsafe {
-            let const_ptr = self.0.borrow() as *const VFat<Self>;
-            let mut_ptr = const_ptr as *mut VFat<Self>;
+            let const_ptr = self.0.borrow() as *const VirtualFat<Self>;
+            let mut_ptr = const_ptr as *mut VirtualFat<Self>;
             let mut_borrow = &mut *mut_ptr;
             f(mut_borrow)
         }

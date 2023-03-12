@@ -15,10 +15,11 @@ edition = "2021"
 filesystem = { path = "../filesystem" }
 format = { path = "../format" }
 shim = { path = "../shim", features = ["alloc"] }
+sync = { path = "../sync" }
 log = "0.4" #FIXME: remove
 
 [dev-dependencies]
 rand = "0.8.5"
 
 [features]
-no_std = ["shim/no_std"]
+no_std = ["shim/no_std", "sync/no_std"]

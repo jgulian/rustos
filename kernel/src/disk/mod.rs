@@ -6,7 +6,7 @@ use alloc::sync::Arc;
 use core::cell::UnsafeCell;
 use core::fmt::{self, Debug};
 
-use fat32::vfat::{HandleReference, VFat, VFatHandle};
+use fat32::virtual_fat::{HandleReference, VirtualFat, VFatHandle};
 use filesystem;
 use filesystem::devices::{BlockDevice, CharDeviceFileSystem};
 use filesystem::fs2::{Directory2, FileSystem2};
@@ -24,7 +24,7 @@ use crate::multiprocessing::mutex::Mutex;
 pub mod sd;
 
 #[derive(Clone)]
-pub struct PiVFatHandle(Rc<Mutex<VFat<Self>>>);
+pub struct PiVFatHandle(Rc<Mutex<VirtualFat<Self>>>);
 
 // These impls are *unsound*. We should use `Arc` instead of `Rc` to implement
 // `Sync` and `Send` trait for `PiVFatHandle`. However, `Arc` uses atomic memory
@@ -42,11 +42,11 @@ impl Debug for PiVFatHandle {
 }
 
 impl VFatHandle for PiVFatHandle {
-    fn new(val: VFat<PiVFatHandle>) -> Self {
+    fn new(val: VirtualFat<PiVFatHandle>) -> Self {
         PiVFatHandle(Rc::new(Mutex::new(val)))
     }
 
-    fn lock<R>(&self, f: impl FnOnce(&mut VFat<PiVFatHandle>) -> R) -> R {
+    fn lock<R>(&self, f: impl FnOnce(&mut VirtualFat<PiVFatHandle>) -> R) -> R {
         f(&mut self.0.lock())
     }
 }
@@ -60,7 +60,7 @@ impl PiVFatWrapper {
 
     pub unsafe fn initialize(&self) {
         let sd = sd::Sd::new().expect("filesystem failed to initialize");
-        let vfat = VFat::<PiVFatHandle>::from(sd).expect("failed to initialize vfat");
+        let vfat = VirtualFat::<PiVFatHandle>::from(sd).expect("failed to initialize vfat");
         (*self.0.get()).replace(vfat);
     }
 

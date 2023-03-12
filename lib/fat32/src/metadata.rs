@@ -1,5 +1,4 @@
 use alloc::boxed::Box;
-use core::borrow::Borrow;
 use core::fmt;
 use core::fmt::Formatter;
 

@@ -39,6 +39,15 @@ impl Path {
         });
     }
 
+    pub fn file_name(&self) -> Option<String> {
+        match self.components().last()? {
+            Component::Root => None,
+            Component::Parent => Some(String::from("..")),
+            Component::Current => Some(String::from(".")),
+            Component::Child(child) => Some(child),
+        }
+    }
+
     pub fn join_str(&mut self, other: &str) {
         let new_component = match other {
             "/" => Component::Root,

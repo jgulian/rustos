@@ -1,13 +1,10 @@
 use core::fmt;
 
-use filesystem::BlockDevice;
+use format::Format;
 use filesystem::device::BlockDevice;
 use filesystem::error::FilesystemError;
-use filesystem::partition::{BlockPartition, PartitionError};
-use format::Format;
+use filesystem::partition::BlockPartition;
 use shim::const_assert_size;
-
-use crate::vfat::Error;
 
 //TODO: go through all repr C and remove
 #[derive(Format)]
@@ -56,7 +53,7 @@ impl TryFrom<&mut BlockPartition> for BiosParameterBlock {
     /// If the EBPB signature is invalid, returns an error of `BadSignature`.
     fn try_from(value: &mut BlockPartition) -> Result<Self, Self::Error> {
         let mut buffer: [u8; 512] = [0; 512];
-        value.read_sector(sector, &mut buffer)?;
+        value.read_block(0, &mut buffer)?;
 
         use format::Format;
         let bios_parameter_block: BiosParameterBlock = BiosParameterBlock::load_slice(&buffer)?;

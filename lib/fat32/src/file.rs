@@ -1,35 +1,12 @@
-
-use alloc::string::String;
-
-use filesystem;
 use shim::io::{self, SeekFrom};
 use crate::chain::Chain;
-use crate::cluster::Cluster;
-use crate::fat::Status;
+use crate::metadata::Metadata;
 
-#[derive(Debug, Clone)]
-pub struct File {
-    name: String,
+#[derive(Clone)]
+pub(crate) struct File {
     metadata: Metadata,
     file_size: u64,
     chain: Chain,
-}
-
-impl File {
-    fn new(vfat: HANDLE, name: String) -> io::Result<Self> {
-        let cluster = vfat.lock(|vfat| -> io::Result<Cluster> {
-            let cluster = vfat.next_free_cluster()?;
-            vfat.update_fat_entry(cluster, Status::new_eoc())?;
-            Ok(cluster)
-        })?;
-
-        Ok(File {
-            name,
-            metadata: Default::default(),
-            file_size: 0,
-            chain: Chain::new_from_cluster(vfat.clone(), cluster)?,
-        })
-    }
 }
 
 impl io::Write for File {
@@ -65,5 +42,12 @@ impl io::Seek for File {
     /// in an `InvalidInput` error.
     fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         self.chain.seek(pos)
+    }
+}
+
+impl Drop for File {
+    fn drop(&mut self) {
+        //TODO: set size
+        todo!()
     }
 }

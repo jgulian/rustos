@@ -48,7 +48,7 @@ pub trait Directory {
     fn create_directory(&mut self, name: &str) -> io::Result<BoxedDirectory>;
     fn remove(&mut self, name: &str) -> io::Result<()>;
     fn list(&mut self) -> io::Result<Vec<String>>;
-    fn metadata(&mut self, name: &str) -> io::Result<Box<dyn Metadata>>;
+    fn metadata(&mut self) -> io::Result<Box<dyn Metadata>>;
 
     fn exists(&mut self, name: &str) -> io::Result<bool> {
         match self.open_entry(name) {

@@ -52,20 +52,19 @@ impl BlockDevice for BlockPartition {
         self.block_size as usize
     }
 
-    fn read_block(&mut self, block: u64, mut data: &mut [u8]) -> io::Result<()> {
+    fn read_block(&mut self, block: u64, data: &mut [u8]) -> io::Result<()> {
+        if data.len() != self.block_size as usize {
+            return Err(io::Error::from(io::ErrorKind::Unsupported));
+        }
+
         let physical_block = self.virtual_to_physical(block)
             .ok_or(io::Error::from(io::ErrorKind::NotFound))?;
 
         data.chunks_mut(self.device.block_size())
-            .take(self.factor() as usize)
             .enumerate()
             .try_for_each(|(i, window)| {
                 if window.len() == self.device.block_size() {
                     self.device.read_block(physical_block + i as u64, window)?;
-                } else {
-                    let mut block = vec![0u8; self.device.block_size()];
-                    self.device.read_block(physical_block + i as u64, block.as_mut_slice())?;
-                    window.copy_from_slice(block.as_slice());
                 }
 
                 Ok(())
@@ -74,21 +73,19 @@ impl BlockDevice for BlockPartition {
         Ok(())
     }
 
-    fn write_block(&mut self, block: u64, mut data: &[u8]) -> io::Result<()> {
+    fn write_block(&mut self, block: u64, data: &[u8]) -> io::Result<()> {
+        if data.len() != self.block_size as usize {
+            return Err(io::Error::from(io::ErrorKind::Unsupported));
+        }
+
         let physical_block = self.virtual_to_physical(block)
             .ok_or(io::Error::from(io::ErrorKind::NotFound))?;
 
         data.chunks(self.device.block_size())
-            .take(self.factor() as usize)
             .enumerate()
             .try_for_each(|(i, window)| {
                 if window.len() == self.device.block_size() {
                     self.device.write_block(physical_block + i as u64, window)?;
-                } else {
-                    let mut block = vec![0u8; self.device.block_size()];
-                    self.device.read_block(physical_block + i as u64, block.as_mut_slice())?;
-                    block.copy_from_slice(window);
-                    self.device.write_block(physical_block + i as u64, block.as_slice())?;
                 }
 
                 Ok(())

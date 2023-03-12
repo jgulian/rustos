@@ -1,6 +1,5 @@
 use core::fmt;
-
-use crate::vfat::*;
+use crate::cluster::Cluster;
 
 use self::Status::*;
 
@@ -26,9 +25,8 @@ impl Status {
     }
 }
 
-#[repr(C, packed)]
 #[derive(Default, Copy, Clone)]
-pub struct FatEntry(pub u32);
+pub struct FatEntry(u32);
 
 impl From<Status> for FatEntry {
     fn from(value: Status) -> Self {
@@ -42,9 +40,21 @@ impl From<Status> for FatEntry {
     }
 }
 
+impl From<[u8; 4]> for FatEntry {
+    fn from(value: [u8; 4]) -> Self {
+        Self(u32::from_le_bytes(value))
+    }
+}
+
+impl Into<[u8; 4]> for FatEntry {
+    fn into(self) -> [u8; 4] {
+        self.0.to_le_bytes()
+    }
+}
+
 impl FatEntry {
     /// Returns the `Status` of the FAT entry `self`.
-    pub fn status(&self) -> Status {
+    pub(crate) fn status(&self) -> Status {
         let status_bits = self.0 & 0x0FFF_FFFF;
 
         if status_bits == 0 {
@@ -62,6 +72,12 @@ impl FatEntry {
 
     pub(crate) fn is_free(&self) -> bool {
         self.status() == Free
+    }
+
+    pub(crate) fn find(cluster: Cluster, fat_start_sector: u64, bytes_per_sector: u64) -> (u64, usize) {
+        let block = fat_start_sector + cluster.offset() as u64 / bytes_per_sector;
+        let offset = (cluster.offset() as u64 % bytes_per_sector) as usize;
+        (block, offset)
     }
 }
 

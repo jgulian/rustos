@@ -128,7 +128,7 @@ impl Directory for VFSDirectory {
             })
     }
 
-    fn metadata(&mut self, _: &str) -> io::Result<Box<dyn Metadata>> {
+    fn metadata(&mut self) -> io::Result<Box<dyn Metadata>> {
         ioerr!(Unsupported)
     }
 }
