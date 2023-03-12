@@ -119,7 +119,7 @@ impl format::Format for DirectoryEntry {
 }
 
 pub(crate) fn parse_name(long_file_names: &mut Vec<LongFileNameEntry>, regular: &RegularDirectoryEntry) -> String {
-    if long_file_name.is_empty() {
+    if long_file_names.is_empty() {
         let mut result = String::new();
         for c in regular.name.iter() {
             if *c == b' ' || *c == 0 {
@@ -164,8 +164,8 @@ pub(crate) fn parse_name(long_file_names: &mut Vec<LongFileNameEntry>, regular: 
 }
 
 pub(crate) fn parse_entry(regular_entry: &RegularDirectoryEntry) -> (u32, Metadata, Option<u32>) {
-    let starting_cluster = ((regular_dir.first_cluster_high as u32) << 16) |
-        (regular_dir.first_cluster_low as u32);
+    let starting_cluster = ((regular_entry.first_cluster_high as u32) << 16) |
+        (regular_entry.first_cluster_low as u32);
 
     let metadata = Metadata {
         attributes: regular_entry.attributes,

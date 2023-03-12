@@ -1,12 +1,19 @@
+use alloc::boxed::Box;
+use alloc::sync::Arc;
 use alloc::vec;
+use alloc::vec::Vec;
 use core::mem;
 
 use filesystem::device::{BlockDevice, stream_read, stream_write};
 use filesystem::error::FilesystemError;
 use filesystem::partition::BlockPartition;
+use filesystem::mbr::PartitionEntry;
 use shim::io;
+use sync::Mutex;
 use crate::cluster::Cluster;
 use crate::bios_parameter_block::BiosParameterBlock;
+use crate::chain::Chain;
+use crate::directory::Directory;
 use crate::error::{VirtualFatError, VirtualFatResult};
 use crate::fat::{FatEntry, Status};
 
@@ -30,20 +37,22 @@ impl VirtualFat {
     pub(crate) fn read_cluster(&mut self, cluster: Cluster, offset: usize, buffer: &mut [u8]) -> io::Result<usize> {
         let (first_block, final_block) = self.get_blocks(cluster, offset);
         stream_read(&mut self.device, offset, first_block..final_block, buffer)
+            .map(|(_, amount)| amount)
     }
 
     pub(crate) fn write_cluster(&mut self, cluster: Cluster, offset: usize, buffer: &[u8]) -> io::Result<usize> {
         let (first_block, final_block) = self.get_blocks(cluster, offset);
         stream_write(&mut self.device, offset, first_block..final_block, buffer)
+            .map(|(_, amount)| amount)
     }
 
-    pub fn fat_entry(&mut self, cluster: Cluster) -> VirtualFatResult<FatEntry> {
+    pub(crate) fn fat_entry(&mut self, cluster: Cluster) -> VirtualFatResult<FatEntry> {
         let (block, offset) = FatEntry::find(cluster, self.fat_start_sector, self.bytes_per_sector as u64);
 
         let mut data = vec![0u8; self.device.block_size() as usize];
         self.device.read_block(block, data.as_mut_slice())?;
 
-        let fat_data = [0u8; 4];
+        let mut fat_data = [0u8; 4];
         fat_data.copy_from_slice(&data[offset..]);
 
         Ok(FatEntry::from(fat_data))
@@ -92,18 +101,18 @@ impl VirtualFat {
 
         Ok(())
     }
-    
-    pub(crate) fn fat_chain_length(&mut self, mut cluster: Cluster) -> VirtualFatResult<u64> {
-        let mut length = 0;
-        
+
+    pub(crate) fn fat_chain(&mut self, mut cluster: Cluster) -> VirtualFatResult<Vec<Cluster>> {
+        let mut result = Vec::new();
+
         loop {
-            length += self.block_size() as u64;
+            result.push(cluster);
             match self.fat_entry(cluster)?.status() {
                 Status::Data(next_cluster) => {
                     cluster = next_cluster;
                 }
                 Status::Eoc(_) => {
-                    return Ok(length);
+                    return Ok(result);
                 }
                 _ => return Err(VirtualFatError::InvalidFatForSizing),
             }
@@ -139,10 +148,29 @@ impl BlockDevice for VirtualFat {
     }
 }
 
-impl TryFrom<BlockPartition> for VirtualFat {
-    type Error = FilesystemError;
+pub struct VirtualFatFilesystem(Arc<dyn Mutex<VirtualFat>>);
 
-    fn try_from(mut value: BlockPartition) -> Result<Self, Self::Error> {
+impl filesystem::filesystem::Filesystem for VirtualFatFilesystem {
+    fn root(&mut self) -> io::Result<Box<dyn filesystem::filesystem::Directory>> {
+        let virtual_fat = self.0.clone();
+        let root_cluster = self.0.lock()
+            .map_err(|_| io::Error::from(io::ErrorKind::Other))?.root_cluster;
+        let chain = Chain::new_from_cluster(virtual_fat.clone(), root_cluster)
+            .map_err(|_| io::Error::from(io::ErrorKind::Other))?;
+        Ok(Box::new(Directory {
+            virtual_fat,
+            metadata: Default::default(),
+            chain,
+        }))
+    }
+
+    fn format(device: &mut dyn BlockDevice, partition: &mut filesystem::mbr::PartitionEntry, sector_size: usize) -> io::Result<()> where Self: Sized {
+        todo!()
+    }
+}
+
+impl VirtualFatFilesystem {
+    fn new<M: Mutex<VirtualFat> + 'static>(mut value: BlockPartition) -> Result<Self, FilesystemError> {
         let bios_parameter_block = BiosParameterBlock::try_from(&mut value)?;
         value.set_block_size(bios_parameter_block.bytes_per_sector as u64);
 
@@ -155,7 +183,7 @@ impl TryFrom<BlockPartition> for VirtualFat {
         let data_start_sector = bios_parameter_block.reserved_sectors as u64 +
             (bios_parameter_block.number_of_fats as u64 * sectors_per_fat as u64);
 
-        Ok(VirtualFat {
+        Ok(VirtualFatFilesystem(Arc::new(M::new(VirtualFat {
             device: value,
             bytes_per_sector: bios_parameter_block.bytes_per_sector,
             sectors_per_cluster: bios_parameter_block.sectors_per_cluster,
@@ -163,6 +191,6 @@ impl TryFrom<BlockPartition> for VirtualFat {
             fat_start_sector: bios_parameter_block.reserved_sectors as u64,
             data_start_sector: data_start_sector as u64,
             root_cluster: Cluster::from(bios_parameter_block.root_cluster),
-        })
+        }))))
     }
 }

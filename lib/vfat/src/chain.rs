@@ -1,4 +1,6 @@
+use alloc::collections::VecDeque;
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 use core::ops::DerefMut;
 use filesystem::device::{BlockDevice, stream_read, stream_write};
 use shim::io;
@@ -6,6 +8,7 @@ use shim::io::SeekFrom;
 use sync::{Mutex, MutexGuard};
 use crate::cluster::Cluster;
 use crate::error::{VirtualFatError, VirtualFatResult};
+use crate::fat::Status;
 use crate::virtual_fat::VirtualFat;
 
 #[derive(Clone)]
@@ -32,8 +35,10 @@ impl Chain {
     }
 
     pub(crate) fn new_from_cluster(virtual_fat: Arc<dyn Mutex<VirtualFat>>, cluster: Cluster) -> VirtualFatResult<Self> {
-        let total_size = virtual_fat.lock()
-            .map_err(|_| VirtualFatError::FailedToLockFatMutex)?.fat_chain_length(cluster)?;
+        let total_size = {
+            let mut lock = virtual_fat.lock().map_err(|_| VirtualFatError::FailedToLockFatMutex)?;
+            (lock.block_size() * lock.fat_chain(cluster)?.len()) as u64
+        };
 
         Ok(Self {
             virtual_fat,
@@ -62,18 +67,20 @@ impl Chain {
         self.total_size
     }
 
-    fn advance_cluster(&mut self, block_size: u64, guard: &mut MutexGuard<VirtualFat>) -> io::Result<bool> {
-        let next_cluster_wrapped = guard.next_cluster(self.current_cluster)
-            .map_err(|_| io::Error::from(io::ErrorKind::Unsupported))?;
+    fn get_blocks(&self, guard: &mut MutexGuard<VirtualFat>) -> io::Result<impl Iterator<Item=u64>> {
+        Ok(guard.fat_chain(self.current_cluster)
+            .map_err(|_| io::Error::from(io::ErrorKind::Other))?
+            .into_iter().map(|cluster| Into::<u32>::into(cluster) as u64))
+    }
 
-        match next_cluster_wrapped {
-            Some(next_cluster) => {
-                self.current_cluster = next_cluster;
-                self.position += block_size - (self.position % block_size);
-                Ok(true)
-            }
-            None => Ok(false),
-        }
+    fn append_cluster(&self, previous: Cluster, guard: &mut MutexGuard<VirtualFat>) -> io::Result<Cluster> {
+        let new_cluster = guard.next_free_cluster()
+            .map_err(|_| io::Error::from(io::ErrorKind::Other))?;
+        guard.update_fat_entry(previous, Status::Data(new_cluster))
+            .map_err(|_| io::Error::from(io::ErrorKind::Other))?;
+        guard.update_fat_entry(new_cluster, Status::new_eoc())
+            .map_err(|_| io::Error::from(io::ErrorKind::Other))?;
+        Ok(new_cluster)
     }
 }
 
@@ -82,23 +89,45 @@ impl io::Read for Chain {
         let mut guard = self.virtual_fat.lock()
             .map_err(|_| io::Error::from(io::ErrorKind::Other))?;
 
-        let read = stream_read(guard.deref_mut(), self.position as usize, blocks, buf)?;
+        let blocks = self.get_blocks(&mut guard)?;
+        let (block, read) = stream_read(guard.deref_mut(), self.position as usize, blocks, buf)?;
+
         self.position += read as u64;
+        self.current_cluster = Cluster::from(block as u32);
         Ok(read)
     }
 }
 
 impl io::Write for Chain {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+    fn write(&mut self, mut buf: &[u8]) -> io::Result<usize> {
         let mut guard = self.virtual_fat.lock()
             .map_err(|_| io::Error::from(io::ErrorKind::Other))?;
 
-        let written = stream_write(guard.deref_mut(), self.position as usize, blocks, buf)?;
-        self.position += written as u64;
-        if self.total_size < self.position {
-            self.total_size = self.position;
+        let mut blocks: VecDeque<u64> = self.get_blocks(&mut guard)?.collect();
+        let mut total_written = 0;
+
+        while !buf.is_empty() {
+            if blocks.is_empty() {
+                let new_cluster = self.append_cluster(self.current_cluster, &mut guard)?;
+                blocks.push_back(Into::<u32>::into(new_cluster) as u64);
+            }
+            let (final_block, written) =
+                stream_write(guard.deref_mut(), self.position as usize, blocks.iter().map(|x| *x), buf)?;
+            buf = &buf[written..];
+            while let Some(block) = blocks.pop_front() {
+                if block == final_block {
+                    break;
+                }
+            }
+            total_written += written;
+            self.position += written as u64;
+            self.current_cluster = Cluster::from(final_block as u32);
+            if self.total_size < self.position {
+                self.total_size = self.position;
+            }
         }
-        Ok(written)
+
+        Ok(total_written)
     }
 
     fn flush(&mut self) -> io::Result<()> {
@@ -127,7 +156,17 @@ impl io::Seek for Chain {
                 self.position = 0;
                 self.current_cluster = self.first_cluster;
             } else {
-                self.advance_cluster(block_size, &mut guard)?;
+                let next_cluster_wrapped = guard.next_cluster(self.current_cluster)
+                    .map_err(|_| io::Error::from(io::ErrorKind::Unsupported))?;
+
+                match next_cluster_wrapped {
+                    Some(next_cluster) => {
+                        self.current_cluster = next_cluster;
+                        self.position += block_size - (self.position % block_size);
+                    }
+                    // TODO: allow seeking past end of file
+                    None => return Err(io::Error::from(io::ErrorKind::Unsupported)),
+                }
             }
         }
     }

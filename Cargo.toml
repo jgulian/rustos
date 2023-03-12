@@ -9,7 +9,7 @@ members = [
     "kernel",
     "lib/aarch64",
     "lib/allocator",
-    "lib/fat32",
+    "lib/vfat",
     "lib/filesystem",
     "lib/filesystem/pseudo_filesystem",
     "lib/format",

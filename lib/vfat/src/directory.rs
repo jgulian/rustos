@@ -16,9 +16,9 @@ use crate::virtual_fat::VirtualFat;
 
 #[derive(Clone)]
 pub(crate) struct Directory {
-    virtual_fat: Arc<dyn Mutex<VirtualFat>>,
-    metadata: Metadata,
-    chain: Chain,
+    pub(crate) virtual_fat: Arc<dyn Mutex<VirtualFat>>,
+    pub(crate) metadata: Metadata,
+    pub(crate) chain: Chain,
 }
 
 impl Directory {
@@ -27,12 +27,12 @@ impl Directory {
     }
 
     //TODO: this hsould return result
-    fn next(&mut self) -> Option<DirectoryEntrySpan> {
-        let mut start = 0;
+    fn next(&mut self) -> io::Result<Option<DirectoryEntrySpan>> {
+        let start = self.chain.position();
         let mut long_file_names: Vec<LongFileNameEntry> = Vec::new();
 
         while self.chain.position() < self.chain.total_size() {
-            let entry = DirectoryEntry::load_readable(&mut self.chain).ok()?;
+            let entry = DirectoryEntry::load_readable(&mut self.chain)?;
 
             match entry {
                 DirectoryEntry::Empty => {}
@@ -41,45 +41,47 @@ impl Directory {
                 }
                 DirectoryEntry::EmptyAndOver => break,
                 DirectoryEntry::Regular(regular_entry) => {
-                    return Some(DirectoryEntrySpan {
+                    return Ok(Some(DirectoryEntrySpan {
                         start,
                         end: self.chain.position(),
                         long_file_names,
                         regular_entry,
                         chain: &mut self.chain,
-                    });
+                    }));
                 }
             }
         }
 
-        None
+        Ok(None)
     }
 }
 
 impl filesystem::Directory for Directory {
     fn open_entry(&mut self, name: &str) -> io::Result<filesystem::Entry> {
         self.restart()?;
-        while let Some(span) = self.next() {
-            if span != name {
+        while let Some(mut span) = self.next()? {
+            if span.name().as_str() != name {
                 continue;
             }
 
-            let (starting_cluster, metadata, directory) = span.parse_entry();
+            let (starting_cluster, metadata, file_size) = span.parse_entry();
 
-            let chain = match directory {
-                None => Chain::new_from_cluster(
-                    self.virtual_fat.clone(),
-                    Cluster::from(starting_cluster),
-                ),
+            let chain = match file_size {
+                None => {
+                    Chain::new_from_cluster(
+                        self.virtual_fat.clone(),
+                        Cluster::from(starting_cluster),
+                    ).map_err(|_| io::Error::from(io::ErrorKind::Other))?
+                },
                 Some(file_size) =>
                     Chain::new_from_cluster_with_size(
                         self.virtual_fat.clone(),
                         Cluster::from(starting_cluster),
                         file_size as u64,
                     ),
-            }.map_err(|_| io::Error::from(io::ErrorKind::Other))?;
+            };
 
-            let entry = if directory {
+            let entry = if file_size.is_none() {
                 filesystem::Entry::Directory(Box::new(Directory {
                     virtual_fat: self.virtual_fat.clone(),
                     metadata,
@@ -109,7 +111,7 @@ impl filesystem::Directory for Directory {
 
     fn remove(&mut self, name: &str) -> io::Result<()> {
         self.restart()?;
-        while let Some(mut span) = self.next() {
+        while let Some(mut span) = self.next()? {
             if span.name() == name {
                 span.clear();
                 break;
@@ -121,8 +123,8 @@ impl filesystem::Directory for Directory {
     fn list(&mut self) -> io::Result<Vec<String>> {
         self.restart()?;
         let mut result = Vec::new();
-        while let Some(mut span) = self.next() {
-            result.push(x.name())
+        while let Some(mut span) = self.next()? {
+            result.push(span.name())
         }
 
         Ok(result)
@@ -142,11 +144,11 @@ struct DirectoryEntrySpan<'a> {
 }
 
 impl<'a> DirectoryEntrySpan<'a> {
-    fn clear(self) {
-        let count = (self.chain.position() - start) / 32;
-        self.chain.seek(SeekFrom::Start(start)).ok()?;
+    fn clear(self) -> io::Result<()> {
+        let count = (self.end - self.start) / 32;
+        self.chain.seek(SeekFrom::Start(self.start))?;
         let empty_and_over = DirectoryEntry::EmptyAndOver;
-        (0..count).try_for_each(|_| empty_and_over.save_writable(self.chain)).ok()?;
+        (0..count).try_for_each(|_| empty_and_over.save_writable(self.chain))
     }
 
     fn name(&mut self) -> String {

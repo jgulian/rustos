@@ -49,7 +49,8 @@ pub type LockResult<G> = Result<G, PoisonError<G>>;
 
 pub type TryLockResult<G> = Result<G, TryLockError<G>>;
 
-pub trait Mutex<T> {
+pub trait Mutex<T: Sized> {
+    fn new(value: T) -> Self where Self: Sized;
     fn lock(&self) -> LockResult<MutexGuard<'_, T>>;
     fn try_lock(&self) -> TryLockResult<MutexGuard<'_, T>>;
     fn unlock(&self);

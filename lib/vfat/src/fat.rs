@@ -4,7 +4,7 @@ use crate::cluster::Cluster;
 use self::Status::*;
 
 #[derive(Debug, PartialEq)]
-pub enum Status {
+pub(crate) enum Status {
     /// The FAT entry corresponds to an unused (free) cluster.
     Free,
     /// The FAT entry/cluster is reserved.
