@@ -1,6 +1,12 @@
-use alloc::collections::VecDeque;
+#[cfg(feature = "no_std")]
 use alloc::sync::Arc;
-use alloc::vec::Vec;
+#[cfg(feature = "no_std")]
+use alloc::collections::VecDeque;
+#[cfg(not(feature = "no_std"))]
+use std::sync::Arc;
+#[cfg(not(feature = "no_std"))]
+use std::collections::VecDeque;
+
 use core::ops::DerefMut;
 use filesystem::device::{BlockDevice, stream_read, stream_write};
 use shim::io;
@@ -12,16 +18,16 @@ use crate::fat::Status;
 use crate::virtual_fat::VirtualFat;
 
 #[derive(Clone)]
-pub(crate) struct Chain {
-    virtual_fat: Arc<dyn Mutex<VirtualFat>>,
+pub(crate) struct Chain<M: Mutex<VirtualFat>> {
+    virtual_fat: Arc<M>,
     position: u64,
     total_size: u64,
     first_cluster: Cluster,
     current_cluster: Cluster,
 }
 
-impl Chain {
-    pub(crate) fn new(virtual_fat: Arc<dyn Mutex<VirtualFat>>) -> VirtualFatResult<Self> {
+impl<M: Mutex<VirtualFat>> Chain<M> {
+    pub(crate) fn new(virtual_fat: Arc<M>) -> VirtualFatResult<Self> {
         let cluster = virtual_fat.lock()
             .map_err(|_| VirtualFatError::FailedToLockFatMutex)?.next_free_cluster()?;
 
@@ -34,7 +40,7 @@ impl Chain {
         })
     }
 
-    pub(crate) fn new_from_cluster(virtual_fat: Arc<dyn Mutex<VirtualFat>>, cluster: Cluster) -> VirtualFatResult<Self> {
+    pub(crate) fn new_from_cluster(virtual_fat: Arc<M>, cluster: Cluster) -> VirtualFatResult<Self> {
         let total_size = {
             let mut lock = virtual_fat.lock().map_err(|_| VirtualFatError::FailedToLockFatMutex)?;
             (lock.block_size() * lock.fat_chain(cluster)?.len()) as u64
@@ -49,7 +55,7 @@ impl Chain {
         })
     }
 
-    pub(crate) fn new_from_cluster_with_size(virtual_fat: Arc<dyn Mutex<VirtualFat>>, cluster: Cluster, total_size: u64) -> Self {
+    pub(crate) fn new_from_cluster_with_size(virtual_fat: Arc<M>, cluster: Cluster, total_size: u64) -> Self {
         Self {
             virtual_fat,
             position: 0,
@@ -67,13 +73,13 @@ impl Chain {
         self.total_size
     }
 
-    fn get_blocks(&self, guard: &mut MutexGuard<VirtualFat>) -> io::Result<impl Iterator<Item=u64>> {
+    fn get_blocks(&self, guard: &mut M::G) -> io::Result<impl Iterator<Item=u64>> {
         Ok(guard.fat_chain(self.current_cluster)
             .map_err(|_| io::Error::from(io::ErrorKind::Other))?
             .into_iter().map(|cluster| Into::<u32>::into(cluster) as u64))
     }
 
-    fn append_cluster(&self, previous: Cluster, guard: &mut MutexGuard<VirtualFat>) -> io::Result<Cluster> {
+    fn append_cluster(&self, previous: Cluster, guard: &mut M::G) -> io::Result<Cluster> {
         let new_cluster = guard.next_free_cluster()
             .map_err(|_| io::Error::from(io::ErrorKind::Other))?;
         guard.update_fat_entry(previous, Status::Data(new_cluster))
@@ -84,7 +90,7 @@ impl Chain {
     }
 }
 
-impl io::Read for Chain {
+impl<M: Mutex<VirtualFat>> io::Read for Chain<M> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         let mut guard = self.virtual_fat.lock()
             .map_err(|_| io::Error::from(io::ErrorKind::Other))?;
@@ -98,7 +104,7 @@ impl io::Read for Chain {
     }
 }
 
-impl io::Write for Chain {
+impl<M: Mutex<VirtualFat>> io::Write for Chain<M> {
     fn write(&mut self, mut buf: &[u8]) -> io::Result<usize> {
         let mut guard = self.virtual_fat.lock()
             .map_err(|_| io::Error::from(io::ErrorKind::Other))?;
@@ -135,7 +141,7 @@ impl io::Write for Chain {
     }
 }
 
-impl io::Seek for Chain {
+impl<M: Mutex<VirtualFat>> io::Seek for Chain<M> {
     fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         let mut guard = self.virtual_fat.lock()
             .map_err(|_| io::Error::from(io::ErrorKind::Other))?;

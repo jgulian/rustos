@@ -13,7 +13,7 @@ use std::vec::Vec;
 
 use shim::io;
 use crate::device::BlockDevice;
-use crate::mbr::PartitionEntry;
+use crate::master_boot_record::PartitionEntry;
 use crate::path::{Component, Path};
 
 type BoxedFile = Box<dyn File>;

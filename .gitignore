@@ -1,17 +1,12 @@
 target/
-build/
-TAGS
-.dep
 /.vagrant/
-kernel/ttywrite
 /.idea
 
-ib/**/Cargo.lock
 Cargo.lock
 */Cargo.lock
 */*/Cargo.lock
 
 user/fs.img
-test.img
 
-ext/fat32-imgs/*.fat32.img
+/fuzz/artifacts
+/fuzz/corpus

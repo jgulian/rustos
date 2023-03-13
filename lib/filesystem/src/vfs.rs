@@ -21,7 +21,7 @@ use shim::{io, ioerr, newioerr};
 use shim::io::{Error, ErrorKind};
 use crate::device::BlockDevice;
 use crate::filesystem::{Directory, Entry, File, Filesystem, Metadata};
-use crate::mbr::PartitionEntry;
+use crate::master_boot_record::PartitionEntry;
 
 use crate::path::Path;
 

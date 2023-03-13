@@ -6,10 +6,10 @@ lto = false # TODO: this can be changed?
 [workspace]
 members = [
     "dev/image",
+    "fuzz",
     "kernel",
     "lib/aarch64",
     "lib/allocator",
-    "lib/vfat",
     "lib/filesystem",
     "lib/filesystem/pseudo_filesystem",
     "lib/format",
@@ -19,6 +19,7 @@ members = [
     "lib/pi",
     "lib/shim",
     "lib/sync",
+    "lib/vfat",
     "lib/volatile",
     "lib/xmodem",
     "user",

@@ -1,3 +1,0 @@
-[build]
-target = "aarch64-unknown-none"
-#build-std = ["core", "alloc"]

@@ -6,10 +6,13 @@ extern crate alloc;
 pub mod device;
 pub mod error;
 pub mod filesystem;
-pub mod mbr;
+pub mod master_boot_record;
 pub mod path;
 pub mod vfs;
 pub mod partition;
+
+#[cfg(not(feature = "no_std"))]
+pub mod image;
 
 #[cfg(test)]
 mod tests;

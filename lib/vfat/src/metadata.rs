@@ -1,8 +1,10 @@
+#[cfg(feature = "no_std")]
 use alloc::boxed::Box;
+#[cfg(not(feature = "no_std"))]
+use std::boxed::Box;
+
 use core::fmt;
 use core::fmt::Formatter;
-
-use filesystem;
 
 /// A date as represented in FAT32 on-disk structures.
 #[derive(Default, Debug, Copy, Clone, PartialEq, Eq)]

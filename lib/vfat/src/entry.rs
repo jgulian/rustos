@@ -1,9 +1,14 @@
+#[cfg(feature = "no_std")]
 use alloc::string::String;
+#[cfg(feature = "no_std")]
 use alloc::vec::Vec;
-use core::cmp::Ordering;
+#[cfg(not(feature = "no_std"))]
+use std::string::String;
+#[cfg(not(feature = "no_std"))]
+use std::vec::Vec;
 use shim::io::{Read, Seek, Write};
 use format::Format;
-use crate::metadata::{Metadata, Timestamp};
+use crate::metadata::Metadata;
 
 pub(crate) enum DirectoryAttribute {
     ReadOnly = 0x01,

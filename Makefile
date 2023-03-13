@@ -18,7 +18,7 @@ all: build
 
 build:
 	@echo "+ Building build/$(KERN).elf [build/$@]"
-	@cargo build --bin kernel --release
+	@cargo build --bin kernel --release --target aarch64-unknown-none
 
 	@echo "+ Building build/$(KERN).bin [objcopy]"
 	@objcopy -O binary $(TARGET) $(BINARY)

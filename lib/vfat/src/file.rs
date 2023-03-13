@@ -1,15 +1,17 @@
 use shim::io::{self, SeekFrom};
+use sync::Mutex;
 use crate::chain::Chain;
 use crate::metadata::Metadata;
+use crate::virtual_fat::VirtualFat;
 
 #[derive(Clone)]
-pub(crate) struct File {
+pub(crate) struct File<M: Mutex<VirtualFat>> {
     metadata: Metadata,
     file_size: u64,
-    chain: Chain,
+    chain: Chain<M>,
 }
 
-impl io::Write for File {
+impl<M: Mutex<VirtualFat>> io::Write for File<M> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.chain.write(buf)
     }
@@ -20,13 +22,13 @@ impl io::Write for File {
 }
 
 
-impl io::Read for File {
+impl<M: Mutex<VirtualFat>> io::Read for File<M> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.chain.read(buf)
     }
 }
 
-impl io::Seek for File {
+impl<M: Mutex<VirtualFat>> io::Seek for File<M> {
     /// Seek to offset `pos` in the file.
     ///
     /// A seek to the end of the file is allowed. A seek _beyond_ the end of the
@@ -45,7 +47,7 @@ impl io::Seek for File {
     }
 }
 
-impl Drop for File {
+impl<M: Mutex<VirtualFat>> Drop for File<M> {
     fn drop(&mut self) {
         //TODO: set size
         todo!()

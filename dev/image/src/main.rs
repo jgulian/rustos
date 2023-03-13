@@ -1,5 +1,4 @@
 mod cli;
-mod device;
 
 #[cfg(test)]
 mod tests;
@@ -13,10 +12,11 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use clap::Parser;
 use cli::ImageArgs;
-use fat32::virtual_fat::{HandleReference, VirtualFat, VFatHandle};
+use vfat::virtual_fat::{HandleReference, VirtualFat, VFatHandle};
 use filesystem::fs2::FileSystem2;
-use filesystem::mbr::{CHS, MasterBootRecord, PartitionEntry};
+use filesystem::master_boot_record::{CHS, MasterBootRecord, PartitionEntry};
 use filesystem::path::{Path};
+use filesystem::image::ImageFile;
 use crate::cli::FileSystem;
 use crate::cli::ImageCommand::{Create, Format};
 use crate::device::ImageFile;

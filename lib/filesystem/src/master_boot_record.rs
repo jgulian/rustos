@@ -1,5 +1,7 @@
-
+#[cfg(feature = "no_std")]
 use alloc::boxed::Box;
+#[cfg(not(feature = "no_std"))]
+use std::boxed::Box;
 use core::fmt::{Debug, Formatter};
 use format::Format;
 use crate::device::BlockDevice;

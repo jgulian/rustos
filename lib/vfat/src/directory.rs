@@ -1,11 +1,23 @@
-use alloc::boxed::Box;
-use alloc::string::String;
+#[cfg(feature = "no_std")]
 use alloc::sync::Arc;
+#[cfg(feature = "no_std")]
+use alloc::boxed::Box;
+#[cfg(feature = "no_std")]
+use alloc::string::String;
+#[cfg(feature = "no_std")]
 use alloc::vec::Vec;
-use core::slice::Iter;
+#[cfg(not(feature = "no_std"))]
+use std::sync::Arc;
+#[cfg(not(feature = "no_std"))]
+use std::boxed::Box;
+#[cfg(not(feature = "no_std"))]
+use std::string::String;
+#[cfg(not(feature = "no_std"))]
+use std::vec::Vec;
+
 use filesystem::filesystem;
 use crate::chain::Chain;
-use crate::metadata::{Date, Metadata, Timestamp};
+use crate::metadata::Metadata;
 use format::Format;
 use shim::io;
 use shim::io::{Seek, SeekFrom};
@@ -15,19 +27,19 @@ use crate::entry::{DirectoryEntry, LongFileNameEntry, parse_entry, parse_name, R
 use crate::virtual_fat::VirtualFat;
 
 #[derive(Clone)]
-pub(crate) struct Directory {
-    pub(crate) virtual_fat: Arc<dyn Mutex<VirtualFat>>,
+pub(crate) struct Directory<M: Mutex<VirtualFat>> {
+    pub(crate) virtual_fat: Arc<M>,
     pub(crate) metadata: Metadata,
-    pub(crate) chain: Chain,
+    pub(crate) chain: Chain<M>,
 }
 
-impl Directory {
+impl<M: Mutex<VirtualFat>> Directory<M> {
     fn restart(&mut self) -> io::Result<()> {
         self.chain.seek(SeekFrom::Start(0)).map(|_| ())
     }
 
     //TODO: this hsould return result
-    fn next(&mut self) -> io::Result<Option<DirectoryEntrySpan>> {
+    fn next(&mut self) -> io::Result<Option<DirectoryEntrySpan<M>>> {
         let start = self.chain.position();
         let mut long_file_names: Vec<LongFileNameEntry> = Vec::new();
 
@@ -56,7 +68,7 @@ impl Directory {
     }
 }
 
-impl filesystem::Directory for Directory {
+impl<M: Mutex<VirtualFat> + 'static> filesystem::Directory for Directory<M> {
     fn open_entry(&mut self, name: &str) -> io::Result<filesystem::Entry> {
         self.restart()?;
         while let Some(mut span) = self.next()? {
@@ -135,15 +147,15 @@ impl filesystem::Directory for Directory {
     }
 }
 
-struct DirectoryEntrySpan<'a> {
+struct DirectoryEntrySpan<'a, M: Mutex<VirtualFat>> {
     start: u64,
     end: u64,
     long_file_names: Vec<LongFileNameEntry>,
     regular_entry: RegularDirectoryEntry,
-    chain: &'a mut Chain,
+    chain: &'a mut Chain<M>,
 }
 
-impl<'a> DirectoryEntrySpan<'a> {
+impl<'a, M: Mutex<VirtualFat>> DirectoryEntrySpan<'a, M> {
     fn clear(self) -> io::Result<()> {
         let count = (self.end - self.start) / 32;
         self.chain.seek(SeekFrom::Start(self.start))?;

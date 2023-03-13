@@ -1,0 +1,21 @@
+[package]
+name = "fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+vfat = { path = "../lib/vfat" }
+
+[profile.release]
+debug = 1
+
+[[bin]]
+name = "fuzz_vfat"
+path = "fuzz_targets/fuzz_vfat.rs"
+test = false
+doc = false

@@ -1,13 +1,25 @@
+#[cfg(feature = "no_std")]
 use alloc::boxed::Box;
+#[cfg(feature = "no_std")]
 use alloc::sync::Arc;
+#[cfg(feature = "no_std")]
 use alloc::vec;
+#[cfg(feature = "no_std")]
 use alloc::vec::Vec;
+#[cfg(not(feature = "no_std"))]
+use std::boxed::Box;
+#[cfg(not(feature = "no_std"))]
+use std::sync::Arc;
+#[cfg(not(feature = "no_std"))]
+use std::vec;
+#[cfg(not(feature = "no_std"))]
+use std::vec::Vec;
+
 use core::mem;
 
 use filesystem::device::{BlockDevice, stream_read, stream_write};
 use filesystem::error::FilesystemError;
 use filesystem::partition::BlockPartition;
-use filesystem::mbr::PartitionEntry;
 use shim::io;
 use sync::Mutex;
 use crate::cluster::Cluster;
@@ -148,9 +160,9 @@ impl BlockDevice for VirtualFat {
     }
 }
 
-pub struct VirtualFatFilesystem(Arc<dyn Mutex<VirtualFat>>);
+pub struct VirtualFatFilesystem<M: Mutex<VirtualFat>>(Arc<M>);
 
-impl filesystem::filesystem::Filesystem for VirtualFatFilesystem {
+impl<M: Mutex<VirtualFat> + 'static> filesystem::filesystem::Filesystem for VirtualFatFilesystem<M> {
     fn root(&mut self) -> io::Result<Box<dyn filesystem::filesystem::Directory>> {
         let virtual_fat = self.0.clone();
         let root_cluster = self.0.lock()
@@ -164,13 +176,13 @@ impl filesystem::filesystem::Filesystem for VirtualFatFilesystem {
         }))
     }
 
-    fn format(device: &mut dyn BlockDevice, partition: &mut filesystem::mbr::PartitionEntry, sector_size: usize) -> io::Result<()> where Self: Sized {
+    fn format(device: &mut dyn BlockDevice, partition: &mut filesystem::master_boot_record::PartitionEntry, sector_size: usize) -> io::Result<()> where Self: Sized {
         todo!()
     }
 }
 
-impl VirtualFatFilesystem {
-    fn new<M: Mutex<VirtualFat> + 'static>(mut value: BlockPartition) -> Result<Self, FilesystemError> {
+impl<M: Mutex<VirtualFat> + 'static> VirtualFatFilesystem<M> {
+    fn new(mut value: BlockPartition) -> Result<Self, FilesystemError> {
         let bios_parameter_block = BiosParameterBlock::try_from(&mut value)?;
         value.set_block_size(bios_parameter_block.bytes_per_sector as u64);
 

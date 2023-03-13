@@ -1,6 +1,7 @@
+#[cfg(feature = "no_std")]
 use alloc::boxed::Box;
-use alloc::vec;
-use core::borrow::BorrowMut;
+#[cfg(not(feature = "no_std"))]
+use std::boxed::Box;
 use shim::io;
 
 //TODO: this has a huge design flaw: i.e. it can't
@@ -8,7 +9,7 @@ use shim::io;
 
 use crate::device::BlockDevice;
 use crate::error::FilesystemError;
-use crate::mbr::MasterBootRecord;
+use crate::master_boot_record::MasterBootRecord;
 
 pub struct BlockPartition {
     /// The device the partition is based on
@@ -62,7 +63,7 @@ impl BlockDevice for BlockPartition {
 
         data.chunks_mut(self.device.block_size())
             .enumerate()
-            .try_for_each(|(i, window)| {
+            .try_for_each(|(i, window)| -> io::Result<()> {
                 if window.len() == self.device.block_size() {
                     self.device.read_block(physical_block + i as u64, window)?;
                 }
@@ -83,7 +84,7 @@ impl BlockDevice for BlockPartition {
 
         data.chunks(self.device.block_size())
             .enumerate()
-            .try_for_each(|(i, window)| {
+            .try_for_each(|(i, window)| -> io::Result<()> {
                 if window.len() == self.device.block_size() {
                     self.device.write_block(physical_block + i as u64, window)?;
                 }

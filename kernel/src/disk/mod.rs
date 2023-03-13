@@ -6,88 +6,18 @@ use alloc::sync::Arc;
 use core::cell::UnsafeCell;
 use core::fmt::{self, Debug};
 
-use fat32::virtual_fat::{HandleReference, VirtualFat, VFatHandle};
 use filesystem;
-use filesystem::devices::{BlockDevice, CharDeviceFileSystem};
-use filesystem::fs2::{Directory2, FileSystem2};
-use filesystem::path::Path;
-use filesystem::{CharDevice, VirtualFileSystem};
-use filesystem::mbr::PartitionEntry;
+
 use pi::uart::MiniUart;
 use shim::{io, ioerr, newioerr};
 use shim::io::{Read, Write};
-
 
 use crate::FILESYSTEM;
 use crate::multiprocessing::mutex::Mutex;
 
 pub mod sd;
 
-#[derive(Clone)]
-pub struct PiVFatHandle(Rc<Mutex<VirtualFat<Self>>>);
-
-// These impls are *unsound*. We should use `Arc` instead of `Rc` to implement
-// `Sync` and `Send` trait for `PiVFatHandle`. However, `Arc` uses atomic memory
-// access, which requires MMU to be initialized on ARM architecture. Since we
-// have enabled only one core of the board, these unsound impls will not cause
-// any immediate harm for now. We will fix this in the future.
-unsafe impl Send for PiVFatHandle {}
-
-unsafe impl Sync for PiVFatHandle {}
-
-impl Debug for PiVFatHandle {
-    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(f, "PiVFatHandle")
-    }
-}
-
-impl VFatHandle for PiVFatHandle {
-    fn new(val: VirtualFat<PiVFatHandle>) -> Self {
-        PiVFatHandle(Rc::new(Mutex::new(val)))
-    }
-
-    fn lock<R>(&self, f: impl FnOnce(&mut VirtualFat<PiVFatHandle>) -> R) -> R {
-        f(&mut self.0.lock())
-    }
-}
-
-struct PiVFatWrapper(UnsafeCell<Option<PiVFatHandle>>);
-
-impl PiVFatWrapper {
-    pub const fn uninitialized() -> Self {
-        PiVFatWrapper(UnsafeCell::new(None))
-    }
-
-    pub unsafe fn initialize(&self) {
-        let sd = sd::Sd::new().expect("filesystem failed to initialize");
-        let vfat = VirtualFat::<PiVFatHandle>::from(sd).expect("failed to initialize vfat");
-        (*self.0.get()).replace(vfat);
-    }
-
-    fn handle(&self) -> &PiVFatHandle {
-        unsafe { self.0.get().as_ref() }.unwrap().as_ref().unwrap()
-    }
-}
-
-unsafe impl Sync for PiVFatWrapper {}
-
-static PI_VFAT_HANDLE_WRAPPER: PiVFatWrapper = PiVFatWrapper::uninitialized();
-
 pub struct DiskFileSystem<'a>(&'a PiVFatHandle);
-
-impl<'a> FileSystem2 for DiskFileSystem<'a> {
-    fn root(&mut self) -> io::Result<Box<dyn Directory2>> {
-        HandleReference(self.0).root()
-    }
-
-    fn copy_entry(&mut self, source: &Path, destination: &Path) -> io::Result<()> {
-        HandleReference(self.0).copy_entry(source, destination)
-    }
-
-    fn format(_device: &mut dyn BlockDevice, _partition: &mut PartitionEntry, _sector_size: usize) -> io::Result<()> {
-        ioerr!(Unsupported)
-    }
-}
 
 pub struct FileSystem(Mutex<Option<VirtualFileSystem>>);
 

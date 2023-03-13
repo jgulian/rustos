@@ -1,6 +1,9 @@
-use shim::io;
-
+#[cfg(feature = "no_std")]
 use alloc::vec;
+#[cfg(not(feature = "no_std"))]
+use std::vec;
+
+use shim::io;
 
 pub trait ByteDevice {
     fn read_byte(&mut self) -> io::Result<u8>;
@@ -22,7 +25,7 @@ pub fn stream_read<I>(device: &mut dyn BlockDevice, offset: usize, blocks: I, da
     blocks.skip(block_offset)
         .zip([prefix_data].into_iter().chain(main_data.chunks_mut(block_size)))
         .enumerate()
-        .try_for_each(|(i, (block, chunk_data))| {
+        .try_for_each(|(i, (block, chunk_data))| -> io::Result<()> {
             if chunk_data.len() == block_size {
                 device.read_block(block, chunk_data)?;
             } else {
@@ -50,7 +53,7 @@ pub fn stream_write<I>(device: &mut dyn BlockDevice, offset: usize, blocks: I, d
     blocks.skip(block_offset)
         .zip([prefix_data].into_iter().chain(main_data.chunks(block_size)))
         .enumerate()
-        .try_for_each(|(i, (block, chunk_data))| {
+        .try_for_each(|(i, (block, chunk_data))| -> io::Result<()> {
             if chunk_data.len() == block_size {
                 device.write_block(block, chunk_data)?;
             } else {

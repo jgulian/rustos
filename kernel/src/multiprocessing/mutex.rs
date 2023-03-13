@@ -76,7 +76,7 @@ impl<T> Mutex<T> {
         } else {
             Ordering::Relaxed
         };
-        self.owner.store(usize::max_value(), ordering);
+        self.owner.store(usize::MAX, ordering);
         self.lock.store(false, ordering);
     }
 }
