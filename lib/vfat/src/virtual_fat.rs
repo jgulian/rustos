@@ -182,7 +182,7 @@ impl<M: Mutex<VirtualFat> + 'static> filesystem::filesystem::Filesystem for Virt
 }
 
 impl<M: Mutex<VirtualFat> + 'static> VirtualFatFilesystem<M> {
-    fn new(mut value: BlockPartition) -> Result<Self, FilesystemError> {
+    pub fn new(mut value: BlockPartition) -> Result<Self, FilesystemError> {
         let bios_parameter_block = BiosParameterBlock::try_from(&mut value)?;
         value.set_block_size(bios_parameter_block.bytes_per_sector as u64);
 

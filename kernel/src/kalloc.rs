@@ -7,10 +7,10 @@ use allocator::GenericAllocator;
 use allocator::util::{align_down, align_up};
 use pi::atags::Atags;
 
-use crate::multiprocessing::mutex::Mutex;
+use crate::multiprocessing::spin_lock::SpinLock;
 
 /// Thread-safe (locking) wrapper around a particular memory allocator.
-pub struct KernelAllocator(Mutex<Option<BinAllocator>>);
+pub struct KernelAllocator(SpinLock<Option<BinAllocator>>);
 
 impl KernelAllocator {
     /// Returns an uninitialized `Allocator`.
@@ -18,7 +18,7 @@ impl KernelAllocator {
     /// The allocator must be initialized by calling `initialize()` before the
     /// first memory allocation. Failure to do will result in panics.
     pub const fn uninitialized() -> Self {
-        KernelAllocator(Mutex::new(None))
+        KernelAllocator(SpinLock::new(None))
     }
 
     /// Initializes the memory allocator.

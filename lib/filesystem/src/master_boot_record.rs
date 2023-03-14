@@ -50,10 +50,10 @@ pub struct PartitionEntry {
 
 #[derive(Copy, Clone, Debug, Format)]
 pub struct MasterBootRecord {
-    pub bootstrap: [u8; 436],
-    pub disk_id: [u8; 10],
-    pub partition_table: [PartitionEntry; 4],
-    pub valid_boot_sector: [u8; 2],
+    pub(crate) bootstrap: [u8; 436],
+    pub(crate) disk_id: [u8; 10],
+    pub(crate) partition_table: [PartitionEntry; 4],
+    pub(crate) valid_boot_sector: [u8; 2],
 }
 
 impl TryFrom<&mut Box<dyn BlockDevice>> for MasterBootRecord {

@@ -5,7 +5,7 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 
 use aarch64::*;
 
-use crate::multiprocessing::mutex::Mutex;
+use crate::multiprocessing::spin_lock::SpinLock;
 use crate::multiprocessing::per_core::{is_mmu_ready, set_mmu_ready};
 use crate::param::{KERNEL_MASK_BITS, USER_MASK_BITS};
 
@@ -16,10 +16,10 @@ mod address;
 mod pagetable;
 
 pub struct VMManager {
-    kern_pt: Mutex<Option<KernPageTable>>,
+    kern_pt: SpinLock<Option<KernPageTable>>,
     kern_pt_addr: AtomicUsize,
     ready_core_cnt: AtomicUsize,
-    frame_reference_counts: Mutex<BTreeMap<PhysicalAddr, usize>>,
+    frame_reference_counts: SpinLock<BTreeMap<PhysicalAddr, usize>>,
 }
 
 impl VMManager {
@@ -29,10 +29,10 @@ impl VMManager {
     /// before the first memory allocation. Failure to do will result in panics.
     pub const fn uninitialized() -> Self {
         VMManager {
-            kern_pt: Mutex::new(None),
+            kern_pt: SpinLock::new(None),
             kern_pt_addr: AtomicUsize::new(0),
             ready_core_cnt: AtomicUsize::new(0),
-            frame_reference_counts: Mutex::new(BTreeMap::new()),
+            frame_reference_counts: SpinLock::new(BTreeMap::new()),
         }
     }
 

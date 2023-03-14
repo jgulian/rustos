@@ -18,8 +18,8 @@ use std::vec::Vec;
 use core::cell::RefCell;
 
 use shim::{io, ioerr, newioerr};
-use shim::io::{Error, ErrorKind};
-use crate::device::BlockDevice;
+use shim::io::{Error, ErrorKind, SeekFrom};
+use crate::device::{BlockDevice, ByteDevice};
 use crate::filesystem::{Directory, Entry, File, Filesystem, Metadata};
 use crate::master_boot_record::PartitionEntry;
 
@@ -39,17 +39,19 @@ pub struct VirtualFilesystem {
 }
 
 impl VirtualFilesystem {
-    pub fn new() -> Self {
-        VirtualFilesystem {
-            mounts: Mounts(Arc::new(RefCell::new(Vec::new()))),
-        }
-    }
-
     pub fn mount(&mut self, mount_point: Path, filesystem: Box<dyn Filesystem>) {
         self.mounts.0.as_ref().borrow_mut().push(Mount {
             mount_point,
             filesystem,
         })
+    }
+}
+
+impl Default for VirtualFilesystem {
+    fn default() -> Self {
+        Self {
+            mounts: Mounts(Arc::new(RefCell::new(Vec::new()))),
+        }
     }
 }
 
@@ -121,7 +123,7 @@ impl Directory for VFSDirectory {
                             .unwrap_or(Ok(Vec::new()))?;
                         result.extend(entries.into_iter());
                     }
-                    None => {}
+                    None => return Err(Error::from(ErrorKind::NotFound)),
                 }
 
                 Ok(result)
@@ -132,3 +134,79 @@ impl Directory for VFSDirectory {
         ioerr!(Unsupported)
     }
 }
+
+pub struct ByteDeviceFilesystem<Device: ByteDevice + Clone>(Device, String);
+pub struct ByteDeviceDirectory<Device: ByteDevice + Clone>(Device, String);
+pub struct ByteDeviceFile<Device: ByteDevice + Clone>(Device);
+
+impl<Device: ByteDevice + Clone + 'static> ByteDeviceFilesystem<Device> {
+    pub fn new(device: Device, file: String) -> Self {
+        Self(device, file)
+    }
+}
+
+impl<Device: ByteDevice + Clone + 'static> Filesystem for ByteDeviceFilesystem<Device> {
+    fn root(&mut self) -> io::Result<Box<dyn Directory>> {
+        Ok(Box::new(ByteDeviceDirectory(self.0.clone(), self.1.clone())))
+    }
+
+    fn format(device: &mut dyn BlockDevice, partition: &mut PartitionEntry, sector_size: usize) -> io::Result<()> where Self: Sized {
+        todo!()
+    }
+}
+
+impl<Device: ByteDevice + Clone + 'static> Directory for ByteDeviceDirectory<Device> {
+    fn open_entry(&mut self, name: &str) -> io::Result<Entry> {
+        if self.1.eq(name) {
+            Ok(Entry::File(Box::new(ByteDeviceFile(self.0.clone()))))
+        } else {
+            Err(io::Error::from(io::ErrorKind::NotFound))
+        }
+    }
+
+    fn create_file(&mut self, name: &str) -> io::Result<Box<dyn File>> {
+        todo!()
+    }
+
+    fn create_directory(&mut self, name: &str) -> io::Result<Box<dyn Directory>> {
+        todo!()
+    }
+
+    fn remove(&mut self, name: &str) -> io::Result<()> {
+        todo!()
+    }
+
+    fn list(&mut self) -> io::Result<Vec<String>> {
+        todo!()
+    }
+
+    fn metadata(&mut self) -> io::Result<Box<dyn Metadata>> {
+        todo!()
+    }
+}
+
+impl<Device: ByteDevice + Clone + 'static> File for ByteDeviceFile<Device> {}
+
+impl<Device: ByteDevice + Clone + 'static> io::Read for ByteDeviceFile<Device> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        io::Read::read(&mut self.0 as &mut dyn ByteDevice, buf)
+    }
+}
+
+impl<Device: ByteDevice + Clone + 'static> io::Write for ByteDeviceFile<Device> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        io::Write::write(&mut self.0 as &mut dyn ByteDevice, buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        io::Write::flush(&mut self.0 as &mut dyn ByteDevice)
+    }
+}
+
+impl<Device: ByteDevice + Clone + 'static> io::Seek for ByteDeviceFile<Device> {
+    fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
+        io::Seek::seek(&mut self.0 as &mut dyn ByteDevice, pos)
+    }
+}
+
+//impl<Device: ByteDevice + Clone + 'static> File for ByteDeviceFile<Device> {}

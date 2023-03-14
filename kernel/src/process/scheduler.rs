@@ -12,7 +12,7 @@ use pi::local_interrupt::{local_tick_in, LocalController, LocalInterrupt};
 use shim::{io, newioerr};
 
 use crate::{SCHEDULER, VMM};
-use crate::multiprocessing::mutex::Mutex;
+use crate::multiprocessing::spin_lock::SpinLock;
 use crate::multiprocessing::per_core::local_irq;
 use crate::param::*;
 use crate::process::{Id, Process, State};
@@ -26,12 +26,12 @@ extern "C" {
 
 /// Process scheduler for the entire machine.
 #[derive(Debug)]
-pub struct GlobalScheduler(Mutex<Option<Box<Scheduler>>>);
+pub struct GlobalScheduler(SpinLock<Option<Box<Scheduler>>>);
 
 impl GlobalScheduler {
     /// Returns an uninitialized wrapper around a local scheduler.
     pub const fn uninitialized() -> GlobalScheduler {
-        GlobalScheduler(Mutex::new(None))
+        GlobalScheduler(SpinLock::new(None))
     }
 
     /// Enters a critical region and execute the provided closure with a mutable

@@ -3,25 +3,23 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use core::cmp::min;
-
-
-use filesystem::fs2::File2;
+use filesystem::filesystem::File;
 
 use shim::{io, ioerr};
 use shim::io::{Seek, SeekFrom};
 
-use crate::multiprocessing::mutex::Mutex;
+use crate::multiprocessing::spin_lock::SpinLock;
 
 pub(crate) struct Pipe(Vec<u8>);
 
 pub(crate) enum PipeResource {
-    Writer(Arc<Mutex<Pipe>>),
-    Reader(Arc<Mutex<Pipe>>),
+    Writer(Arc<SpinLock<Pipe>>),
+    Reader(Arc<SpinLock<Pipe>>),
 }
 
 impl PipeResource {
     pub(crate) fn new_pair() -> (Self, Self) {
-        let pipe = Arc::new(Mutex::new(Pipe(Vec::new())));
+        let pipe = Arc::new(SpinLock::new(Pipe(Vec::new())));
         let writer = PipeResource::Writer(pipe.clone());
         let reader = PipeResource::Reader(pipe);
         (writer, reader)
@@ -32,15 +30,7 @@ impl Drop for PipeResource {
     fn drop(&mut self) {}
 }
 
-impl File2 for PipeResource {
-    fn duplicate(&mut self) -> io::Result<Box<dyn File2>> {
-        Ok(Box::new(match self {
-            PipeResource::Writer(writer) =>
-                PipeResource::Writer(writer.clone()),
-            PipeResource::Reader(reader) =>
-                PipeResource::Reader(reader.clone()),
-        }))
-    }
+impl File for PipeResource {
 }
 
 impl io::Read for PipeResource {

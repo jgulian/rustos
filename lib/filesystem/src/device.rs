@@ -4,10 +4,74 @@ use alloc::vec;
 use std::vec;
 
 use shim::io;
+use shim::io::SeekFrom;
 
 pub trait ByteDevice {
-    fn read_byte(&mut self) -> io::Result<u8>;
-    fn write_byte(&mut self, byte: u8) -> io::Result<()>;
+    fn read_byte(&mut self) -> io::Result<u8> {
+        loop {
+            match self.try_read_byte() {
+                Ok(byte) => return Ok(byte),
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {}
+                Err(e) => return Err(e),
+            }
+        }
+    }
+    fn write_byte(&mut self, byte: u8) -> io::Result<()> {
+        loop {
+            match self.try_write_byte(byte) {
+                Ok(_) => return Ok(()),
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {}
+                Err(e) => return Err(e),
+            }
+        }
+    }
+
+    fn try_read_byte(&mut self) -> io::Result<u8>;
+    fn try_write_byte(&mut self, byte: u8) -> io::Result<()>;
+}
+
+impl io::Read for dyn ByteDevice {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        let mut count = 0;
+        let result = buf.iter_mut().try_for_each(|byte| -> io::Result<()> {
+            *byte = self.try_read_byte()?;
+            count += 1;
+            Ok(())
+        });
+
+        match result {
+            Ok(_) => return Ok(count),
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => Ok(count),
+            Err(e) => Err(e),
+        }
+    }
+}
+
+impl io::Write for dyn ByteDevice {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        let mut count = 0;
+        let result = buf.iter().try_for_each(|byte| -> io::Result<()> {
+            self.try_write_byte(*byte)?;
+            count += 1;
+            Ok(())
+        });
+
+        match result {
+            Ok(_) => return Ok(count),
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => Ok(count),
+            Err(e) => Err(e),
+        }
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+impl io::Seek for dyn ByteDevice {
+    fn seek(&mut self, _: SeekFrom) -> io::Result<u64> {
+        Err(io::Error::from(io::ErrorKind::NotSeekable))
+    }
 }
 
 pub trait BlockDevice {

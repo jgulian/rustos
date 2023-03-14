@@ -10,7 +10,6 @@ use core::slice::from_raw_parts;
 
 use aarch64;
 use aarch64::SPSR_EL1;
-use filesystem::fs2::FileSystem2;
 use filesystem::path::Path;
 use kernel_api::{OsError, OsResult};
 use shim::{io, newioerr};

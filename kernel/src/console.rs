@@ -4,7 +4,7 @@ use core::fmt::Write;
 use pi::uart::MiniUart;
 use shim::io;
 
-use crate::multiprocessing::mutex::Mutex;
+use crate::multiprocessing::spin_lock::SpinLock;
 
 /// A global singleton allowing read/write access to the console.
 pub struct Console {
@@ -73,7 +73,7 @@ impl fmt::Write for Console {
 }
 
 /// Global `Console` singleton.
-pub static CONSOLE: Mutex<Console> = Mutex::new(Console::new());
+pub static CONSOLE: SpinLock<Console> = SpinLock::new(Console::new());
 
 /// Internal function called by the `kprint[ln]!` macros.
 #[doc(hidden)]

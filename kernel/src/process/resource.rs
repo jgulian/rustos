@@ -4,7 +4,7 @@ use core::cmp::Ordering;
 use core::fmt;
 use core::fmt::Formatter;
 
-use filesystem::fs2::File2;
+use filesystem::filesystem::File;
 use kernel_api::{OsError, OsResult};
 
 
@@ -36,7 +36,7 @@ impl PartialOrd<u64> for ResourceId {
 }
 
 pub enum Resource {
-    File(Box<dyn File2>),
+    File(Box<dyn File>),
 }
 
 pub struct ResourceEntry {

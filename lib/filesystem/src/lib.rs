@@ -8,7 +8,7 @@ pub mod error;
 pub mod filesystem;
 pub mod master_boot_record;
 pub mod path;
-pub mod vfs;
+pub mod virtual_file_system;
 pub mod partition;
 
 #[cfg(not(feature = "no_std"))]

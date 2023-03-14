@@ -21,7 +21,7 @@ pub type LockResult<G> = Result<G, PoisonError<G>>;
 
 pub type TryLockResult<G> = Result<G, TryLockError<G>>;
 
-pub trait Mutex<T: Sized> {
+pub trait Mutex<T: Send + Sized>: Send + Sync {
     type G: MutexGuard<T>;
 
     fn new(value: T) -> Self where Self: Sized;

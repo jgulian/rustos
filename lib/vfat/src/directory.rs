@@ -72,6 +72,7 @@ impl<M: Mutex<VirtualFat> + 'static> filesystem::Directory for Directory<M> {
     fn open_entry(&mut self, name: &str) -> io::Result<filesystem::Entry> {
         self.restart()?;
         while let Some(mut span) = self.next()? {
+            // TODO: use eq?
             if span.name().as_str() != name {
                 continue;
             }

@@ -12,5 +12,5 @@ pub(crate) mod error;
 pub(crate) mod file;
 pub(crate) mod metadata;
 pub(crate) mod chain;
-pub(crate) mod virtual_fat;
+pub mod virtual_fat;
 
