@@ -15,10 +15,11 @@ use std::sync::Arc;
 #[cfg(not(feature = "no_std"))]
 use std::vec::Vec;
 
-use core::cell::RefCell;
+use core::ops::{Deref, DerefMut};
+use shim::io;
 
-use shim::{io, ioerr, newioerr};
-use shim::io::{Error, ErrorKind, SeekFrom};
+use shim::io::SeekFrom;
+use sync::Mutex;
 use crate::device::{BlockDevice, ByteDevice};
 use crate::filesystem::{Directory, Entry, File, Filesystem, Metadata};
 use crate::master_boot_record::PartitionEntry;
@@ -30,32 +31,29 @@ struct Mount {
     filesystem: Box<dyn Filesystem>,
 }
 
-//TODO: this is not thread safe
-#[derive(Clone)]
-struct Mounts(Arc<RefCell<Vec<Mount>>>);
+pub struct Mounts(Vec<Mount>);
 
-pub struct VirtualFilesystem {
-    mounts: Mounts,
+pub struct VirtualFilesystem<M: Mutex<Mounts>> {
+    mounts: Arc<M>,
 }
 
-impl VirtualFilesystem {
-    pub fn mount(&mut self, mount_point: Path, filesystem: Box<dyn Filesystem>) {
-        self.mounts.0.as_ref().borrow_mut().push(Mount {
-            mount_point,
-            filesystem,
-        })
+impl<M: Mutex<Mounts>> VirtualFilesystem<M> {
+    pub fn mount(&mut self, mount_point: Path, filesystem: Box<dyn Filesystem>) -> io::Result<()> {
+        self.mounts.lock(|mounts| {
+            mounts.0.push(Mount { mount_point, filesystem, });
+        }).map_err(|_| io::Error::from(io::ErrorKind::Other))
     }
 }
 
-impl Default for VirtualFilesystem {
+impl<M: Mutex<Mounts>> Default for VirtualFilesystem<M> {
     fn default() -> Self {
         Self {
-            mounts: Mounts(Arc::new(RefCell::new(Vec::new()))),
+            mounts: Arc::new(M::new(Mounts(Vec::new()))),
         }
     }
 }
 
-impl Filesystem for VirtualFilesystem {
+impl<M: Mutex<Mounts> + 'static> Filesystem for VirtualFilesystem<M> {
     fn root(&mut self) -> io::Result<Box<dyn Directory>> {
         Ok(Box::new(VFSDirectory {
             path: Path::default(),
@@ -64,88 +62,92 @@ impl Filesystem for VirtualFilesystem {
     }
 
     fn format(_: &mut dyn BlockDevice, _: &mut PartitionEntry, _: usize) -> io::Result<()> where Self: Sized {
-        Err(Error::from(ErrorKind::Unsupported))
+        Err(io::Error::from(io::ErrorKind::Unsupported))
     }
 }
 
-struct VFSDirectory {
+struct VFSDirectory<M: Mutex<Mounts>> {
     path: Path,
-    mounts: Mounts,
+    mounts: Arc<M>,
 }
 
-impl Directory for VFSDirectory {
+impl<M: Mutex<Mounts> + 'static> Directory for VFSDirectory<M> {
     fn open_entry(&mut self, name: &str) -> io::Result<Entry> {
         let mut new_path = self.path.clone();
         new_path.join_str(name);
 
-        let mounts = self.mounts.clone();
-        let mut mounts_borrow = mounts.0.as_ref().borrow_mut();
-        mounts_borrow.iter_mut()
-            .filter(|mount| mount.mount_point.starts_with(&self.path))
-            .find_map(|mount| -> Option<Entry> {
-                if mount.mount_point == self.path {
-                    let mut thing = mount.filesystem.root().ok()?;
-                    thing.open_entry(name).ok()
-                } else if mount.mount_point.starts_with(&new_path) {
-                    Some(Entry::Directory(Box::new(VFSDirectory {
-                        path: new_path.clone(),
-                        mounts: self.mounts.clone(),
-                    })))
-                } else {
-                    None
-                }
-            }).ok_or(newioerr!(NotFound))
+        self.mounts.lock(|mounts| {
+            mounts.0.iter_mut()
+                .filter(|mount| mount.mount_point.starts_with(&self.path))
+                .find_map(|mount| -> Option<Entry> {
+                    if mount.mount_point == self.path {
+                        let mut thing = mount.filesystem.root().ok()?;
+                        thing.open_entry(name).ok()
+                    } else if mount.mount_point.starts_with(&new_path) {
+                        Some(Entry::Directory(Box::new(VFSDirectory {
+                            path: new_path.clone(),
+                            mounts: self.mounts.clone(),
+                        })))
+                    } else {
+                        None
+                    }
+                }).ok_or(io::Error::from(io::ErrorKind::NotFound))
+        }).map_err(|_| io::Error::from(io::ErrorKind::Other))?
     }
 
     fn create_file(&mut self, name: &str) -> io::Result<Box<dyn File>> {
-        self.mounts.0.as_ref().borrow_mut().iter_mut()
-            .filter(|mount| mount.mount_point == self.path)
-            .next().map(|mount| mount.filesystem.root()?.create_file(name))
-            .unwrap_or(ioerr!(Unsupported))
+        self.mounts.lock(|mounts| {
+            mounts.0.iter_mut()
+                .filter(|mount| mount.mount_point == self.path)
+                .next().map(|mount| mount.filesystem.root()?.create_file(name))
+                .unwrap_or(Err(io::Error::from(io::ErrorKind::Unsupported)))
+        }).map_err(|_| io::Error::from(io::ErrorKind::Other))?
     }
 
     fn create_directory(&mut self, _: &str) -> io::Result<Box<dyn Directory>> {
-        ioerr!(Unsupported)
+        Err(io::Error::from(io::ErrorKind::Unsupported))
     }
 
     fn remove(&mut self, _: &str) -> io::Result<()> {
-        ioerr!(Unsupported)
+        Err(io::Error::from(io::ErrorKind::Unsupported))
     }
 
     fn list(&mut self) -> io::Result<Vec<String>> {
-        self.mounts.0.as_ref().borrow_mut().iter_mut()
-            .try_fold(Vec::new(), |mut result: Vec<String>, mount| {
-                match self.path.relative_from(&mount.mount_point) {
-                    Some(sub_path) => {
-                        let entries = mount.filesystem.open(&sub_path)
-                            .and_then(|entry| entry.into_directory())
-                            .map(|mut directory| directory.list())
-                            .unwrap_or(Ok(Vec::new()))?;
-                        result.extend(entries.into_iter());
+        self.mounts.deref().lock(|mounts| {
+            mounts.0.iter_mut()
+                .try_fold(Vec::new(), |mut result: Vec<String>, mount| {
+                    match self.path.relative_from(&mount.mount_point) {
+                        Some(sub_path) => {
+                            let entries = mount.filesystem.open(&sub_path)
+                                .and_then(|entry| entry.into_directory())
+                                .map(|mut directory| directory.list())
+                                .unwrap_or(Ok(Vec::new()))?;
+                            result.extend(entries.into_iter());
+                        }
+                        None => return Err(io::Error::from(io::ErrorKind::NotFound)),
                     }
-                    None => return Err(Error::from(ErrorKind::NotFound)),
-                }
 
-                Ok(result)
-            })
+                    Ok(result)
+                })
+        }).map_err(|_| io::Error::from(io::ErrorKind::Other))?
     }
 
     fn metadata(&mut self) -> io::Result<Box<dyn Metadata>> {
-        ioerr!(Unsupported)
+        Err(io::Error::from(io::ErrorKind::Unsupported))
     }
 }
 
-pub struct ByteDeviceFilesystem<Device: ByteDevice + Clone>(Device, String);
-pub struct ByteDeviceDirectory<Device: ByteDevice + Clone>(Device, String);
-pub struct ByteDeviceFile<Device: ByteDevice + Clone>(Device);
+pub struct ByteDeviceFilesystem<Device: ByteDevice + Send + Sync + Clone>(Device, String);
+pub struct ByteDeviceDirectory<Device: ByteDevice + Send + Sync + Clone>(Device, String);
+pub struct ByteDeviceFile<Device: ByteDevice + Send + Sync + Clone>(Device);
 
-impl<Device: ByteDevice + Clone + 'static> ByteDeviceFilesystem<Device> {
+impl<Device: ByteDevice + Clone + Send + Sync + 'static> ByteDeviceFilesystem<Device> {
     pub fn new(device: Device, file: String) -> Self {
         Self(device, file)
     }
 }
 
-impl<Device: ByteDevice + Clone + 'static> Filesystem for ByteDeviceFilesystem<Device> {
+impl<Device: ByteDevice + Clone + Send + Sync + 'static> Filesystem for ByteDeviceFilesystem<Device> {
     fn root(&mut self) -> io::Result<Box<dyn Directory>> {
         Ok(Box::new(ByteDeviceDirectory(self.0.clone(), self.1.clone())))
     }
@@ -155,7 +157,7 @@ impl<Device: ByteDevice + Clone + 'static> Filesystem for ByteDeviceFilesystem<D
     }
 }
 
-impl<Device: ByteDevice + Clone + 'static> Directory for ByteDeviceDirectory<Device> {
+impl<Device: ByteDevice + Clone + Send + Sync + 'static> Directory for ByteDeviceDirectory<Device> {
     fn open_entry(&mut self, name: &str) -> io::Result<Entry> {
         if self.1.eq(name) {
             Ok(Entry::File(Box::new(ByteDeviceFile(self.0.clone()))))
@@ -185,15 +187,15 @@ impl<Device: ByteDevice + Clone + 'static> Directory for ByteDeviceDirectory<Dev
     }
 }
 
-impl<Device: ByteDevice + Clone + 'static> File for ByteDeviceFile<Device> {}
+impl<Device: ByteDevice + Clone + Send + Sync + 'static> File for ByteDeviceFile<Device> {}
 
-impl<Device: ByteDevice + Clone + 'static> io::Read for ByteDeviceFile<Device> {
+impl<Device: ByteDevice + Clone + Send + Sync + 'static> io::Read for ByteDeviceFile<Device> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         io::Read::read(&mut self.0 as &mut dyn ByteDevice, buf)
     }
 }
 
-impl<Device: ByteDevice + Clone + 'static> io::Write for ByteDeviceFile<Device> {
+impl<Device: ByteDevice + Clone + Send + Sync + 'static> io::Write for ByteDeviceFile<Device> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         io::Write::write(&mut self.0 as &mut dyn ByteDevice, buf)
     }
@@ -203,7 +205,7 @@ impl<Device: ByteDevice + Clone + 'static> io::Write for ByteDeviceFile<Device> 
     }
 }
 
-impl<Device: ByteDevice + Clone + 'static> io::Seek for ByteDeviceFile<Device> {
+impl<Device: ByteDevice + Clone + Send + Sync + 'static> io::Seek for ByteDeviceFile<Device> {
     fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         io::Seek::seek(&mut self.0 as &mut dyn ByteDevice, pos)
     }

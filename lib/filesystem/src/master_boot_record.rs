@@ -56,7 +56,7 @@ pub struct MasterBootRecord {
     pub(crate) valid_boot_sector: [u8; 2],
 }
 
-impl TryFrom<&mut Box<dyn BlockDevice>> for MasterBootRecord {
+impl TryFrom<&mut Box<dyn BlockDevice + Send + Sync>> for MasterBootRecord {
     type Error = FilesystemError;
 
 
@@ -68,7 +68,7 @@ impl TryFrom<&mut Box<dyn BlockDevice>> for MasterBootRecord {
     /// Returns `UnknownBootIndicator(n)` if partition `n` contains an invalid
     /// boot indicator. Returns `Io(err)` if the I/O error `err` occured while
     /// reading the MBR.
-    fn try_from(value: &mut Box<dyn BlockDevice>) -> Result<Self, Self::Error> {
+    fn try_from(value: &mut Box<dyn BlockDevice + Send + Sync>) -> Result<Self, Self::Error> {
         let mut buffer: [u8; 512] = [0; 512];
         value.read_block(0, &mut buffer)?;
 

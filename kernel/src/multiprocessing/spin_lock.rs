@@ -2,6 +2,7 @@ use core::cell::UnsafeCell;
 use core::fmt;
 use core::ops::{Deref, DerefMut, Drop};
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use sync::{LockResult, TryLockError, TryLockResult};
 
 use crate::multiprocessing::per_core::is_mmu_ready;
 
@@ -16,30 +17,29 @@ unsafe impl<T: Send> Send for SpinLock<T> {}
 
 unsafe impl<T: Send> Sync for SpinLock<T> {}
 
+struct SpinLockMutexGuard<'a, T>(&'a SpinLock<T>);
 
+impl<'a, T> sync::Mutex<T> for SpinLock<T> {
+    type G = SpinLockMutexGuard<'a, T>;
 
-pub struct MutexGuard<'a, T: 'a> {
-    lock: &'a SpinLock<T>,
-}
-
-impl<'a, T> ! Send for MutexGuard<'a, T> {}
-
-unsafe impl<'a, T: Sync> Sync for MutexGuard<'a, T> {}
-
-impl<T> SpinLock<T> {
-    pub const fn new(val: T) -> SpinLock<T> {
+    fn new(value: T) -> Self where Self: Sized {
         SpinLock {
             lock: AtomicBool::new(false),
-            owner: AtomicUsize::new(usize::max_value()),
-            data: UnsafeCell::new(val),
+            owner: AtomicUsize::new(usize::MAX),
+            data: UnsafeCell::new(value),
         }
     }
-}
 
-impl<T> SpinLock<T> {
-    // Once MMU/cache is enabled, do the right thing here. For now, we don't
-    // need any real synchronization.
-    pub fn try_lock(&self) -> Option<MutexGuard<T>> {
+    fn lock(&self) -> LockResult<Self::G> {
+        loop {
+            match self.try_lock() {
+                Some(guard) => return guard,
+                None => continue,
+            }
+        }
+    }
+
+    fn try_lock(&self) -> TryLockResult<Self::G> {
         let me = aarch64::affinity();
 
         let ordering = if is_mmu_ready() {
@@ -47,27 +47,14 @@ impl<T> SpinLock<T> {
         } else if me == 0 {
             Ordering::Relaxed
         } else {
-            return None;
+            return Err(TryLockError::InvalidState);
         };
 
         //TODO: Review
         if !self.lock.compare_and_swap(false, true, ordering) {
-            Some(MutexGuard { lock: self })
+            Ok(SpinLockMutexGuard(self))
         } else {
-            None
-        }
-    }
-
-    // Once MMU/cache is enabled, do the right thing here. For now, we don't
-    // need any real synchronization.
-    #[inline(never)]
-    pub fn lock(&self) -> MutexGuard<T> {
-        // Wait until we can "aquire" the lock, then "acquire" it.
-        loop {
-            match self.try_lock() {
-                Some(guard) => return guard,
-                None => continue,
-            }
+            Err(TryLockError::WouldBlock)
         }
     }
 
@@ -80,33 +67,17 @@ impl<T> SpinLock<T> {
         self.owner.store(usize::MAX, ordering);
         self.lock.store(false, ordering);
     }
-}
 
-impl<'a, T: 'a> Deref for MutexGuard<'a, T> {
-    type Target = T;
+    fn is_poisoned(&self) -> bool {
+        todo!()
+    }
 
-    fn deref(&self) -> &T {
-        unsafe { &*self.lock.data.get() }
+    fn clear_poison(&self) {
+        todo!()
     }
 }
 
-impl<'a, T: 'a> DerefMut for MutexGuard<'a, T> {
-    fn deref_mut(&mut self) -> &mut T {
-        unsafe { &mut *self.lock.data.get() }
-    }
-}
 
-impl<'a, T: 'a> Drop for MutexGuard<'a, T> {
-    fn drop(&mut self) {
-        self.lock.unlock()
-    }
-}
+impl<'a, T> !Send for SpinLockMutexGuard<'a, T> {}
+unsafe impl<'a, T: Sync> Sync for SpinLockMutexGuard<'a, T> {}
 
-impl<T: fmt::Debug> fmt::Debug for SpinLock<T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self.try_lock() {
-            Some(guard) => f.debug_struct("Mutex").field("data", &&*guard).finish(),
-            None => f.debug_struct("Mutex").field("data", &"<locked>").finish(),
-        }
-    }
-}

@@ -40,9 +40,9 @@ pub trait Metadata {
     fn modified(&self) -> Box<dyn Timestamp>;
 }
 
-pub trait File: io::Seek + io::Read + io::Write {}
+pub trait File: io::Seek + io::Read + io::Write + Send + Sync {}
 
-pub trait Directory {
+pub trait Directory: Send + Sync {
     fn open_entry(&mut self, name: &str) -> io::Result<Entry>;
     fn create_file(&mut self, name: &str) -> io::Result<BoxedFile>;
     fn create_directory(&mut self, name: &str) -> io::Result<BoxedDirectory>;
@@ -94,7 +94,7 @@ impl Entry {
     }
 }
 
-pub trait Filesystem {
+pub trait Filesystem: Send + Sync {
     fn root(&mut self) -> io::Result<BoxedDirectory>;
 
     fn open(&mut self, path: &Path) -> io::Result<Entry> {

@@ -14,6 +14,7 @@ pub struct PoisonError<G> {
 
 pub enum TryLockError<G> {
     Poisoned(PoisonError<G>),
+    InvalidState,
     WouldBlock,
 }
 
@@ -21,15 +22,10 @@ pub type LockResult<G> = Result<G, PoisonError<G>>;
 
 pub type TryLockResult<G> = Result<G, TryLockError<G>>;
 
-pub trait Mutex<T: Send + Sized>: Send + Sync {
-    type G: MutexGuard<T>;
-
+pub trait Mutex<T: Send>: Send + Sync {
     fn new(value: T) -> Self where Self: Sized;
-    fn lock(&self) -> LockResult<Self::G>;
-    fn try_lock(&self) -> TryLockResult<Self::G>;
-    fn unlock(&self);
+    fn lock<R>(&self, f: impl FnOnce(&mut T) -> R) -> LockResult<R>;
+    fn try_lock<R>(&self, f: impl FnOnce(&mut T) -> R) -> TryLockResult<R>;
     fn is_poisoned(&self) -> bool;
     fn clear_poison(&self);
 }
-
-pub trait MutexGuard<T>: Deref<Target=T> + DerefMut<Target=T> {}

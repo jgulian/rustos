@@ -165,8 +165,10 @@ pub struct VirtualFatFilesystem<M: Mutex<VirtualFat>>(Arc<M>);
 impl<M: Mutex<VirtualFat> + 'static> filesystem::filesystem::Filesystem for VirtualFatFilesystem<M> {
     fn root(&mut self) -> io::Result<Box<dyn filesystem::filesystem::Directory>> {
         let virtual_fat = self.0.clone();
-        let root_cluster = self.0.lock()
-            .map_err(|_| io::Error::from(io::ErrorKind::Other))?.root_cluster;
+
+        let root_cluster = self.0.lock(|virtual_fat| virtual_fat.root_cluster)
+            .map_err(|_| io::Error::from(io::ErrorKind::Other))?;
+
         let chain = Chain::new_from_cluster(virtual_fat.clone(), root_cluster)
             .map_err(|_| io::Error::from(io::ErrorKind::Other))?;
         Ok(Box::new(Directory {

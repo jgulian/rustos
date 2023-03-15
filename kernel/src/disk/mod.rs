@@ -12,7 +12,7 @@ use filesystem::device::{BlockDevice, ByteDevice};
 use filesystem::master_boot_record::{MasterBootRecord, PartitionEntry};
 use filesystem::partition::BlockPartition;
 use filesystem::path::Path;
-use filesystem::virtual_file_system::{ByteDeviceFilesystem, VirtualFilesystem};
+use filesystem::virtual_file_system::{ByteDeviceFilesystem, Mounts, VirtualFilesystem};
 use vfat::virtual_fat::{VirtualFat, VirtualFatFilesystem};
 
 use pi::uart::MiniUart;
@@ -25,7 +25,7 @@ use crate::multiprocessing::spin_lock::SpinLock;
 
 pub mod sd;
 
-pub struct FileSystem(SpinLock<Option<VirtualFilesystem>>);
+pub struct FileSystem(SpinLock<Option<VirtualFilesystem<SpinLock<Mounts>>>>);
 
 impl FileSystem {
     /// Returns an uninitialized `FileSystem`.

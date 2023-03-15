@@ -13,7 +13,7 @@ use crate::master_boot_record::MasterBootRecord;
 
 pub struct BlockPartition {
     /// The device the partition is based on
-    device: Box<dyn BlockDevice>,
+    device: Box<dyn BlockDevice + Send + Sync>,
     /// The physical sector where the partition begins.
     block_offset: u64,
     /// Number of sectors
@@ -96,10 +96,10 @@ impl BlockDevice for BlockPartition {
     }
 }
 
-impl TryFrom<(Box<dyn BlockDevice>, u8)> for BlockPartition {
+impl TryFrom<(Box<dyn BlockDevice + Send + Sync>, u8)> for BlockPartition {
     type Error = FilesystemError;
 
-    fn try_from((mut device, filesystem): (Box<dyn BlockDevice>, u8)) -> Result<Self, Self::Error> {
+    fn try_from((mut device, filesystem): (Box<dyn BlockDevice + Send + Sync>, u8)) -> Result<Self, Self::Error> {
         let block_size = device.block_size() as u64;
         let master_boot_record = MasterBootRecord::try_from(&mut device)?;
 
