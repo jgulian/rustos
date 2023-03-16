@@ -3,6 +3,7 @@ use core::fmt::Write;
 
 use pi::uart::MiniUart;
 use shim::io;
+use sync::Mutex;
 
 use crate::multiprocessing::spin_lock::SpinLock;
 
@@ -78,16 +79,10 @@ pub static CONSOLE: SpinLock<Console> = SpinLock::new(Console::new());
 /// Internal function called by the `kprint[ln]!` macros.
 #[doc(hidden)]
 pub fn _print(args: fmt::Arguments) {
-    #[cfg(not(test))]
-    {
-        let mut console = CONSOLE.lock();
-        console.write_fmt(args).unwrap();
-    }
+    CONSOLE.lock(|console| {
+        console.write_fmt(args).unwrap()
+    }).unwrap()
 
-    #[cfg(test)]
-    {
-        print!("{}", args);
-    }
 }
 
 /// Like `println!`, but for kernel2-space.

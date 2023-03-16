@@ -40,7 +40,9 @@ pub trait Metadata {
     fn modified(&self) -> Box<dyn Timestamp>;
 }
 
-pub trait File: io::Seek + io::Read + io::Write + Send + Sync {}
+pub trait File: io::Seek + io::Read + io::Write + Send + Sync {
+    fn duplicate(&mut self) -> io::Result<Box<dyn File>>;
+}
 
 pub trait Directory: Send + Sync {
     fn open_entry(&mut self, name: &str) -> io::Result<Entry>;

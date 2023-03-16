@@ -7,6 +7,7 @@ use std::string::String;
 #[cfg(not(feature = "no_std"))]
 use std::vec::Vec;
 
+use shim::io;
 use core::fmt::{Display, Formatter};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -21,6 +22,10 @@ pub enum Component {
 pub struct Path(String);
 
 impl Path {
+    pub fn root() -> Self {
+        Self(String::from(""))
+    }
+
     fn new(components: Vec<Component>) -> Path {
         let mut path = Path(String::new());
         for component in components {
@@ -48,14 +53,20 @@ impl Path {
         }
     }
 
-    pub fn join_str(&mut self, other: &str) {
+    pub fn join_str(&mut self, other: &str) -> io::Result<()> {
         let new_component = match other {
             "/" => Component::Root,
             "." => Component::Root,
             ".." => Component::Root,
-            _ => Component::Child(other.replace("/", ""))
+            _ => {
+                if other.contains('/') {
+                    return Err(io::Error::from(io::ErrorKind::InvalidFilename));
+                }
+                Component::Child(other.replace('/', ""))
+            }
         };
         self.push_component(new_component);
+        Ok(())
     }
 
     pub fn simplify(&self) -> Path {
@@ -99,9 +110,28 @@ impl Path {
     }
 }
 
+impl TryFrom<&str> for Path {
+    type Error = io::Error;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        let mut result = Path::default();
+
+        value.split('/').try_for_each(|component_str| -> io::Result<()> {
+            if component_str.is_empty() {
+                result.push_component(Component::Root)
+            } else {
+                result.join_str(component_str)?;
+            }
+            Ok(())
+        })?;
+
+        Ok(result)
+    }
+}
+
 impl Default for Path {
     fn default() -> Self {
-        Self(String::from("/"))
+        Self(String::from(""))
     }
 }
 

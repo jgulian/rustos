@@ -7,9 +7,11 @@ use filesystem::filesystem::File;
 
 use shim::{io, ioerr};
 use shim::io::{Seek, SeekFrom};
+use sync::Mutex;
 
 use crate::multiprocessing::spin_lock::SpinLock;
 
+//TODO: this should probably be VecDeque
 pub(crate) struct Pipe(Vec<u8>);
 
 pub(crate) enum PipeResource {
@@ -26,11 +28,15 @@ impl PipeResource {
     }
 }
 
-impl Drop for PipeResource {
-    fn drop(&mut self) {}
-}
-
 impl File for PipeResource {
+    fn duplicate(&mut self) -> io::Result<Box<dyn File>> {
+        Ok(Box::new(match self {
+            PipeResource::Writer(writer) =>
+                PipeResource::Writer(writer.clone()),
+            PipeResource::Reader(reader) =>
+                PipeResource::Reader(reader.clone()),
+        }))
+    }
 }
 
 impl io::Read for PipeResource {
@@ -39,12 +45,13 @@ impl io::Read for PipeResource {
             PipeResource::Writer(_) => {
                 ioerr!(Unsupported)
             }
-            PipeResource::Reader(pipe_arc) => {
-                let mut pipe = pipe_arc.lock();
-                let amount = min(pipe.0.len(), buf.len());
-                buf[..amount].copy_from_slice(&pipe.0.as_slice()[..amount]);
-                pipe.0.drain(0..amount);
-                Ok(amount)
+            PipeResource::Reader(pipe) => {
+                pipe.lock(|pipe| {
+                    let amount = min(pipe.0.len(), buf.len());
+                    buf[..amount].copy_from_slice(&pipe.0.as_slice()[..amount]);
+                    pipe.0.drain(0..amount);
+                    Ok(amount)
+                }).unwrap()
             }
         }
     }
@@ -53,10 +60,11 @@ impl io::Read for PipeResource {
 impl io::Write for PipeResource {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         match self {
-            PipeResource::Writer(pipe_arc) => {
-                let mut pipe = pipe_arc.lock();
-                pipe.0.extend_from_slice(buf);
-                Ok(buf.len())
+            PipeResource::Writer(pipe) => {
+                pipe.lock(|pipe| {
+                    pipe.0.extend_from_slice(buf);
+                    Ok(buf.len())
+                }).unwrap()
             }
             PipeResource::Reader(_pipe_arc) => {
                 ioerr!(Unsupported)

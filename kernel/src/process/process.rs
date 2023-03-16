@@ -10,6 +10,7 @@ use core::slice::from_raw_parts;
 
 use aarch64;
 use aarch64::SPSR_EL1;
+use filesystem::filesystem::Filesystem;
 use filesystem::path::Path;
 use kernel_api::{OsError, OsResult};
 use shim::{io, newioerr};
@@ -102,9 +103,9 @@ impl Process {
 
         let mut file = FILESYSTEM.borrow().open(pn)
             .map_err(|_| OsError::IoError)?
-            .into_file().ok_or(OsError::NoEntry)?;
+            .into_file().map_err(|_| OsError::NoEntry)?;
 
-        file.read(user_image).map_err(|_e| OsError::IoError)?;
+        file.read(user_image).map_err(|_| OsError::IoError)?;
         Ok(process)
     }
 
@@ -165,10 +166,10 @@ impl Process {
 
     //TODO: limit number of open files
     pub fn open(&mut self, path_name: String) -> OsResult<ResourceId> {
-        let path = Path::try_from(path_name)?;
+        let path = Path::try_from(path_name.as_str())?;
         let file = FILESYSTEM.borrow()
             .open(&path)?
-            .into_file().ok_or(newioerr!(NotFound))?;
+            .into_file().map_err(|_| newioerr!(NotFound))?;
         Ok(self.resources.insert(Resource::File(file)))
     }
 
@@ -258,12 +259,12 @@ impl Process {
 
         let path = Path::try_from(argument_vec.first()
             .ok_or(newioerr!(InvalidFilename))?
-            .clone())?;
+            .clone().as_str())?;
         let mut absolute_path = Path::root();
-        absolute_path.append(&path);
+        absolute_path.join(&path);
 
         let mut program_file = FILESYSTEM.borrow().open(&absolute_path)?
-            .into_file().ok_or(newioerr!(InvalidFilename))?;
+            .into_file().map_err(|_| newioerr!(InvalidFilename))?;
 
         self.vmap = Box::new(UserPageTable::new());
 

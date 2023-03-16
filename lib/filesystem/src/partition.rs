@@ -23,6 +23,22 @@ pub struct BlockPartition {
 }
 
 impl BlockPartition {
+    pub fn new(mut device: Box<dyn BlockDevice + Send + Sync>, filesystem_id: u8) -> Result<Self, FilesystemError> {
+        let block_size = device.block_size() as u64;
+        let master_boot_record = MasterBootRecord::try_from(&mut device)?;
+
+        let partition = *master_boot_record.partition_table.iter()
+            .find(|partition| partition.partition_type == filesystem_id)
+            .ok_or(FilesystemError::BadSignature)?;
+
+        Ok(BlockPartition {
+            device,
+            block_offset: partition.relative_sector as u64,
+            block_count: partition.total_sectors as u64,
+            block_size,
+        })
+    }
+
     /// Set the block size of the block partition
     pub fn set_block_size(&mut self, block_size: u64) {
         self.block_size = block_size;
@@ -93,25 +109,5 @@ impl BlockDevice for BlockPartition {
             })?;
 
         Ok(())
-    }
-}
-
-impl TryFrom<(Box<dyn BlockDevice + Send + Sync>, u8)> for BlockPartition {
-    type Error = FilesystemError;
-
-    fn try_from((mut device, filesystem): (Box<dyn BlockDevice + Send + Sync>, u8)) -> Result<Self, Self::Error> {
-        let block_size = device.block_size() as u64;
-        let master_boot_record = MasterBootRecord::try_from(&mut device)?;
-
-        let partition = *master_boot_record.partition_table.iter()
-            .find(|partition| partition.partition_type == filesystem)
-            .ok_or(FilesystemError::BadSignature)?;
-
-        Ok(BlockPartition {
-            device,
-            block_offset: partition.relative_sector as u64,
-            block_count: partition.total_sectors as u64,
-            block_size,
-        })
     }
 }

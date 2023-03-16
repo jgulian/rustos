@@ -60,7 +60,7 @@ unsafe fn kernel_main() -> ! {
     init::initialize_app_cores();
     VMM.wait();
 
-    let init = Path::new("/init").expect("unable to open init");
+    let init = Path::try_from("/init").expect("unable to open init");
     SCHEDULER.add(Process::load(&init).expect("unable to run init"));
 
     SCHEDULER.start();

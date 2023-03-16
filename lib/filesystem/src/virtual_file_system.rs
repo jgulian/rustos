@@ -56,7 +56,7 @@ impl<M: Mutex<Mounts>> Default for VirtualFilesystem<M> {
 impl<M: Mutex<Mounts> + 'static> Filesystem for VirtualFilesystem<M> {
     fn root(&mut self) -> io::Result<Box<dyn Directory>> {
         Ok(Box::new(VFSDirectory {
-            path: Path::default(),
+            path: Path::root(),
             mounts: self.mounts.clone(),
         }))
     }
@@ -187,7 +187,11 @@ impl<Device: ByteDevice + Clone + Send + Sync + 'static> Directory for ByteDevic
     }
 }
 
-impl<Device: ByteDevice + Clone + Send + Sync + 'static> File for ByteDeviceFile<Device> {}
+impl<Device: ByteDevice + Clone + Send + Sync + 'static> File for ByteDeviceFile<Device> {
+    fn duplicate(&mut self) -> io::Result<Box<dyn File>> {
+        Ok(Box::new(ByteDeviceFile(self.0.clone())))
+    }
+}
 
 impl<Device: ByteDevice + Clone + Send + Sync + 'static> io::Read for ByteDeviceFile<Device> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {

@@ -1,3 +1,4 @@
+use proc_macro::TokenStream;
 
 #[proc_macro_attribute]
 pub fn read(attr: TokenStream, item: TokenStream) -> TokenStream {

@@ -10,6 +10,7 @@ use aarch64::{SP};
 
 use pi::local_interrupt::{local_tick_in, LocalController, LocalInterrupt};
 use shim::{io, newioerr};
+use sync::Mutex;
 
 use crate::{SCHEDULER, VMM};
 use crate::multiprocessing::spin_lock::SpinLock;
@@ -25,7 +26,6 @@ extern "C" {
 }
 
 /// Process scheduler for the entire machine.
-#[derive(Debug)]
 pub struct GlobalScheduler(SpinLock<Option<Box<Scheduler>>>);
 
 impl GlobalScheduler {
@@ -34,14 +34,16 @@ impl GlobalScheduler {
         GlobalScheduler(SpinLock::new(None))
     }
 
+    //TODO: remove THIS IS JUST A LOCK
     /// Enters a critical region and execute the provided closure with a mutable
     /// reference to the inner scheduler.
     pub fn critical<F, R>(&self, f: F) -> R
         where
             F: FnOnce(&mut Scheduler) -> R,
     {
-        let mut guard = self.0.lock();
-        f(guard.as_mut().expect("scheduler uninitialized"))
+        self.0.lock(|scheduler| {
+            f(scheduler.as_mut().expect("scheduler uninitialized"))
+        }).unwrap()
     }
 
     /// Adds a process to the scheduler's queue and returns that process's ID.
@@ -158,7 +160,7 @@ impl GlobalScheduler {
 
     /// Initializes the scheduler and add userspace processes to the Scheduler.
     pub unsafe fn initialize(&self) {
-        *self.0.lock() = Some(Scheduler::new());
+        self.0.lock(|scheduler| *scheduler = Some(Scheduler::new())).unwrap();
     }
 
     pub fn on_process<T: FnOnce(&mut Process) -> R, R>(&self, tf: &mut TrapFrame, on: T) -> io::Result<R> {

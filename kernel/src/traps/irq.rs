@@ -3,6 +3,7 @@ use core::ops::Index;
 
 use pi::interrupt::Interrupt;
 use pi::local_interrupt::LocalInterrupt;
+use sync::Mutex;
 
 use crate::multiprocessing::spin_lock::SpinLock;
 use crate::traps::TrapFrame;
@@ -114,17 +115,19 @@ impl<I, T> IrqHandlerRegistry<I> for T
     /// Register an irq handler for an interrupt.
     /// The caller should assure that `initialize()` has been called before calling this function.
     fn register(&self, int: I, handler: IrqHandler) {
-        self.index(int).lock().replace(handler);
+        self.index(int).lock(|irq_handler| irq_handler.replace(handler)).unwrap();
     }
 
     /// Executes an irq handler for the givven interrupt.
     /// The caller should assure that `initialize()` has been called before calling this function.
     fn invoke(&self, int: I, tf: &mut TrapFrame) {
-        match self.index(int).lock().as_mut() {
-            Some(handler) => {
-                (**handler)(tf);
+        self.index(int).lock(|irq_handler| {
+            match irq_handler {
+                None => {}
+                Some(handler) => {
+                    (**handler)(tf);
+                }
             }
-            _ => {}
-        }
+        }).unwrap()
     }
 }
