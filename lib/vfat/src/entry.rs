@@ -31,7 +31,7 @@ pub(crate)  struct RegularDirectoryEntry {
     created_time: u32,
     last_access: u16,
     first_cluster_high: u16,
-    last_modification: u16,
+    last_modification: u32,
     first_cluster_low: u16,
     file_size: u32,
 }

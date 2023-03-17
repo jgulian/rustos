@@ -16,6 +16,7 @@ use std::sync::Arc;
 use std::vec::Vec;
 
 use core::ops::{Deref, DerefMut};
+use log::info;
 use shim::io;
 
 use shim::io::SeekFrom;
@@ -74,15 +75,14 @@ struct VFSDirectory<M: Mutex<Mounts>> {
 impl<M: Mutex<Mounts> + 'static> Directory for VFSDirectory<M> {
     fn open_entry(&mut self, name: &str) -> io::Result<Entry> {
         let mut new_path = self.path.clone();
-        new_path.join_str(name);
+        new_path.join_str(name)?;
 
         self.mounts.lock(|mounts| {
             mounts.0.iter_mut()
                 .filter(|mount| mount.mount_point.starts_with(&self.path))
                 .find_map(|mount| -> Option<Entry> {
                     if mount.mount_point == self.path {
-                        let mut thing = mount.filesystem.root().ok()?;
-                        thing.open_entry(name).ok()
+                        mount.filesystem.root().ok()?.open_entry(name).ok()
                     } else if mount.mount_point.starts_with(&new_path) {
                         Some(Entry::Directory(Box::new(VFSDirectory {
                             path: new_path.clone(),

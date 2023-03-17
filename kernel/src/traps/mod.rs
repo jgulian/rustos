@@ -67,8 +67,6 @@ impl fmt::Display for Info {
 pub extern "C" fn receive_exception(info: Info, esr: u32, trap_frame: &mut TrapFrame) {
     let syndrome = Syndrome::from(esr);
 
-    //TODO: default to killing processes if they create exceptions I don't handle.
-
     match handle_exception(info, syndrome, trap_frame) {
         Ok(_) => {}
         Err(_) => {

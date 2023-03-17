@@ -1,5 +1,6 @@
 #[cfg(feature = "no_std")]
 use alloc::string::String;
+use alloc::string::ToString;
 #[cfg(feature = "no_std")]
 use alloc::vec::Vec;
 #[cfg(not(feature = "no_std"))]
@@ -23,7 +24,7 @@ pub struct Path(String);
 
 impl Path {
     pub fn root() -> Self {
-        Self(String::from(""))
+        Self(String::from("/"))
     }
 
     fn new(components: Vec<Component>) -> Path {
@@ -77,26 +78,14 @@ impl Path {
     }
 
     pub fn starts_with(&self, other: &Path) -> bool {
-        let mut other_components = other.components();
-        let equal = self.components().zip(other.components())
-            .all(|(a, b)| a == b);
-        equal && other_components.next().is_none()
+        self.0.starts_with(other.0.as_str())
     }
 
     pub fn relative_from(&self, other: &Path) -> Option<Path> {
-        let mut self_components = self.components();
-        let prefixed = other.components().all(|component| {
-            if let Some(self_component) = self_components.next() {
-                component == self_component
-            } else {
-                false
-            }
-        });
-
-        if prefixed {
-            Some(Self::new(self_components.collect()))
-        } else {
+        if !self.starts_with(other) {
             None
+        } else {
+            Some(Path(self.0[..other.0.len()].to_string()))
         }
     }
 

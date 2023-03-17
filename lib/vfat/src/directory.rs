@@ -73,6 +73,7 @@ impl<M: Mutex<VirtualFat>> Directory<M> {
 impl<M: Mutex<VirtualFat> + 'static> filesystem::Directory for Directory<M> {
     fn open_entry(&mut self, name: &str) -> io::Result<filesystem::Entry> {
         self.restart()?;
+
         while let Some(mut span) = self.next()? {
             // TODO: use eq?
             if span.name().as_str() != name {
@@ -88,12 +89,12 @@ impl<M: Mutex<VirtualFat> + 'static> filesystem::Directory for Directory<M> {
                         Cluster::from(starting_cluster),
                     ).map_err(|_| io::Error::from(io::ErrorKind::Other))?
                 },
-                Some(file_size) =>
+                Some(file_size) => {
                     Chain::new_from_cluster_with_size(
                         self.virtual_fat.clone(),
                         Cluster::from(starting_cluster),
                         file_size as u64,
-                    ),
+                    ) }
             };
 
             let entry = match file_size {

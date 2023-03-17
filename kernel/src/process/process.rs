@@ -80,8 +80,6 @@ impl Process {
     ///
     /// Returns Os Error if do_load fails.
     pub fn load(pn: &Path) -> OsResult<Process> {
-        use crate::VMM;
-
         let mut p = Process::do_load(pn)?;
 
         p.context.sp = Process::get_stack_top().as_u64();
@@ -257,11 +255,8 @@ impl Process {
         let argument_vec = parse_execute(arguments);
         let _environment_vec = parse_execute(environment);
 
-        let path = Path::try_from(argument_vec.first()
-            .ok_or(newioerr!(InvalidFilename))?
-            .clone().as_str())?;
         let mut absolute_path = Path::root();
-        absolute_path.join(&path);
+        absolute_path.join_str(argument_vec.first().ok_or(newioerr!(InvalidFilename))?.as_str())?;
 
         let mut program_file = FILESYSTEM.borrow().open(&absolute_path)?
             .into_file().map_err(|_| newioerr!(InvalidFilename))?;
