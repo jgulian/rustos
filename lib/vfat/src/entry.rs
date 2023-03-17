@@ -90,14 +90,14 @@ impl format::Format for DirectoryEntry {
     fn load_readable<T: Read>(stream: &mut T) -> shim::io::Result<Self> {
         let mut slice = [0u8; 32];
         stream.read_exact(&mut slice)?;
-        info!("read slice {:?}", slice);
-        match slice[11] {
-            0 => Ok(Self::EmptyAndOver),
-            0xe5 => Ok(Self::Empty),
-            0b1111 => {
-                Ok(Self::LongFileName(LongFileNameEntry::load_slice(&slice)?))
-            }
-            _ => Ok(Self::Regular(RegularDirectoryEntry::load_slice(&slice)?)),
+        if slice[0] == 0 {
+            Ok(Self::Empty)
+        } else if slice[0] == 0xe5 {
+            Ok(Self::EmptyAndOver)
+        } else if slice[11] == 0b1111 {
+            Ok(Self::LongFileName(LongFileNameEntry::load_slice(&slice)?))
+        } else {
+            Ok(Self::Regular(RegularDirectoryEntry::load_slice(&slice)?))
         }
     }
 

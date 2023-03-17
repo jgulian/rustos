@@ -25,6 +25,7 @@ use shim::io::{Seek, SeekFrom};
 use sync::Mutex;
 use crate::cluster::Cluster;
 use crate::entry::{DirectoryEntry, LongFileNameEntry, parse_entry, parse_name, RegularDirectoryEntry};
+use crate::file::File;
 use crate::virtual_fat::VirtualFat;
 
 #[derive(Clone)]
@@ -46,7 +47,6 @@ impl<M: Mutex<VirtualFat>> Directory<M> {
 
         while self.chain.position() < self.chain.total_size() {
             let entry = DirectoryEntry::load_readable(&mut self.chain)?;
-            info!("entry: {:?}", entry);
 
             match entry {
                 DirectoryEntry::Empty => {}
@@ -73,10 +73,8 @@ impl<M: Mutex<VirtualFat>> Directory<M> {
 impl<M: Mutex<VirtualFat> + 'static> filesystem::Directory for Directory<M> {
     fn open_entry(&mut self, name: &str) -> io::Result<filesystem::Entry> {
         self.restart()?;
-        info!("restarted");
         while let Some(mut span) = self.next()? {
             // TODO: use eq?
-            info!("found {}", span.name());
             if span.name().as_str() != name {
                 continue;
             }
@@ -98,18 +96,21 @@ impl<M: Mutex<VirtualFat> + 'static> filesystem::Directory for Directory<M> {
                     ),
             };
 
-            let entry = if file_size.is_none() {
-                filesystem::Entry::Directory(Box::new(Directory {
-                    virtual_fat: self.virtual_fat.clone(),
-                    metadata,
-                    chain,
-                }))
-            } else {
-                filesystem::Entry::Directory(Box::new(Directory {
-                    virtual_fat: self.virtual_fat.clone(),
-                    metadata,
-                    chain,
-                }))
+            let entry = match file_size {
+                None => {
+                    filesystem::Entry::Directory(Box::new(Directory {
+                        virtual_fat: self.virtual_fat.clone(),
+                        metadata,
+                        chain,
+                    }))
+                }
+                Some(file_size) => {
+                    filesystem::Entry::File(Box::new(File {
+                        metadata,
+                        file_size,
+                        chain,
+                    }))
+                }
             };
 
             return Ok(entry);

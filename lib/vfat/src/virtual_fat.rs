@@ -43,14 +43,12 @@ pub struct VirtualFat {
 impl VirtualFat {
     fn get_blocks(&self, cluster: Cluster) -> (u64, u64) {
         let mut first_block = cluster.sector_start(self.data_start_sector, self.sectors_per_cluster);
-        info!("amogus {}", self.data_start_sector);
         let final_block = first_block + self.sectors_per_cluster as u64;
         (first_block, final_block)
     }
 
     pub(crate) fn read_cluster(&mut self, cluster: Cluster, offset: usize, buffer: &mut [u8]) -> io::Result<usize> {
         let (first_block, final_block) = self.get_blocks(cluster);
-        info!("reading cluster {:?} on blocks {} - {}", cluster, first_block, final_block);
         stream_read(&mut self.device, offset, first_block..final_block, buffer)
             .map(|(_, amount)| amount)
     }

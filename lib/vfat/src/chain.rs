@@ -19,7 +19,6 @@ use crate::error::{VirtualFatError, VirtualFatResult};
 use crate::fat::Status;
 use crate::virtual_fat::VirtualFat;
 
-#[derive(Clone)]
 pub(crate) struct Chain<M: Mutex<VirtualFat>> {
     virtual_fat: Arc<M>,
     position: u64,
@@ -94,13 +93,6 @@ impl<M: Mutex<VirtualFat>> Chain<M> {
 impl<M: Mutex<VirtualFat>> io::Read for Chain<M> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         let (block, read) = self.virtual_fat.lock(|mut virtual_fat| {
-            self.get_blocks(&mut virtual_fat).unwrap().for_each(|a| info!("block {}", a));
-            let mut data = vec![0u8; virtual_fat.block_size()];
-            for a in 0..20 {
-                virtual_fat.read_cluster(Cluster::from(a), 0, data.as_mut_slice())?;
-                info!("bestie {:?}", data.as_slice());
-            }
-
             let blocks = self.get_blocks(&mut virtual_fat)?;
             stream_read(virtual_fat, self.position as usize, blocks, buf)
         }).map_err(|_| io::Error::from(io::ErrorKind::Other))??;
@@ -183,5 +175,17 @@ impl<M: Mutex<VirtualFat>> io::Seek for Chain<M> {
                 }
             }
         }).map_err(|_| io::Error::from(io::ErrorKind::Other))?
+    }
+}
+
+impl<M: Mutex<VirtualFat>> Clone for Chain<M> {
+    fn clone(&self) -> Self {
+        Self {
+            virtual_fat: self.virtual_fat.clone(),
+            position: self.position,
+            total_size: self.total_size,
+            first_cluster: self.first_cluster.clone(),
+            current_cluster: self.current_cluster.clone(),
+        }
     }
 }

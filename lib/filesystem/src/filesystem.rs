@@ -104,7 +104,6 @@ pub trait Filesystem: Send + Sync {
         let mut components = Vec::new();
 
         for component in path.components() {
-            info!("component {:?}", component);
             match component {
                 Component::Root => {
                     components.push(Entry::Directory(self.root()?));
@@ -114,15 +113,11 @@ pub trait Filesystem: Send + Sync {
                 }
                 Component::Current => {}
                 Component::Child(child) => {
-                    info!("opening child");
                     let new_entry = components.last_mut()
                         .ok_or(io::Error::from(io::ErrorKind::NotFound))
                         .map(|entry| {
-                            info!("mogus");
                             let a = entry.as_directory()?;
-                            info!("sussy");
                             a.open_entry(child.as_str()) })??;
-                    info!("opening child success");
                     components.push(new_entry);
                 }
             }

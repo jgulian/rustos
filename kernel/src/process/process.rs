@@ -101,11 +101,9 @@ impl Process {
         process.vmap.alloc(Process::get_stack_base(), PagePermissions::RW);
         let user_image = process.vmap.alloc(Process::get_image_base(), PagePermissions::RWX);
 
-        info!("here");
         let mut file = FILESYSTEM.borrow().open(pn)
             .map_err(|_| OsError::IoError)?
             .into_file().map_err(|_| OsError::NoEntry)?;
-        info!("not here");
 
         file.read(user_image).map_err(|_| OsError::IoError)?;
         Ok(process)

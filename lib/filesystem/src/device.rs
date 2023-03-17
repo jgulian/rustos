@@ -1,5 +1,6 @@
 #[cfg(feature = "no_std")]
 use alloc::vec;
+use core::cmp::min;
 use log::info;
 #[cfg(not(feature = "no_std"))]
 use std::vec;
@@ -84,11 +85,12 @@ pub trait BlockDevice {
 pub fn stream_read<I>(device: &mut dyn BlockDevice, offset: usize, blocks: I, data: &mut [u8]) -> io::Result<(u64, usize)> where I: Iterator<Item=u64> {
     let block_size = device.block_size();
     let (block_offset, small_offset) = offset_data(offset, block_size);
-    let (prefix_data, main_data) = data.split_at_mut(small_offset % block_size);
+    let (prefix_data, main_data) = data.split_at_mut(min(block_size - small_offset, data.len()));
+    let prefix_option = if prefix_data.is_empty() { None } else { Some(prefix_data) };
     let (mut last_block, mut amount_read) = (0, 0);
 
     blocks.skip(block_offset)
-        .zip([prefix_data].into_iter().chain(main_data.chunks_mut(block_size)))
+        .zip(prefix_option.into_iter().chain(main_data.chunks_mut(block_size)))
         .enumerate()
         .try_for_each(|(i, (block, chunk_data))| -> io::Result<()> {
             if chunk_data.len() == block_size {
@@ -109,6 +111,7 @@ pub fn stream_read<I>(device: &mut dyn BlockDevice, offset: usize, blocks: I, da
     Ok((last_block, amount_read))
 }
 
+//TODO: this is broken but read should work so copy that
 pub fn stream_write<I>(device: &mut dyn BlockDevice, offset: usize, blocks: I, data: &[u8]) -> io::Result<(u64, usize)> where I: Iterator<Item=u64> {
     let block_size = device.block_size();
     let (block_offset, small_offset) = offset_data(offset, block_size);
@@ -139,13 +142,5 @@ pub fn stream_write<I>(device: &mut dyn BlockDevice, offset: usize, blocks: I, d
 }
 
 fn offset_data(offset: usize, block_size: usize) -> (usize, usize) {
-    (offset / block_size, block_size - offset % block_size)
-}
-
-fn get_chunk(block_size: usize, offset: usize, buffer: &mut [u8]) -> (usize, &mut [u8]) {
-    if offset == block_size {
-        (offset + block_size, &mut buffer[..block_size])
-    } else {
-        (0, &mut buffer[offset..block_size])
-    }
+    (offset / block_size, offset % block_size)
 }

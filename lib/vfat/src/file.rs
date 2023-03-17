@@ -1,3 +1,4 @@
+use alloc::boxed::Box;
 use shim::io::{self, SeekFrom};
 use sync::Mutex;
 use crate::chain::Chain;
@@ -6,9 +7,19 @@ use crate::virtual_fat::VirtualFat;
 
 #[derive(Clone)]
 pub(crate) struct File<M: Mutex<VirtualFat>> {
-    metadata: Metadata,
-    file_size: u64,
-    chain: Chain<M>,
+    pub(crate) metadata: Metadata,
+    pub(crate) file_size: u32,
+    pub(crate) chain: Chain<M>,
+}
+
+impl<M: Mutex<VirtualFat> + 'static> filesystem::filesystem::File for File<M> {
+    fn duplicate(&mut self) -> io::Result<Box<dyn filesystem::filesystem::File>> {
+        Ok(Box::new(Self {
+            metadata: self.metadata.clone(),
+            file_size: self.file_size,
+            chain: self.chain.clone(),
+        }))
+    }
 }
 
 impl<M: Mutex<VirtualFat>> io::Write for File<M> {
@@ -50,6 +61,5 @@ impl<M: Mutex<VirtualFat>> io::Seek for File<M> {
 impl<M: Mutex<VirtualFat>> Drop for File<M> {
     fn drop(&mut self) {
         //TODO: set size
-        todo!()
     }
 }
