@@ -2,12 +2,14 @@
 use alloc::sync::Arc;
 #[cfg(feature = "no_std")]
 use alloc::collections::VecDeque;
+use alloc::vec;
 #[cfg(not(feature = "no_std"))]
 use std::sync::Arc;
 #[cfg(not(feature = "no_std"))]
 use std::collections::VecDeque;
 
 use core::ops::DerefMut;
+use log::info;
 use filesystem::device::{BlockDevice, stream_read, stream_write};
 use shim::io;
 use shim::io::SeekFrom;
@@ -92,6 +94,13 @@ impl<M: Mutex<VirtualFat>> Chain<M> {
 impl<M: Mutex<VirtualFat>> io::Read for Chain<M> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         let (block, read) = self.virtual_fat.lock(|mut virtual_fat| {
+            self.get_blocks(&mut virtual_fat).unwrap().for_each(|a| info!("block {}", a));
+            let mut data = vec![0u8; virtual_fat.block_size()];
+            for a in 0..20 {
+                virtual_fat.read_cluster(Cluster::from(a), 0, data.as_mut_slice())?;
+                info!("bestie {:?}", data.as_slice());
+            }
+
             let blocks = self.get_blocks(&mut virtual_fat)?;
             stream_read(virtual_fat, self.position as usize, blocks, buf)
         }).map_err(|_| io::Error::from(io::ErrorKind::Other))??;

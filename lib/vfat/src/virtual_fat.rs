@@ -16,6 +16,7 @@ use std::vec;
 use std::vec::Vec;
 
 use core::mem;
+use log::info;
 
 use filesystem::device::{BlockDevice, stream_read, stream_write};
 use filesystem::error::FilesystemError;
@@ -40,20 +41,22 @@ pub struct VirtualFat {
 }
 
 impl VirtualFat {
-    fn get_blocks(&self, cluster: Cluster, offset: usize) -> (u64, u64) {
+    fn get_blocks(&self, cluster: Cluster) -> (u64, u64) {
         let mut first_block = cluster.sector_start(self.data_start_sector, self.sectors_per_cluster);
+        info!("amogus {}", self.data_start_sector);
         let final_block = first_block + self.sectors_per_cluster as u64;
         (first_block, final_block)
     }
 
     pub(crate) fn read_cluster(&mut self, cluster: Cluster, offset: usize, buffer: &mut [u8]) -> io::Result<usize> {
-        let (first_block, final_block) = self.get_blocks(cluster, offset);
+        let (first_block, final_block) = self.get_blocks(cluster);
+        info!("reading cluster {:?} on blocks {} - {}", cluster, first_block, final_block);
         stream_read(&mut self.device, offset, first_block..final_block, buffer)
             .map(|(_, amount)| amount)
     }
 
     pub(crate) fn write_cluster(&mut self, cluster: Cluster, offset: usize, buffer: &[u8]) -> io::Result<usize> {
-        let (first_block, final_block) = self.get_blocks(cluster, offset);
+        let (first_block, final_block) = self.get_blocks(cluster);
         stream_write(&mut self.device, offset, first_block..final_block, buffer)
             .map(|(_, amount)| amount)
     }
@@ -65,7 +68,7 @@ impl VirtualFat {
         self.device.read_block(block, data.as_mut_slice())?;
 
         let mut fat_data = [0u8; 4];
-        fat_data.copy_from_slice(&data[offset..]);
+        fat_data.copy_from_slice(&data[offset..offset + 4]);
 
         Ok(FatEntry::from(fat_data))
     }

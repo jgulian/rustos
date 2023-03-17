@@ -2,6 +2,7 @@
 use alloc::string::String;
 #[cfg(feature = "no_std")]
 use alloc::vec::Vec;
+use log::info;
 #[cfg(not(feature = "no_std"))]
 use std::string::String;
 #[cfg(not(feature = "no_std"))]
@@ -20,7 +21,7 @@ pub(crate) enum DirectoryAttribute {
     LongFileName = 0b1111,
 }
 
-#[derive(Copy, Clone, Format)]
+#[derive(Copy, Clone, Debug, Format)]
 pub(crate)  struct RegularDirectoryEntry {
     name: [u8; 8],
     extension: [u8; 3],
@@ -35,7 +36,7 @@ pub(crate)  struct RegularDirectoryEntry {
     file_size: u32,
 }
 
-#[derive(Copy, Clone, Format)]
+#[derive(Copy, Clone, Debug, Format)]
 pub(crate) struct LongFileNameEntry {
     order: u8,
     name_one: [u8; 10],
@@ -77,6 +78,7 @@ impl LongFileNameEntry {
     }
 }
 
+#[derive(Debug)]
 pub(crate) enum DirectoryEntry {
     Empty,
     Regular(RegularDirectoryEntry),
@@ -88,6 +90,7 @@ impl format::Format for DirectoryEntry {
     fn load_readable<T: Read>(stream: &mut T) -> shim::io::Result<Self> {
         let mut slice = [0u8; 32];
         stream.read_exact(&mut slice)?;
+        info!("read slice {:?}", slice);
         match slice[11] {
             0 => Ok(Self::EmptyAndOver),
             0xe5 => Ok(Self::Empty),

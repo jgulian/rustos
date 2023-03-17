@@ -6,6 +6,7 @@ use alloc::boxed::Box;
 use alloc::string::String;
 #[cfg(feature = "no_std")]
 use alloc::vec::Vec;
+use log::info;
 #[cfg(not(feature = "no_std"))]
 use std::sync::Arc;
 #[cfg(not(feature = "no_std"))]
@@ -45,6 +46,7 @@ impl<M: Mutex<VirtualFat>> Directory<M> {
 
         while self.chain.position() < self.chain.total_size() {
             let entry = DirectoryEntry::load_readable(&mut self.chain)?;
+            info!("entry: {:?}", entry);
 
             match entry {
                 DirectoryEntry::Empty => {}
@@ -71,8 +73,10 @@ impl<M: Mutex<VirtualFat>> Directory<M> {
 impl<M: Mutex<VirtualFat> + 'static> filesystem::Directory for Directory<M> {
     fn open_entry(&mut self, name: &str) -> io::Result<filesystem::Entry> {
         self.restart()?;
+        info!("restarted");
         while let Some(mut span) = self.next()? {
             // TODO: use eq?
+            info!("found {}", span.name());
             if span.name().as_str() != name {
                 continue;
             }

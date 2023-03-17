@@ -1,5 +1,6 @@
 #[cfg(feature = "no_std")]
 use alloc::vec;
+use log::info;
 #[cfg(not(feature = "no_std"))]
 use std::vec;
 
@@ -83,7 +84,7 @@ pub trait BlockDevice {
 pub fn stream_read<I>(device: &mut dyn BlockDevice, offset: usize, blocks: I, data: &mut [u8]) -> io::Result<(u64, usize)> where I: Iterator<Item=u64> {
     let block_size = device.block_size();
     let (block_offset, small_offset) = offset_data(offset, block_size);
-    let (prefix_data, main_data) = data.split_at_mut(small_offset);
+    let (prefix_data, main_data) = data.split_at_mut(small_offset % block_size);
     let (mut last_block, mut amount_read) = (0, 0);
 
     blocks.skip(block_offset)
@@ -111,7 +112,7 @@ pub fn stream_read<I>(device: &mut dyn BlockDevice, offset: usize, blocks: I, da
 pub fn stream_write<I>(device: &mut dyn BlockDevice, offset: usize, blocks: I, data: &[u8]) -> io::Result<(u64, usize)> where I: Iterator<Item=u64> {
     let block_size = device.block_size();
     let (block_offset, small_offset) = offset_data(offset, block_size);
-    let (prefix_data, main_data) = data.split_at(small_offset);
+    let (prefix_data, main_data) = data.split_at(small_offset % block_size);
     let (mut last_block, mut amount_written) = (0, 0);
 
     blocks.skip(block_offset)
@@ -139,4 +140,12 @@ pub fn stream_write<I>(device: &mut dyn BlockDevice, offset: usize, blocks: I, d
 
 fn offset_data(offset: usize, block_size: usize) -> (usize, usize) {
     (offset / block_size, block_size - offset % block_size)
+}
+
+fn get_chunk(block_size: usize, offset: usize, buffer: &mut [u8]) -> (usize, &mut [u8]) {
+    if offset == block_size {
+        (offset + block_size, &mut buffer[..block_size])
+    } else {
+        (0, &mut buffer[offset..block_size])
+    }
 }
