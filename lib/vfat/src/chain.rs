@@ -2,11 +2,14 @@
 use alloc::sync::Arc;
 #[cfg(feature = "no_std")]
 use alloc::collections::VecDeque;
+#[cfg(feature = "no_std")]
 use alloc::vec;
 #[cfg(not(feature = "no_std"))]
 use std::sync::Arc;
 #[cfg(not(feature = "no_std"))]
 use std::collections::VecDeque;
+#[cfg(not(feature = "no_std"))]
+use std::vec;
 
 use core::ops::DerefMut;
 use log::info;

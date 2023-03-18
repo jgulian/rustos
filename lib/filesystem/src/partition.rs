@@ -1,7 +1,5 @@
 #[cfg(feature = "no_std")]
 use alloc::boxed::Box;
-use alloc::vec;
-use log::info;
 #[cfg(not(feature = "no_std"))]
 use std::boxed::Box;
 use shim::io;

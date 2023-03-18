@@ -1,10 +1,13 @@
 #[cfg(feature = "no_std")]
 use alloc::string::String;
+#[cfg(feature = "no_std")]
 use alloc::string::ToString;
 #[cfg(feature = "no_std")]
 use alloc::vec::Vec;
 #[cfg(not(feature = "no_std"))]
 use std::string::String;
+#[cfg(not(feature = "no_std"))]
+use std::string::ToString;
 #[cfg(not(feature = "no_std"))]
 use std::vec::Vec;
 
@@ -61,7 +64,7 @@ impl Path {
             ".." => Component::Root,
             _ => {
                 if other.contains('/') {
-                    return Err(io::Error::from(io::ErrorKind::InvalidFilename));
+                    return Err(io::Error::from(io::ErrorKind::InvalidInput));
                 }
                 Component::Child(other.replace('/', ""))
             }

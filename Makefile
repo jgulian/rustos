@@ -49,7 +49,7 @@ user:
 	@mkdir $(USER_DIRECTORY)
 	@echo "+ Building user programs"
 	for program in $(USER_PROGRAMS) ; do 											\
-		cargo build --bin $$program --release &&											\
+		cargo build --bin $$program --target aarch64-unknown-none --release &&											\
 		objcopy -O binary $(TARGET_DIR)/$$program $(USER_DIRECTORY)/$$program;		\
     done
 

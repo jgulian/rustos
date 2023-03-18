@@ -9,6 +9,7 @@ use std::string::String;
 use std::vec::Vec;
 use shim::io::{Read, Seek, Write};
 use format::Format;
+use crate::entry::DirectoryAttribute::LongFileName;
 use crate::metadata::Metadata;
 
 pub(crate) enum DirectoryAttribute {
@@ -187,4 +188,32 @@ pub(crate) fn parse_entry(regular_entry: &RegularDirectoryEntry) -> (u32, Metada
     } else {
         (starting_cluster, metadata, Some(regular_entry.file_size))
     }
+}
+
+pub(crate) fn create_long_file_name_entries(name: &str) -> Vec<LongFileNameEntry> {
+    let buffer: Vec<u8> = String::from(name).encode_utf16()
+        .flat_map(|d| [(d & 0xFF) as u8, (d >> 8 & 0xFF) as u8]).collect();
+    buffer.chunks(26)
+        .enumerate()
+        .map(|(i, chunk)| {
+            let mut result = LongFileNameEntry {
+                order: i as u8,
+                name_one: [0; 10],
+                attributes: LongFileName as u8,
+                dir_type: 0,
+                checksum: 0,
+                name_two: [0; 12],
+                first_cluster_low: 0,
+                name_three: [0; 4],
+            };
+
+            //TODO: this doesn't feel perf
+            result.name_one.iter_mut()
+                .chain(result.name_two.iter_mut())
+                .chain(result.name_three.iter_mut())
+                .zip(chunk.into_iter())
+                .for_each(|(target, source)| *target = *source);
+
+            result
+        }).collect()
 }

@@ -42,7 +42,7 @@ impl io::Read for dyn ByteDevice {
         });
 
         match result {
-            Ok(_) => return Ok(count),
+            Ok(_) => Ok(count),
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => Ok(count),
             Err(e) => Err(e),
         }
@@ -72,7 +72,7 @@ impl io::Write for dyn ByteDevice {
 
 impl io::Seek for dyn ByteDevice {
     fn seek(&mut self, _: SeekFrom) -> io::Result<u64> {
-        Err(io::Error::from(io::ErrorKind::NotSeekable))
+        Err(io::Error::from(io::ErrorKind::Unsupported))
     }
 }
 
@@ -115,11 +115,12 @@ pub fn stream_read<I>(device: &mut dyn BlockDevice, offset: usize, blocks: I, da
 pub fn stream_write<I>(device: &mut dyn BlockDevice, offset: usize, blocks: I, data: &[u8]) -> io::Result<(u64, usize)> where I: Iterator<Item=u64> {
     let block_size = device.block_size();
     let (block_offset, small_offset) = offset_data(offset, block_size);
-    let (prefix_data, main_data) = data.split_at(small_offset % block_size);
+    let (prefix_data, main_data) = data.split_at(min(block_size - small_offset, data.len()));
+    let prefix_option = if prefix_data.is_empty() { None } else { Some(prefix_data) };
     let (mut last_block, mut amount_written) = (0, 0);
 
     blocks.skip(block_offset)
-        .zip([prefix_data].into_iter().chain(main_data.chunks(block_size)))
+        .zip(prefix_option.into_iter().chain(main_data.chunks(block_size)))
         .enumerate()
         .try_for_each(|(i, (block, chunk_data))| -> io::Result<()> {
             if chunk_data.len() == block_size {

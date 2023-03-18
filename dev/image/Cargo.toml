@@ -12,3 +12,4 @@ vfat = { path = "../../lib/vfat" }
 filesystem = { path = "../../lib/filesystem" }
 format = { path = "../../lib/format" }
 shim = { path = "../../lib/shim" }
+sync = { path = "../../lib/sync" }

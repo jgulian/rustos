@@ -21,10 +21,11 @@ use crate::chain::Chain;
 use crate::metadata::Metadata;
 use format::Format;
 use shim::io;
-use shim::io::{Seek, SeekFrom};
+use shim::io::{Seek, SeekFrom, Write};
 use sync::Mutex;
 use crate::cluster::Cluster;
-use crate::entry::{DirectoryEntry, LongFileNameEntry, parse_entry, parse_name, RegularDirectoryEntry};
+use crate::entry::{create_long_file_name_entries, DirectoryEntry, LongFileNameEntry, parse_entry, parse_name, RegularDirectoryEntry};
+use crate::entry::DirectoryAttribute::LongFileName;
 use crate::file::File;
 use crate::virtual_fat::VirtualFat;
 
@@ -40,7 +41,6 @@ impl<M: Mutex<VirtualFat>> Directory<M> {
         self.chain.seek(SeekFrom::Start(0)).map(|_| ())
     }
 
-    //TODO: this hsould return result
     fn next(&mut self) -> io::Result<Option<DirectoryEntrySpan<M>>> {
         let start = self.chain.position();
         let mut long_file_names: Vec<LongFileNameEntry> = Vec::new();
@@ -68,6 +68,38 @@ impl<M: Mutex<VirtualFat>> Directory<M> {
 
         Ok(None)
     }
+
+    fn append_entry(&mut self, name: &str, entry: RegularDirectoryEntry) -> io::Result<()> {
+        let long_file_names = create_long_file_name_entries(name);
+        let needed_entries = long_file_names.len() + 1;
+        let mut free_entries_found = 0;
+
+        self.restart()?;
+        loop {
+            let entry = DirectoryEntry::load_readable(&mut self.chain)?;
+            match entry {
+                DirectoryEntry::Empty => {
+                    free_entries_found += 1;
+                    if free_entries_found == needed_entries {
+                        break;
+                    }
+                }
+                DirectoryEntry::Regular(_) => free_entries_found = 0,
+                DirectoryEntry::LongFileName(_) => free_entries_found = 0,
+                DirectoryEntry::EmptyAndOver => break,
+            }
+        }
+
+        long_file_names.iter().try_for_each(|long_file_name|
+            long_file_name.save_writable(&mut self.chain))?;
+        entry.save_writable(&mut self.chain)?;
+
+        Ok(())
+    }
+
+    pub(crate) fn update_file_size(&mut self, file_name: &str, new_size: u32) {
+
+    }
 }
 
 impl<M: Mutex<VirtualFat> + 'static> filesystem::Directory for Directory<M> {
@@ -88,13 +120,14 @@ impl<M: Mutex<VirtualFat> + 'static> filesystem::Directory for Directory<M> {
                         self.virtual_fat.clone(),
                         Cluster::from(starting_cluster),
                     ).map_err(|_| io::Error::from(io::ErrorKind::Other))?
-                },
+                }
                 Some(file_size) => {
                     Chain::new_from_cluster_with_size(
                         self.virtual_fat.clone(),
                         Cluster::from(starting_cluster),
                         file_size as u64,
-                    ) }
+                    )
+                }
             };
 
             let entry = match file_size {
@@ -121,7 +154,19 @@ impl<M: Mutex<VirtualFat> + 'static> filesystem::Directory for Directory<M> {
     }
 
     fn create_file(&mut self, name: &str) -> io::Result<Box<dyn filesystem::File>> {
-        todo!()
+        self.append_entry(name, RegularDirectoryEntry {
+            name: name.as_bytes().iter().chain([0; 8]).collect(),
+            extension: [],
+            attributes: 0,
+            nt_reserved: 0,
+            created_time_tenth: 0,
+            created_time: 0,
+            last_access: 0,
+            first_cluster_high: 0,
+            last_modification: 0,
+            first_cluster_low: 0,
+            file_size: 0,
+        })
     }
 
     fn create_directory(&mut self, name: &str) -> io::Result<Box<dyn filesystem::Directory>> {

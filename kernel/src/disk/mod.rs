@@ -90,6 +90,7 @@ impl ConsoleFile {
 
 impl ByteDevice for ConsoleFile {
     fn read_byte(&mut self) -> io::Result<u8> {
+        info!("reading byte");
         Ok(self.0.lock(|byte_device| byte_device.read_byte()).unwrap())
     }
 

@@ -3,6 +3,8 @@ use alloc::boxed::Box;
 #[cfg(not(feature = "no_std"))]
 use std::boxed::Box;
 use core::fmt::{Debug, Formatter};
+use core::ops::{Index, IndexMut};
+use core::slice::SliceIndex;
 use format::Format;
 use crate::device::BlockDevice;
 use crate::error::FilesystemError;
@@ -56,6 +58,20 @@ pub struct MasterBootRecord {
     pub(crate) valid_boot_sector: [u8; 2],
 }
 
+impl<I> Index<I> for MasterBootRecord where I: SliceIndex<[PartitionEntry], Output=PartitionEntry> {
+    type Output = PartitionEntry;
+
+    fn index(&self, index: I) -> &Self::Output {
+        self.partition_table.index(index)
+    }
+}
+
+impl<I> IndexMut<I> for MasterBootRecord where I: SliceIndex<[PartitionEntry], Output=PartitionEntry> {
+    fn index_mut(&mut self, index: I) -> &mut Self::Output {
+        self.partition_table.index_mut(index)
+    }
+}
+
 impl TryFrom<&mut Box<dyn BlockDevice + Send + Sync>> for MasterBootRecord {
     type Error = FilesystemError;
 
@@ -86,5 +102,23 @@ impl TryFrom<&mut Box<dyn BlockDevice + Send + Sync>> for MasterBootRecord {
         }
 
         Ok(master_boot_record)
+    }
+}
+
+impl Default for MasterBootRecord {
+    fn default() -> Self {
+        Self {
+            bootstrap: [0; 436],
+            disk_id: [0, 0, 0, 0, 199, 93, 147, 39, 0, 0],
+            partition_table: [PartitionEntry {
+                boot_indicator: 0,
+                starting_chs: CHS { header: 0, sector: 0, cylinder: 0, },
+                partition_type: 0,
+                ending_chs: CHS { header: 0, sector: 0, cylinder: 0, },
+                relative_sector: 0,
+                total_sectors: 0,
+            }; 4],
+            valid_boot_sector: [85, 170],
+        }
     }
 }

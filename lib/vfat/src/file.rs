@@ -1,4 +1,7 @@
+#[cfg(feature = "no_std")]
 use alloc::boxed::Box;
+#[cfg(not(feature = "no_std"))]
+use std::boxed::Box;
 use shim::io::{self, SeekFrom};
 use sync::Mutex;
 use crate::chain::Chain;
