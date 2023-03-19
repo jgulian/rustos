@@ -81,7 +81,12 @@ impl<M: Mutex<VirtualFat>> Directory<M> {
 
         self.restart()?;
         loop {
-            let entry = DirectoryEntry::load_readable(&mut self.chain)?;
+            let entry = match DirectoryEntry::load_readable(&mut self.chain) {
+                Ok(entry) => entry,
+                Err(ref e) if e.kind() == io::ErrorKind::UnexpectedEof => break,
+                Err(e) => return Err(e),
+            };
+
             match entry {
                 DirectoryEntry::Empty => {
                     free_entries_found += 1;
@@ -95,6 +100,7 @@ impl<M: Mutex<VirtualFat>> Directory<M> {
             }
         }
 
+        self.chain.seek(SeekFrom::Current(free_entries_found as i64 * -32))?;
         long_file_names.iter().try_for_each(|long_file_name|
             long_file_name.save_writable(&mut self.chain))?;
         entry.save_writable(&mut self.chain)?;
@@ -131,6 +137,7 @@ impl<M: Mutex<VirtualFat> + 'static> filesystem::Directory for Directory<M> {
 
         while let Some(mut span) = self.next()? {
             // TODO: use eq?
+            info!("looking for {}, found {}", name, span.name());
             if span.name().as_str() != name {
                 continue;
             }
@@ -174,6 +181,8 @@ impl<M: Mutex<VirtualFat> + 'static> filesystem::Directory for Directory<M> {
 
             return Ok(entry);
         }
+
+        info!("thats all folks");
 
         Err(io::Error::from(io::ErrorKind::NotFound))
     }

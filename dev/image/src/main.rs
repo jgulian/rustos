@@ -103,8 +103,6 @@ fn format_image<'a>(path: &PathBuf, sector_size: u16, _filesystem: FileSystem, p
 fn add_directory_to_filesystem(image_filesystem: &mut dyn Filesystem, folder: PathBuf, image_path: Path) -> io::Result<()> {
     let directory_entries = read_dir(folder.clone())?;
 
-    println!("here 1");
-
     let mut image_directory = image_filesystem.open(&image_path)?.into_directory()?;
 
     for directory_entry_wrapped in directory_entries {
@@ -129,8 +127,6 @@ fn add_directory_to_filesystem(image_filesystem: &mut dyn Filesystem, folder: Pa
             sub_image_path.join_str(entry_name)?;
             println!("opening {}", sub_image_path);
             image_directory.create_directory(entry_name)?;
-
-            println!("here 6");
 
             add_directory_to_filesystem(image_filesystem, sub_folder, sub_image_path)?;
         } else {

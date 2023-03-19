@@ -1,17 +1,12 @@
 #[cfg(feature = "no_std")]
 use alloc::sync::Arc;
 #[cfg(feature = "no_std")]
-use alloc::collections::VecDeque;
-#[cfg(feature = "no_std")]
-use alloc::vec;
+use alloc::vec::Vec;
 #[cfg(not(feature = "no_std"))]
 use std::sync::Arc;
 #[cfg(not(feature = "no_std"))]
-use std::collections::VecDeque;
-#[cfg(not(feature = "no_std"))]
-use std::vec;
+use std::vec::Vec;
 
-use core::ops::DerefMut;
 use log::info;
 use filesystem::device::{BlockDevice, stream_read, stream_write};
 use shim::io;
@@ -83,8 +78,7 @@ impl<M: Mutex<VirtualFat>> Chain<M> {
     }
 
     fn append_cluster(&self, previous: Cluster, virtual_fat: &mut VirtualFat) -> io::Result<Cluster> {
-        let new_cluster = virtual_fat.next_free_cluster()
-            .map_err(|_| io::Error::from(io::ErrorKind::Other))?;
+        let new_cluster = virtual_fat.get_clear_cluster()?;
         virtual_fat.update_fat_entry(previous, Status::Data(new_cluster))
             .map_err(|_| io::Error::from(io::ErrorKind::Other))?;
         virtual_fat.update_fat_entry(new_cluster, Status::new_eoc())
@@ -95,8 +89,8 @@ impl<M: Mutex<VirtualFat>> Chain<M> {
 
 impl<M: Mutex<VirtualFat>> io::Read for Chain<M> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        let (block, read) = self.virtual_fat.lock(|mut virtual_fat| {
-            let blocks = self.get_blocks(&mut virtual_fat)?;
+        let (block, read) = self.virtual_fat.lock(|virtual_fat| {
+            let blocks = self.get_blocks(virtual_fat)?;
             stream_read(virtual_fat, self.position as usize, blocks, buf)
         }).map_err(|_| io::Error::from(io::ErrorKind::Other))??;
 
@@ -111,23 +105,19 @@ impl<M: Mutex<VirtualFat>> io::Write for Chain<M> {
         let virtual_fat = self.virtual_fat.clone();
 
         virtual_fat.lock(|virtual_fat| {
-            let mut blocks: VecDeque<u64> = self.get_blocks(virtual_fat)?.collect();
             let mut total_written = 0;
 
             while !buf.is_empty() {
-                if blocks.is_empty() {
-                    let new_cluster = self.append_cluster(self.current_cluster, virtual_fat)?;
-                    blocks.push_back(Into::<u32>::into(new_cluster) as u64);
+                if self.position == self.total_size {
+                    self.current_cluster = self.append_cluster(self.current_cluster, virtual_fat)?;
                 }
+
+                let blocks = self.get_blocks(virtual_fat)?;
                 let real_offset = (self.position as usize) % virtual_fat.block_size();
                 let (final_block, written) =
-                    stream_write(virtual_fat, real_offset, blocks.iter().copied(), buf)?;
+                    stream_write(virtual_fat, real_offset, blocks, buf)?;
                 buf = &buf[written..];
-                while let Some(block) = blocks.pop_front() {
-                    if block == final_block {
-                        break;
-                    }
-                }
+
                 total_written += written;
                 self.position += written as u64;
                 self.current_cluster = Cluster::from(final_block as u32);
