@@ -113,6 +113,8 @@ impl<M: Mutex<VirtualFat>> Directory<M> {
         while let Some(mut span) = self.next()? {
             if span.name().as_str() == file_name {
                 span.regular_entry.update_file_size(new_size)?;
+                span.save()?;
+                info!("new size: {}", new_size);
                 return Ok(())
             }
         }
@@ -156,7 +158,7 @@ impl<M: Mutex<VirtualFat> + 'static> filesystem::Directory for Directory<M> {
                         self.virtual_fat.clone(),
                         Cluster::from(starting_cluster),
                         file_size as u64,
-                    )
+                    ).map_err(|_| io::Error::from(io::ErrorKind::Other))?
                 }
             };
 
@@ -239,7 +241,7 @@ impl<'a, M: Mutex<VirtualFat>> DirectoryEntrySpan<'a, M> {
     fn clear(self) -> io::Result<()> {
         let count = (self.end - self.start) / 32;
         self.chain.seek(SeekFrom::Start(self.start))?;
-        let empty_and_over = DirectoryEntry::EmptyAndOver;
+        let empty_and_over = DirectoryEntry::Empty;
         (0..count).try_for_each(|_| empty_and_over.save_writable(self.chain))
     }
 
@@ -249,6 +251,14 @@ impl<'a, M: Mutex<VirtualFat>> DirectoryEntrySpan<'a, M> {
 
     fn parse_entry(&self) -> (u32, Metadata, Option<u32>) {
         parse_entry(&self.regular_entry)
+    }
+
+    fn save(&mut self) -> io::Result<()> {
+        self.chain.seek(SeekFrom::Start(self.start))?;
+        self.long_file_names.iter()
+            .try_for_each(|long_file_name| long_file_name.save_writable(self.chain))?;
+        self.regular_entry.save_writable(self.chain)?;
+        Ok(())
     }
 }
 

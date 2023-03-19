@@ -21,19 +21,23 @@ pub(crate) struct Chain<M: Mutex<VirtualFat>> {
     virtual_fat: Arc<M>,
     position: u64,
     total_size: u64,
+    capacity: u64,
     first_cluster: Cluster,
     current_cluster: Cluster,
 }
 
 impl<M: Mutex<VirtualFat>> Chain<M> {
     pub(crate) fn new(virtual_fat: Arc<M>) -> VirtualFatResult<Self> {
-        let cluster = virtual_fat.lock(|virtual_fat| virtual_fat.next_free_cluster())
-            .map_err(|_| VirtualFatError::FailedToLockFatMutex)??;
+        let (cluster, capacity) = virtual_fat.lock(|virtual_fat| -> VirtualFatResult<(Cluster, u64)> {
+            let cluster = virtual_fat.next_free_cluster()?;
+            Ok((cluster, virtual_fat.block_size() as u64))
+        }).map_err(|_| VirtualFatError::FailedToLockFatMutex)??;
 
         Ok(Self {
             virtual_fat,
             position: 0,
             total_size: 0,
+            capacity,
             first_cluster: cluster,
             current_cluster: cluster,
         })
@@ -48,19 +52,25 @@ impl<M: Mutex<VirtualFat>> Chain<M> {
             virtual_fat,
             position: 0,
             total_size,
+            capacity: total_size,
             first_cluster: cluster,
             current_cluster: cluster,
         })
     }
 
-    pub(crate) fn new_from_cluster_with_size(virtual_fat: Arc<M>, cluster: Cluster, total_size: u64) -> Self {
-        Self {
+    pub(crate) fn new_from_cluster_with_size(virtual_fat: Arc<M>, cluster: Cluster, total_size: u64) -> VirtualFatResult<Self> {
+        let capacity = virtual_fat.lock(|virtual_fat| -> VirtualFatResult<u64>
+            { Ok((virtual_fat.block_size() * virtual_fat.fat_chain(cluster)?.len()) as u64) })
+            .map_err(|_| VirtualFatError::FailedToLockFatMutex)??;
+
+        Ok(Self {
             virtual_fat,
             position: 0,
             total_size,
+            capacity,
             first_cluster: cluster,
             current_cluster: cluster,
-        }
+        })
     }
 
     pub(crate) fn position(&self) -> u64 {
@@ -77,13 +87,14 @@ impl<M: Mutex<VirtualFat>> Chain<M> {
             .into_iter().map(|cluster| Into::<u32>::into(cluster) as u64))
     }
 
-    fn append_cluster(&self, previous: Cluster, virtual_fat: &mut VirtualFat) -> io::Result<Cluster> {
-        let new_cluster = virtual_fat.get_clear_cluster()?;
-        virtual_fat.update_fat_entry(previous, Status::Data(new_cluster))
+    fn append_cluster(&mut self, previous: Cluster, virtual_fat: &mut VirtualFat) -> io::Result<()> {
+        self.current_cluster = virtual_fat.get_clear_cluster()?;
+        virtual_fat.update_fat_entry(previous, Status::Data(self.current_cluster))
             .map_err(|_| io::Error::from(io::ErrorKind::Other))?;
-        virtual_fat.update_fat_entry(new_cluster, Status::new_eoc())
+        virtual_fat.update_fat_entry(self.current_cluster, Status::new_eoc())
             .map_err(|_| io::Error::from(io::ErrorKind::Other))?;
-        Ok(new_cluster)
+        self.capacity += virtual_fat.block_size() as u64;
+        Ok(())
     }
 }
 
@@ -108,8 +119,8 @@ impl<M: Mutex<VirtualFat>> io::Write for Chain<M> {
             let mut total_written = 0;
 
             while !buf.is_empty() {
-                if self.position == self.total_size {
-                    self.current_cluster = self.append_cluster(self.current_cluster, virtual_fat)?;
+                if self.position == self.capacity {
+                    self.append_cluster(self.current_cluster, virtual_fat)?;
                 }
 
                 let blocks = self.get_blocks(virtual_fat)?;
@@ -178,6 +189,7 @@ impl<M: Mutex<VirtualFat>> Clone for Chain<M> {
             virtual_fat: self.virtual_fat.clone(),
             position: self.position,
             total_size: self.total_size,
+            capacity: self.capacity,
             first_cluster: self.first_cluster.clone(),
             current_cluster: self.current_cluster.clone(),
         }

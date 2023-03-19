@@ -37,7 +37,11 @@ impl<M: Mutex<VirtualFat> + 'static> filesystem::filesystem::File for File<M> {
 
 impl<M: Mutex<VirtualFat>> io::Write for File<M> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.chain.write(buf)
+        let written = self.chain.write(buf)?;
+        if self.file_size < self.chain.total_size() as u32 {
+            self.file_size = self.chain.total_size() as u32;
+        }
+        Ok(written)
     }
 
     fn flush(&mut self) -> io::Result<()> {

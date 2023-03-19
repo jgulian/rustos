@@ -7,6 +7,7 @@ use core::cell::UnsafeCell;
 use core::fmt::{self, Debug};
 
 use filesystem;
+use filesystem::cache::CachedBlockDevice;
 use filesystem::filesystem::{Filesystem, Directory, File};
 use filesystem::device::{BlockDevice, ByteDevice};
 use filesystem::master_boot_record::{MasterBootRecord, PartitionEntry};
@@ -47,8 +48,9 @@ impl FileSystem {
     pub unsafe fn initialize(&self) {
         let mut virtual_file_system = VirtualFilesystem::default();
 
-        let mut sd_device = Box::new(Sd::new().unwrap());
-        let virtual_fat_block_partition = BlockPartition::new(sd_device, 0xc).unwrap();
+        let mut sd_device = Sd::new().unwrap();
+        let mut cached_sd_device = CachedBlockDevice::new(sd_device, None);
+        let virtual_fat_block_partition = BlockPartition::new(Box::new(cached_sd_device), 0xc).unwrap();
         let disk_file_system = VirtualFatFilesystem::<SpinLock<VirtualFat>>::new(virtual_fat_block_partition).unwrap();
 
         virtual_file_system.mount(Path::root(), Box::new(disk_file_system)).unwrap();
