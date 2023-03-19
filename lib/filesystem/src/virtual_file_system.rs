@@ -95,7 +95,7 @@ impl<M: Mutex<Mounts> + 'static> Directory for VFSDirectory<M> {
         }).map_err(|_| io::Error::from(io::ErrorKind::Other))?
     }
 
-    fn create_file(&mut self, name: &str) -> io::Result<Box<dyn File>> {
+    fn create_file(&mut self, name: &str) -> io::Result<()> {
         self.mounts.lock(|mounts| {
             mounts.0.iter_mut()
                 .filter(|mount| mount.mount_point == self.path)
@@ -104,7 +104,7 @@ impl<M: Mutex<Mounts> + 'static> Directory for VFSDirectory<M> {
         }).map_err(|_| io::Error::from(io::ErrorKind::Other))?
     }
 
-    fn create_directory(&mut self, _: &str) -> io::Result<Box<dyn Directory>> {
+    fn create_directory(&mut self, _: &str) -> io::Result<()> {
         Err(io::Error::from(io::ErrorKind::Unsupported))
     }
 
@@ -166,11 +166,11 @@ impl<Device: ByteDevice + Clone + Send + Sync + 'static> Directory for ByteDevic
         }
     }
 
-    fn create_file(&mut self, name: &str) -> io::Result<Box<dyn File>> {
+    fn create_file(&mut self, name: &str) -> io::Result<()> {
         todo!()
     }
 
-    fn create_directory(&mut self, name: &str) -> io::Result<Box<dyn Directory>> {
+    fn create_directory(&mut self, name: &str) -> io::Result<()> {
         todo!()
     }
 

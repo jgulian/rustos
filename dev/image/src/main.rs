@@ -1,16 +1,15 @@
 mod cli;
+mod logger;
 
 #[cfg(test)]
 mod tests;
 
-use std::borrow::{Borrow};
 use std::fs::{File, read_dir};
 use std::io;
 use std::io::{copy, Error, ErrorKind, Seek, SeekFrom, Write};
 use std::io::ErrorKind::InvalidInput;
 use std::ops::DerefMut;
 use std::path::PathBuf;
-use std::rc::Rc;
 use clap::Parser;
 use cli::ImageArgs;
 use vfat::virtual_fat::{VirtualFat, VirtualFatFilesystem};
@@ -22,11 +21,14 @@ use filesystem::partition::BlockPartition;
 use sync::LockResult;
 use crate::cli::FileSystem;
 use crate::cli::ImageCommand::{Create, Format};
+use log::error;
 
 const BYTES_PER_MEGABYTE: u64 = 1000000;
 
 fn main() {
     let ImageArgs {path, sector_size, command } = ImageArgs::parse();
+
+    logger::init_logger();
 
     match command {
         Create { image_size_mb } => {
@@ -101,6 +103,8 @@ fn format_image<'a>(path: &PathBuf, sector_size: u16, _filesystem: FileSystem, p
 fn add_directory_to_filesystem(image_filesystem: &mut dyn Filesystem, folder: PathBuf, image_path: Path) -> io::Result<()> {
     let directory_entries = read_dir(folder.clone())?;
 
+    println!("here 1");
+
     let mut image_directory = image_filesystem.open(&image_path)?.into_directory()?;
 
     for directory_entry_wrapped in directory_entries {
@@ -112,7 +116,6 @@ fn add_directory_to_filesystem(image_filesystem: &mut dyn Filesystem, folder: Pa
             .ok_or(Error::from(ErrorKind::Unsupported))?;
 
         if file_type.is_file() {
-            println!("copying {}", directory_entry.path().display());
             image_directory.create_file(entry_name)?;
             let mut file = image_directory.open_entry(entry_name)?.into_file()?;
             let mut real_file = File::open(&directory_entry.path())?;
@@ -126,6 +129,8 @@ fn add_directory_to_filesystem(image_filesystem: &mut dyn Filesystem, folder: Pa
             sub_image_path.join_str(entry_name)?;
             println!("opening {}", sub_image_path);
             image_directory.create_directory(entry_name)?;
+
+            println!("here 6");
 
             add_directory_to_filesystem(image_filesystem, sub_folder, sub_image_path)?;
         } else {

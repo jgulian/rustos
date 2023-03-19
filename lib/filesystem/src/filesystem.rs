@@ -47,8 +47,8 @@ pub trait File: io::Seek + io::Read + io::Write + Send + Sync {
 
 pub trait Directory: Send + Sync {
     fn open_entry(&mut self, name: &str) -> io::Result<Entry>;
-    fn create_file(&mut self, name: &str) -> io::Result<BoxedFile>;
-    fn create_directory(&mut self, name: &str) -> io::Result<BoxedDirectory>;
+    fn create_file(&mut self, name: &str) -> io::Result<()>;
+    fn create_directory(&mut self, name: &str) -> io::Result<()>;
     fn remove(&mut self, name: &str) -> io::Result<()>;
     fn list(&mut self) -> io::Result<Vec<String>>;
     fn metadata(&mut self) -> io::Result<Box<dyn Metadata>>;

@@ -2,6 +2,7 @@
 use alloc::string::String;
 #[cfg(feature = "no_std")]
 use alloc::vec::Vec;
+use core::char::TryFromCharError;
 use log::info;
 #[cfg(not(feature = "no_std"))]
 use std::string::String;
@@ -9,10 +10,12 @@ use std::string::String;
 use std::vec::Vec;
 use shim::io::{Read, Seek, Write};
 use format::Format;
-use crate::entry::DirectoryAttribute::LongFileName;
+use shim::io;
+use crate::cluster::Cluster;
+use crate::entry::EntryAttribute::LongFileName;
 use crate::metadata::Metadata;
 
-pub(crate) enum DirectoryAttribute {
+pub(crate) enum EntryAttribute {
     ReadOnly = 0x01,
     Hidden = 0x02,
     System = 0x04,
@@ -22,8 +25,8 @@ pub(crate) enum DirectoryAttribute {
     LongFileName = 0b1111,
 }
 
-#[derive(Copy, Clone, Debug, Format)]
-pub(crate)  struct RegularDirectoryEntry {
+#[derive(Copy, Clone, Debug, Default, Format)]
+pub(crate) struct RegularDirectoryEntry {
     name: [u8; 8],
     extension: [u8; 3],
     attributes: u8,
@@ -35,6 +38,77 @@ pub(crate)  struct RegularDirectoryEntry {
     last_modification: u32,
     first_cluster_low: u16,
     file_size: u32,
+}
+
+impl RegularDirectoryEntry {
+    pub(crate) fn new_file_entry(name: &str, cluster: Cluster) -> Self {
+        let mut result = Self::default();
+        let (high_cluster, low_cluster) = cluster.high_and_low();
+        result.first_cluster_high = high_cluster;
+        result.first_cluster_low = low_cluster;
+        result.copy_in_name(name);
+        result
+    }
+
+    pub(crate) fn new_directory_entry(name: &str, cluster: Cluster) -> Self {
+        let mut result = Self::default();
+        let (high_cluster, low_cluster) = cluster.high_and_low();
+        result.first_cluster_high = high_cluster;
+        result.first_cluster_low = low_cluster;
+        result.copy_in_name(name);
+        result.attributes = EntryAttribute::Directory as u8;
+        result
+    }
+
+    pub(crate) fn update_file_size(&mut self, file_size: u32) -> io::Result<()> {
+        if self.attributes & EntryAttribute::Directory as u8 > 0 {
+            return Err(io::Error::new(io::ErrorKind::Unsupported, "can't set size on directory"));
+        }
+
+        self.file_size = file_size;
+        Ok(())
+    }
+
+    fn copy_in_name(&mut self, name: &str) {
+        let (mut i, mut in_extension) = (0, false);
+        name.chars().for_each(|mut c|{
+            if c == '.' {
+                if in_extension {
+                    self.extension = [0; 3];
+                    i = 0;
+                } else {
+                    in_extension = true;
+                    i = 0;
+                }
+            }
+
+            if !(c.is_alphanumeric() || "$%'-_@~`!(){}^#&".contains(c)) {
+                return;
+            }
+
+            if c.is_ascii_lowercase() {
+                c.make_ascii_uppercase();
+            }
+
+            let byte = match u8::try_from(c) {
+                Ok(byte) => byte,
+                Err(_) => return,
+            };
+
+            if !in_extension {
+                if i < 8 {
+                    self.name[i] = byte;
+                    i += 1;
+                }
+            } else {
+                if i < 3 {
+                    self.extension[i] = byte;
+                    i += 1;
+                }
+            }
+        })
+
+    }
 }
 
 #[derive(Copy, Clone, Debug, Format)]
@@ -55,7 +129,7 @@ impl LongFileNameEntry {
         let mut result = Self {
             order,
             name_one: [0u8; 10],
-            attributes: DirectoryAttribute::LongFileName as u8,
+            attributes: EntryAttribute::LongFileName as u8,
             dir_type: 0,
             checksum: 0,
             name_two: [0u8; 12],
@@ -183,7 +257,7 @@ pub(crate) fn parse_entry(regular_entry: &RegularDirectoryEntry) -> (u32, Metada
         last_modification: Default::default(),
     };
 
-    if regular_entry.attributes & (DirectoryAttribute::Directory as u8) > 0 {
+    if regular_entry.attributes & (EntryAttribute::Directory as u8) > 0 {
         (starting_cluster, metadata, None)
     } else {
         (starting_cluster, metadata, Some(regular_entry.file_size))
@@ -197,7 +271,7 @@ pub(crate) fn create_long_file_name_entries(name: &str) -> Vec<LongFileNameEntry
         .enumerate()
         .map(|(i, chunk)| {
             let mut result = LongFileNameEntry {
-                order: i as u8,
+                order: i as u8 + 1,
                 name_one: [0; 10],
                 attributes: LongFileName as u8,
                 dir_type: 0,

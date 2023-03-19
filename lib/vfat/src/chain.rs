@@ -119,8 +119,9 @@ impl<M: Mutex<VirtualFat>> io::Write for Chain<M> {
                     let new_cluster = self.append_cluster(self.current_cluster, virtual_fat)?;
                     blocks.push_back(Into::<u32>::into(new_cluster) as u64);
                 }
+                let real_offset = (self.position as usize) % virtual_fat.block_size();
                 let (final_block, written) =
-                    stream_write(virtual_fat, self.position as usize, blocks.iter().map(|x| *x), buf)?;
+                    stream_write(virtual_fat, real_offset, blocks.iter().copied(), buf)?;
                 buf = &buf[written..];
                 while let Some(block) = blocks.pop_front() {
                     if block == final_block {

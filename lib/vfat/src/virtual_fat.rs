@@ -133,6 +133,17 @@ impl VirtualFat {
         }
     }
 
+    pub(crate) fn get_clear_cluster(&mut self) -> io::Result<Cluster> {
+        let cluster = self.next_free_cluster()
+            .map_err(|_| io::Error::new(io::ErrorKind::Unsupported, "no free cluster found"))?;
+        let zero_block = vec![0u8; self.block_size()];
+
+        self.write_block(cluster.into(), zero_block.as_slice())
+            .map_err(|_| io::Error::new(io::ErrorKind::Unsupported, "failed to clear cluster"))?;
+
+        Ok(cluster)
+    }
+
     fn number_of_fats(&self) -> usize {
         self.sectors_per_fat as usize * self.bytes_per_sector as usize / mem::size_of::<FatEntry>()
     }
@@ -183,43 +194,10 @@ impl<M: Mutex<VirtualFat> + 'static> filesystem::filesystem::Filesystem for Virt
     fn format(device: &mut dyn BlockDevice, partition: &mut filesystem::master_boot_record::PartitionEntry, sector_size: usize) -> io::Result<()> where Self: Sized {
         partition.partition_type = 0xc;
 
-        let mut boot_code = [0u8; 420];
-        boot_code[..DEFAULT_BOOT_CODE_HEAD.len()].copy_from_slice(&DEFAULT_BOOT_CODE_HEAD);
-
         // TODO: make it have the correct size and location
         // currently they've just been reversed
 
-        let bpb = BiosParameterBlock {
-            jump_instructions: [235, 88, 144],
-            oem_identifier: *b"rustmkft",
-            bytes_per_sector: sector_size as u16,
-            sectors_per_cluster: 1,
-            reserved_sectors: 32,
-            number_of_fats: 2,
-            max_num_of_dirs: 0,
-            total_logical_sectors: 0,
-            media_desciptor_type: 248,
-            sectors_per_fat_one: 0,
-            sectors_per_track: 32,
-            number_of_heads: 64,
-            number_of_hidden_sectors: 0,
-            total_logical_sectors_extended: 247952,
-            sectors_per_fat_two: 1908,
-            flags: 0,
-            version: 0,
-            root_cluster: 2,
-            sector_of_fsinfo: 1,
-            sector_of_backup: 6,
-            reserved: [0; 12],
-            drive_number: 128,
-            nt_flags: 0,
-            signature: 41,
-            serial_number: 3173764726,
-            label_string: *b"NO NAME    ",
-            system_identifier: *b"FAT32   ",
-            boot_code,
-            bp_signature: [0x55, 0xaa],
-        };
+        let bpb = BiosParameterBlock::new(sector_size as u16);
 
         let mut bpb_data: Vec<u8> = Vec::new();
         bpb_data.reserve_exact(sector_size);
@@ -234,8 +212,9 @@ impl<M: Mutex<VirtualFat> + 'static> filesystem::filesystem::Filesystem for Virt
         fat_empty[0x4..0x8].copy_from_slice(&0xfff_ffff_u32.to_le_bytes());
         fat_empty[0x8..0xc].copy_from_slice(&0xfff_fff8_u32.to_le_bytes());
 
-        for i in 1..(bpb.reserved_sectors as u32 + bpb.sectors_per_fat_two * bpb.number_of_fats as u32 + 3) {
-            let buffer = if (i > bpb.reserved_sectors as u32) &&
+        let end_of_fats = bpb.reserved_sectors as u32 + bpb.sectors_per_fat_two * bpb.number_of_fats as u32;
+        for i in 1..(end_of_fats + 3) {
+            let buffer = if i < bpb.reserved_sectors as u32 || i > end_of_fats ||
                 (i - bpb.reserved_sectors as u32) % bpb.sectors_per_fat_two != 0 {
                 zero.as_slice()
             } else {
@@ -247,11 +226,6 @@ impl<M: Mutex<VirtualFat> + 'static> filesystem::filesystem::Filesystem for Virt
         Ok(())
     }
 }
-
-const DEFAULT_BOOT_CODE_HEAD: [u8; 129] = *b"\x0e\x1f\xbe\x77\x7c\xac\x22\xc0\x74\x0b\x56\xb4\x0e\
-\xbb\x07\x00\xcd\x10\x5e\xeb\xf0\x32\xe4\xcd\x16\xcd\x19\xeb\xfe\
-This is not a bootable disk.  Please insert a bootable floppy and\r\npress any key to try again \
-... \r\n";
 
 impl<M: Mutex<VirtualFat> + 'static> VirtualFatFilesystem<M> {
     pub fn new(mut value: BlockPartition) -> Result<Self, FilesystemError> {

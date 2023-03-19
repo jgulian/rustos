@@ -5,6 +5,8 @@ use alloc::boxed::Box;
 #[cfg(feature = "no_std")]
 use alloc::string::String;
 #[cfg(feature = "no_std")]
+use alloc::vec;
+#[cfg(feature = "no_std")]
 use alloc::vec::Vec;
 use log::info;
 #[cfg(not(feature = "no_std"))]
@@ -14,6 +16,8 @@ use std::boxed::Box;
 #[cfg(not(feature = "no_std"))]
 use std::string::String;
 #[cfg(not(feature = "no_std"))]
+use std::vec;
+#[cfg(not(feature = "no_std"))]
 use std::vec::Vec;
 
 use filesystem::filesystem;
@@ -21,15 +25,16 @@ use crate::chain::Chain;
 use crate::metadata::Metadata;
 use format::Format;
 use shim::io;
-use shim::io::{Seek, SeekFrom, Write};
+use shim::io::{Read, Seek, SeekFrom, Write};
 use sync::Mutex;
 use crate::cluster::Cluster;
 use crate::entry::{create_long_file_name_entries, DirectoryEntry, LongFileNameEntry, parse_entry, parse_name, RegularDirectoryEntry};
-use crate::entry::DirectoryAttribute::LongFileName;
+use crate::entry::EntryAttribute::LongFileName;
+use crate::error::VirtualFatResult;
+use crate::fat::Status;
 use crate::file::File;
 use crate::virtual_fat::VirtualFat;
 
-#[derive(Clone)]
 pub(crate) struct Directory<M: Mutex<VirtualFat>> {
     pub(crate) virtual_fat: Arc<M>,
     pub(crate) metadata: Metadata,
@@ -97,8 +102,26 @@ impl<M: Mutex<VirtualFat>> Directory<M> {
         Ok(())
     }
 
-    pub(crate) fn update_file_size(&mut self, file_name: &str, new_size: u32) {
+    pub(crate) fn update_file_size(&mut self, file_name: &str, new_size: u32) -> io::Result<()> {
+        self.restart()?;
+        while let Some(mut span) = self.next()? {
+            if span.name().as_str() == file_name {
+                span.regular_entry.update_file_size(new_size)?;
+                return Ok(())
+            }
+        }
 
+        Err(io::Error::new(io::ErrorKind::NotFound, "entry not found"))
+    }
+
+    //TODO: remove all these map_err s
+    fn get_new_cluster(&mut self) -> io::Result<Cluster> {
+        self.virtual_fat.lock(|virtual_fat| -> VirtualFatResult<Cluster> {
+            let cluster = virtual_fat.get_clear_cluster()?;
+            virtual_fat.update_fat_entry(cluster, Status::new_eoc())?;
+            Ok(cluster)
+        }).map_err(|_| io::Error::new(io::ErrorKind::Unsupported, "virtual fat lock poisoned"))?
+            .map_err(|_| io::Error::new(io::ErrorKind::Unsupported, "failed to get and clean cluster"))
     }
 }
 
@@ -140,6 +163,8 @@ impl<M: Mutex<VirtualFat> + 'static> filesystem::Directory for Directory<M> {
                 }
                 Some(file_size) => {
                     filesystem::Entry::File(Box::new(File {
+                        name: String::from(name),
+                        directory: self.clone(),
                         metadata,
                         file_size,
                         chain,
@@ -153,31 +178,25 @@ impl<M: Mutex<VirtualFat> + 'static> filesystem::Directory for Directory<M> {
         Err(io::Error::from(io::ErrorKind::NotFound))
     }
 
-    fn create_file(&mut self, name: &str) -> io::Result<Box<dyn filesystem::File>> {
-        self.append_entry(name, RegularDirectoryEntry {
-            name: name.as_bytes().iter().chain([0; 8]).collect(),
-            extension: [],
-            attributes: 0,
-            nt_reserved: 0,
-            created_time_tenth: 0,
-            created_time: 0,
-            last_access: 0,
-            first_cluster_high: 0,
-            last_modification: 0,
-            first_cluster_low: 0,
-            file_size: 0,
-        })
+    fn create_file(&mut self, name: &str) -> io::Result<()> {
+        let free_cluster = self.get_new_cluster()?;
+        let file_entry = RegularDirectoryEntry::new_file_entry(name, free_cluster);
+        self.append_entry(name, file_entry)?;
+        Ok(())
     }
 
-    fn create_directory(&mut self, name: &str) -> io::Result<Box<dyn filesystem::Directory>> {
-        todo!()
+    fn create_directory(&mut self, name: &str) -> io::Result<()> {
+        let free_cluster = self.get_new_cluster()?;
+        let file_entry = RegularDirectoryEntry::new_directory_entry(name, free_cluster);
+        self.append_entry(name, file_entry)?;
+        Ok(())
     }
 
     fn remove(&mut self, name: &str) -> io::Result<()> {
         self.restart()?;
         while let Some(mut span) = self.next()? {
             if span.name() == name {
-                span.clear();
+                span.clear()?;
                 break;
             }
         }
@@ -221,5 +240,15 @@ impl<'a, M: Mutex<VirtualFat>> DirectoryEntrySpan<'a, M> {
 
     fn parse_entry(&self) -> (u32, Metadata, Option<u32>) {
         parse_entry(&self.regular_entry)
+    }
+}
+
+impl<M: Mutex<VirtualFat>> Clone for Directory<M> {
+    fn clone(&self) -> Self {
+        Self {
+            virtual_fat: self.virtual_fat.clone(),
+            metadata: self.metadata.clone(),
+            chain: self.chain.clone(),
+        }
     }
 }

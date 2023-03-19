@@ -1,15 +1,23 @@
 #[cfg(feature = "no_std")]
 use alloc::boxed::Box;
+#[cfg(feature = "no_std")]
+use alloc::string::String;
+use log::info;
 #[cfg(not(feature = "no_std"))]
 use std::boxed::Box;
+#[cfg(not(feature = "no_std"))]
+use std::string::String;
 use shim::io::{self, SeekFrom};
 use sync::Mutex;
 use crate::chain::Chain;
+use crate::directory::Directory;
 use crate::metadata::Metadata;
 use crate::virtual_fat::VirtualFat;
 
 #[derive(Clone)]
 pub(crate) struct File<M: Mutex<VirtualFat>> {
+    pub(crate) name: String,
+    pub(crate) directory: Directory<M>,
     pub(crate) metadata: Metadata,
     pub(crate) file_size: u32,
     pub(crate) chain: Chain<M>,
@@ -18,6 +26,8 @@ pub(crate) struct File<M: Mutex<VirtualFat>> {
 impl<M: Mutex<VirtualFat> + 'static> filesystem::filesystem::File for File<M> {
     fn duplicate(&mut self) -> io::Result<Box<dyn filesystem::filesystem::File>> {
         Ok(Box::new(Self {
+            name: self.name.clone(),
+            directory: self.directory.clone(),
             metadata: self.metadata.clone(),
             file_size: self.file_size,
             chain: self.chain.clone(),
@@ -63,6 +73,7 @@ impl<M: Mutex<VirtualFat>> io::Seek for File<M> {
 
 impl<M: Mutex<VirtualFat>> Drop for File<M> {
     fn drop(&mut self) {
-        //TODO: set size
+        self.directory.update_file_size(self.name.as_str(), self.file_size)
+            .expect("unable to update file size");
     }
 }
