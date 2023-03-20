@@ -103,7 +103,7 @@ impl Process {
             .map_err(|_| OsError::IoError)?
             .into_file().map_err(|_| OsError::NoEntry)?;
 
-        let amount_read = file.read(user_image).map_err(|_| OsError::IoError)?;
+        let _amount_read = file.read(user_image).map_err(|_| OsError::IoError)?;
         Ok(process)
     }
 

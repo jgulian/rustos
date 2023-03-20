@@ -1,6 +1,6 @@
 use core::cell::UnsafeCell;
-use core::fmt;
-use core::ops::{Deref, DerefMut, Drop};
+
+use core::ops::{Drop};
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use sync::{LockError, LockResult};
 

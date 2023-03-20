@@ -10,7 +10,7 @@ use crate::multiprocessing::spin_lock::SpinLock;
 pub(self) struct AllocatorInformation;
 
 impl PseudoDirectory for AllocatorInformation {
-    fn read(&mut self, offset: &Path, buf: &mut [u8]) -> io::Result<usize> {
+    fn read(&mut self, offset: &Path, _buf: &mut [u8]) -> io::Result<usize> {
         match offset.as_str() {
             "/allocator" => {
 

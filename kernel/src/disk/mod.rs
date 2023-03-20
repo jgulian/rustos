@@ -1,28 +1,28 @@
 use alloc::boxed::Box;
-use alloc::rc::Rc;
-use alloc::string::{String, ToString};
+
+use alloc::string::{String};
 use alloc::sync::Arc;
 
-use core::cell::UnsafeCell;
-use core::fmt::{self, Debug};
+
+
 
 use filesystem;
 use filesystem::cache::CachedBlockDevice;
-use filesystem::filesystem::{Filesystem, Directory, File};
+use filesystem::filesystem::{Filesystem, Directory};
 use filesystem::device::{BlockDevice, ByteDevice};
-use filesystem::master_boot_record::{MasterBootRecord, PartitionEntry};
+use filesystem::master_boot_record::{PartitionEntry};
 use filesystem::partition::BlockPartition;
 use filesystem::path::Path;
 use filesystem::virtual_file_system::{ByteDeviceFilesystem, Mounts, VirtualFilesystem};
 use vfat::virtual_fat::{VirtualFat, VirtualFatFilesystem};
 
 use pi::uart::MiniUart;
-use shim::{io, ioerr, newioerr};
-use shim::io::{Read, Write};
+use shim::{io, ioerr};
+
 use sync::Mutex;
 use crate::disk::sd::Sd;
 
-use crate::FILESYSTEM;
+
 use crate::multiprocessing::spin_lock::SpinLock;
 
 pub mod sd;
@@ -49,8 +49,8 @@ impl FileSystem {
     pub unsafe fn initialize(&self) {
         let mut virtual_file_system = VirtualFilesystem::default();
 
-        let mut sd_device = Sd::new().unwrap();
-        let mut cached_sd_device = CachedBlockDevice::new(sd_device, None);
+        let sd_device = Sd::new().unwrap();
+        let cached_sd_device = CachedBlockDevice::new(sd_device, None);
         let virtual_fat_block_partition = BlockPartition::new(Box::new(cached_sd_device), 0xc).unwrap();
         let disk_file_system = VirtualFatFilesystem::<SpinLock<VirtualFat>>::new(virtual_fat_block_partition).unwrap();
 
@@ -98,7 +98,8 @@ impl ByteDevice for ConsoleFile {
     }
 
     fn write_byte(&mut self, byte: u8) -> io::Result<()> {
-        Ok(self.0.lock(|byte_device| byte_device.write_byte(byte)).unwrap())
+        self.0.lock(|byte_device| byte_device.write_byte(byte)).unwrap();
+        Ok(())
     }
 
     fn try_read_byte(&mut self) -> io::Result<u8> {
@@ -114,7 +115,8 @@ impl ByteDevice for ConsoleFile {
     fn try_write_byte(&mut self, byte: u8) -> io::Result<()> {
         self.0.lock(|byte_device| {
             if byte_device.can_write() {
-                Ok(byte_device.write_byte(byte))
+                byte_device.write_byte(byte);
+                Ok(())
             } else {
                 Err(io::Error::from(io::ErrorKind::WouldBlock))
             }

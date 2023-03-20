@@ -84,7 +84,7 @@ impl BlockDevice for Sd {
         }
     }
 
-    fn write_block(&mut self, block: u64, data: &[u8]) -> io::Result<()> {
+    fn write_block(&mut self, _block: u64, _data: &[u8]) -> io::Result<()> {
         unimplemented!("SD card and file system are read only")
     }
 }
