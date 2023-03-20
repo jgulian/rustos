@@ -104,7 +104,6 @@ impl Process {
             .into_file().map_err(|_| OsError::NoEntry)?;
 
         let amount_read = file.read(user_image).map_err(|_| OsError::IoError)?;
-        info!("{} {:x?}", amount_read, &user_image[..1024]);
         Ok(process)
     }
 
@@ -253,7 +252,6 @@ impl Process {
     }
 
     pub fn execute(&mut self, arguments: &[u8], environment: &[u8]) -> OsResult<()> {
-        info!("execute");
         let argument_vec = parse_execute(arguments);
         let _environment_vec = parse_execute(environment);
 

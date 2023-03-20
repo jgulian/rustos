@@ -26,6 +26,7 @@ use crate::FILESYSTEM;
 use crate::multiprocessing::spin_lock::SpinLock;
 
 pub mod sd;
+mod system;
 
 pub struct FileSystem(SpinLock<Option<VirtualFilesystem<SpinLock<Mounts>>>>);
 

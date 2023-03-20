@@ -3,7 +3,7 @@ use core::fmt;
 use core::fmt::Write;
 use core::time::Duration;
 
-use shim::ioerr;
+use shim::{ioerr, newioerr};
 
 use crate::*;
 
@@ -120,19 +120,19 @@ pub fn open(file: &str) -> OsResult<u64> {
 }
 
 //TODO: make the semantics match io::Read
-pub fn read(file: u64, bytes: &mut [u8]) -> OsResult<()> {
+pub fn read(file: u64, bytes: &mut [u8]) -> OsResult<usize> {
     unsafe {
         syscall_args!(file, (bytes.as_ptr()) as u64, bytes.len() as u64);
         syscall!(Syscall::Read);
-        syscall_receive0!()
+        syscall_receive1!().map(|size| size as usize)
     }
 }
 
-pub fn write(file: u64, bytes: &[u8]) -> OsResult<()> {
+pub fn write(file: u64, bytes: &[u8]) -> OsResult<usize> {
     unsafe {
         syscall_args!(file, (bytes.as_ptr()) as u64, bytes.len() as u64);
         syscall!(Syscall::Write);
-        syscall_receive0!()
+        syscall_receive1!().map(|size| size as usize)
     }
 }
 
@@ -237,19 +237,15 @@ impl File {
 
 impl io::Read for File {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        match read(self.0, buf) {
-            Ok(_) => Ok(buf.len()),
-            Err(_) => ioerr!(Interrupted),
-        }
+        read(self.0, buf)
+            .map_err(|_| newioerr!(Interrupted))
     }
 }
 
 impl io::Write for File {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        match write(self.0, buf) {
-            Ok(_) => Ok(buf.len()),
-            Err(_) => ioerr!(Interrupted),
-        }
+        write(self.0, buf)
+            .map_err(|_| newioerr!(Interrupted))
     }
 
     fn flush(&mut self) -> io::Result<()> {

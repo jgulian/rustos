@@ -114,7 +114,6 @@ impl<M: Mutex<VirtualFat>> Directory<M> {
             if span.name().as_str() == file_name {
                 span.regular_entry.update_file_size(new_size)?;
                 span.save()?;
-                info!("new size: {}", new_size);
                 return Ok(())
             }
         }
@@ -139,7 +138,6 @@ impl<M: Mutex<VirtualFat> + 'static> filesystem::Directory for Directory<M> {
 
         while let Some(mut span) = self.next()? {
             // TODO: use eq?
-            info!("looking for {}, found {}", name, span.name());
             if span.name().as_str() != name {
                 continue;
             }
@@ -183,8 +181,6 @@ impl<M: Mutex<VirtualFat> + 'static> filesystem::Directory for Directory<M> {
 
             return Ok(entry);
         }
-
-        info!("thats all folks");
 
         Err(io::Error::from(io::ErrorKind::NotFound))
     }

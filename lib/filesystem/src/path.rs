@@ -22,7 +22,7 @@ pub enum Component {
     Child(String),
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Path(String);
 
 impl Path {
@@ -90,6 +90,10 @@ impl Path {
         } else {
             Some(Path(self.0[..other.0.len()].to_string()))
         }
+    }
+
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
     }
 
     fn push_component(&mut self, component: Component) {

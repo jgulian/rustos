@@ -11,7 +11,7 @@ members = [
     "lib/aarch64",
     "lib/allocator",
     "lib/filesystem",
-    "lib/filesystem/pseudo_filesystem",
+    #"lib/filesystem/pseudo_filesystem",
     "lib/format",
     "lib/format/format_derive",
     "lib/jlib",

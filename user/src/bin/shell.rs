@@ -28,7 +28,10 @@ fn main() {
         print!("shell > ");
 
         while {
-            stdin.read(&mut byte).expect("could not read stdio");
+            let mut read = 0;
+            while read == 0 {
+                read = stdin.read(&mut byte).expect("could not read stdio");
+            }
 
             // TODO: work for serial escape codes broader than arrow keys
             if byte[0] == 27 {

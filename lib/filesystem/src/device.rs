@@ -83,16 +83,11 @@ pub trait BlockDevice {
 }
 
 pub fn stream_read<I>(device: &mut dyn BlockDevice, offset: usize, blocks: I, data: &mut [u8]) -> io::Result<(u64, usize)> where I: Iterator<Item=u64> {
-    let debug = data.len() == 65536;
     let block_size = device.block_size();
     let (block_offset, small_offset) = offset_data(offset, block_size);
     let (prefix_data, main_data) = data.split_at_mut(min(block_size - small_offset, data.len()));
     let prefix_option = if prefix_data.is_empty() { None } else { Some(prefix_data) };
     let (mut last_block, mut amount_read) = (0, 0);
-
-    if debug {
-        info!("reading file");
-    }
 
     blocks.skip(block_offset)
         .zip(prefix_option.into_iter().chain(main_data.chunks_mut(block_size)))
@@ -106,9 +101,6 @@ pub fn stream_read<I>(device: &mut dyn BlockDevice, offset: usize, blocks: I, da
                 let shadow_offset = if i == 0 { small_offset } else { 0 };
                 let chunk_shadow = &shadow[shadow_offset..shadow_offset + chunk_data.len()];
                 chunk_data.copy_from_slice(chunk_shadow);
-            }
-            if debug && i == 0 {
-                info!("got {:x?}", chunk_data);
             }
 
             last_block = block;
