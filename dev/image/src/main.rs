@@ -21,7 +21,7 @@ use filesystem::partition::BlockPartition;
 use sync::LockResult;
 use crate::cli::FileSystem;
 use crate::cli::ImageCommand::{Create, Format};
-use log::error;
+use log::{error, info};
 
 const BYTES_PER_MEGABYTE: u64 = 1000000;
 

@@ -4,6 +4,7 @@ use core::fmt;
 
 use allocator::bin::BinAllocator;
 use allocator::GenericAllocator;
+use allocator::statistics::AllocatorStatistics;
 use allocator::util::{align_down, align_up};
 use pi::atags::Atags;
 use sync::Mutex;
@@ -31,15 +32,24 @@ impl KernelAllocator {
     /// Panics if the system's memory map could not be retrieved.
     pub unsafe fn initialize(&self) {
         let (start, end) = memory_map().expect("failed to find memory map");
-        self.0.lock(|allocator|{
+        self.0.lock(|allocator| {
             *allocator = Some(BinAllocator::new(start, end));
+        }).unwrap()
+    }
+
+    pub fn stats(&self) -> AllocatorStatistics {
+        self.0.lock(|allocator| {
+            allocator
+                .as_mut()
+                .expect("allocator uninitialized")
+                .statistics()
         }).unwrap()
     }
 }
 
 unsafe impl GlobalAlloc for KernelAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        self.0.lock(|allocator|{
+        self.0.lock(|allocator| {
             allocator
                 .as_mut()
                 .expect("allocator uninitialized")
@@ -48,7 +58,7 @@ unsafe impl GlobalAlloc for KernelAllocator {
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        self.0.lock(|allocator|{
+        self.0.lock(|allocator| {
             allocator
                 .as_mut()
                 .expect("allocator uninitialized")
@@ -93,6 +103,5 @@ impl fmt::Debug for KernelAllocator {
             }
             Ok(())
         }).unwrap()
-
     }
 }

@@ -1,5 +1,4 @@
 #![feature(alloc_error_handler)]
-#![feature(prelude_2024)]
 #![no_std]
 #![no_main]
 
@@ -8,14 +7,14 @@ extern crate alloc;
 use alloc::string::ToString;
 
 use kernel_api::println;
+use crate::user::get_arguments;
 
 mod user;
 
 fn main() {
-    println!("Alloc started");
-
-    let message = "poggers".to_string();
-    println!("Message: {}", message);
-
-    println!("Alloc finished");
+    let arguments = get_arguments();
+    match arguments.skip(1).next() {
+        None => {}
+        Some(_) => {}
+    }
 }

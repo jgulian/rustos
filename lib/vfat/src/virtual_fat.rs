@@ -212,15 +212,16 @@ impl<M: Mutex<VirtualFat> + 'static> filesystem::filesystem::Filesystem for Virt
         fat_empty[0x4..0x8].copy_from_slice(&0xfff_ffff_u32.to_le_bytes());
         fat_empty[0x8..0xc].copy_from_slice(&0xfff_fff8_u32.to_le_bytes());
 
-        let end_of_fats = bpb.reserved_sectors as u32 + bpb.sectors_per_fat_two * bpb.number_of_fats as u32;
-        for i in 1..(end_of_fats + 3) {
-            let buffer = if i < bpb.reserved_sectors as u32 || i > end_of_fats ||
-                (i - bpb.reserved_sectors as u32) % bpb.sectors_per_fat_two != 0 {
-                zero.as_slice()
-            } else {
-                fat_empty.as_slice()
-            };
-            device.write_block((partition.relative_sector + i) as u64, buffer)?;
+        for i in 1..bpb.reserved_sectors as u32 {
+            device.write_block((partition.relative_sector + i) as u64, zero.as_slice())?;
+        }
+
+        for i in 0..bpb.number_of_fats as u32 {
+            let relative_sector = (partition.relative_sector + bpb.reserved_sectors as u32 + i * bpb.sectors_per_fat_two) as u64;
+            device.write_block(relative_sector, fat_empty.as_slice())?;
+            for j in 1..bpb.sectors_per_fat_two as u64 {
+                device.write_block(relative_sector + j, zero.as_slice())?;
+            }
         }
 
         Ok(())

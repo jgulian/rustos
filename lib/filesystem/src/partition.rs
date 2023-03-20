@@ -75,12 +75,8 @@ impl BlockDevice for BlockPartition {
             return Err(io::Error::from(io::ErrorKind::Unsupported));
         }
 
-        //info!("sussy {}", block);
-
         let physical_block = self.virtual_to_physical(block)
             .ok_or(io::Error::from(io::ErrorKind::NotFound))?;
-
-        //info!("mogus {}", physical_block);
 
         data.chunks_mut(self.device.block_size())
             .enumerate()

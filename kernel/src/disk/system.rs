@@ -1,20 +1,32 @@
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
-use alloc::string::String;
+use alloc::format;
+use alloc::string::{String, ToString};
 use alloc::vec::Vec;
+use core::cmp::min;
 use filesystem::path::Path;
 use filesystem::pseudo::{EntryType, PseudoDirectory, PseudoDirectoryCollection, PseudoFilesystem};
 use shim::io;
+use crate::ALLOCATOR;
 use crate::multiprocessing::spin_lock::SpinLock;
 
-pub(self) struct AllocatorInformation;
+struct AllocatorInformation;
 
 impl PseudoDirectory for AllocatorInformation {
-    fn read(&mut self, offset: &Path, _buf: &mut [u8]) -> io::Result<usize> {
+    fn read(&mut self, offset: &Path, buf: &mut [u8]) -> io::Result<usize> {
         match offset.as_str() {
-            "/allocator" => {
+            "allocator" => {
+                let statistics = ALLOCATOR.stats();
+                let data = format!("allocated_size: {}\nallocation_count: {}\ntotal_memory: {}\n",
+                                   statistics.allocated_size,
+                                   statistics.allocation_count,
+                                   statistics.total_memory
+                );
 
-                Ok(0)
+                let len = min(data.len(), buf.len());
+                let bytes = &data.as_bytes()[..len];
+                buf[..len].copy_from_slice(bytes);
+                Ok(len)
             }
             _ => Err(io::Error::from(io::ErrorKind::NotFound))
         }
@@ -37,15 +49,15 @@ impl PseudoDirectory for AllocatorInformation {
 
     fn entry_type(&mut self, offset: &Path) -> Option<EntryType> {
         match offset.as_str() {
-            "/allocator" => Some(EntryType::File),
+            "allocator" => Some(EntryType::File),
             _ => None,
         }
     }
 }
 
-pub(self) fn new_system_filesystem() -> io::Result<PseudoFilesystem<SpinLock<PseudoDirectoryCollection>>> {
+pub(super) fn new_system_filesystem() -> io::Result<PseudoFilesystem<SpinLock<PseudoDirectoryCollection>>> {
     let mut directories: BTreeMap<Path, Box<dyn PseudoDirectory>> = BTreeMap::new();
-    directories.insert(Path::root(), Box::new(AllocatorInformation));
+    directories.insert(Path::try_from("allocator")?, Box::new(AllocatorInformation));
 
     Ok(PseudoFilesystem::new(PseudoDirectoryCollection::new(directories)))
 }

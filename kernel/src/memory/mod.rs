@@ -59,7 +59,7 @@ impl VMManager {
     ///
     /// Panics if the current system does not support 64KB memory translation granule size.
     unsafe fn setup(&self) {
-        assert!(ID_AA64MMFR0_EL1.get_value(ID_AA64MMFR0_EL1::TGran64) == 0);
+        assert_eq!(ID_AA64MMFR0_EL1.get_value(ID_AA64MMFR0_EL1::TGran64), 0);
 
         let ips = ID_AA64MMFR0_EL1.get_value(ID_AA64MMFR0_EL1::PARange);
 

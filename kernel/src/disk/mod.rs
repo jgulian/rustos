@@ -21,6 +21,7 @@ use shim::{io, ioerr};
 
 use sync::Mutex;
 use crate::disk::sd::Sd;
+use crate::disk::system::new_system_filesystem;
 
 
 use crate::multiprocessing::spin_lock::SpinLock;
@@ -62,6 +63,11 @@ impl FileSystem {
         );
         virtual_file_system.mount(console_path, console_filesystem).unwrap();
 
+        let system_filesystem = new_system_filesystem()
+            .expect("unable to create system pseudo filesystem");
+        virtual_file_system.mount(Path::root(), Box::new(system_filesystem))
+            .expect("unable to mount system pseudo filesystem");
+
         self.0.lock(|filesystem|{
             filesystem.replace(virtual_file_system);
         }).unwrap();
@@ -93,7 +99,6 @@ impl ConsoleFile {
 
 impl ByteDevice for ConsoleFile {
     fn read_byte(&mut self) -> io::Result<u8> {
-        info!("reading byte");
         Ok(self.0.lock(|byte_device| byte_device.read_byte()).unwrap())
     }
 

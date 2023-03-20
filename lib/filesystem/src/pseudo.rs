@@ -1,8 +1,25 @@
+#[cfg(feature = "no_std")]
 use alloc::boxed::Box;
+#[cfg(feature = "no_std")]
 use alloc::collections::BTreeMap;
+#[cfg(feature = "no_std")]
 use alloc::string::String;
+#[cfg(feature = "no_std")]
 use alloc::sync::Arc;
+#[cfg(feature = "no_std")]
 use alloc::vec::Vec;
+use log::info;
+#[cfg(not(feature = "no_std"))]
+use std::boxed::Box;
+#[cfg(not(feature = "no_std"))]
+use std::collections::BTreeMap;
+#[cfg(not(feature = "no_std"))]
+use std::string::String;
+#[cfg(not(feature = "no_std"))]
+use std::sync::Arc;
+#[cfg(not(feature = "no_std"))]
+use std::vec::Vec;
+
 use shim::io;
 use shim::io::{Read, Seek, SeekFrom, Write};
 use sync::Mutex;
