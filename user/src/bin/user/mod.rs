@@ -68,10 +68,14 @@ unsafe impl GlobalAlloc for GlobalAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         unsafe {
             let (beg, end) = &mut *self.0.0.get();
-            if *beg == 0 {
+            if *end - *beg < layout.size() {
                 let (alloc_beg, alloc_len) = sbrk().expect("unable to alloc");
-                *beg = alloc_beg;
-                *end = alloc_beg + alloc_len;
+                if *end != alloc_beg {
+                    *beg = alloc_beg;
+                    *end = alloc_beg + alloc_len;
+                } else {
+                    *end += alloc_len;
+                }
             }
 
             if *beg & (layout.align() - 1) != 0 {
@@ -119,7 +123,7 @@ impl Iterator for ArgumentIterator {
             self.0 -= length;
             self.1 -= length;
 
-            let slice = unsafe { core::slice::from_raw_parts(location as *const u8, length) };
+            let slice = unsafe { core::slice::from_raw_parts((location + 1) as *const u8, length - 1) };
             Some(unsafe { core::str::from_utf8_unchecked(slice) })
         }
     }

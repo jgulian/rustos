@@ -1,6 +1,7 @@
 use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 use alloc::vec;
+use core::ops::Add;
 use core::time::Duration;
 
 use kernel_api::*;
@@ -22,12 +23,14 @@ use crate::traps::TrapFrame;
 /// when `sleep` returned.
 pub fn sys_sleep(tf: &mut TrapFrame) -> OsResult<()> {
     let ms = tf.xs[0];
+    info!("sleeping for {} ms", ms);
     let started = timer::current_time();
     let sleep_until = started + Duration::from_millis(ms);
 
     let waiting = State::Waiting(Box::new(move |process| {
         let current_time = timer::current_time();
         let passed = sleep_until < current_time;
+        info!("checking {:?} < {:?}, {}", sleep_until, current_time, passed);
         if passed {
             let millis: u64 = (current_time - started).as_millis() as u64;
             process.context.xs[0] = millis;
@@ -154,7 +157,10 @@ pub fn sys_getpid(tf: &mut TrapFrame) -> OsResult<()> {
 pub fn sys_sbrk(tf: &mut TrapFrame) -> OsResult<()> {
     let result = SCHEDULER.on_process(tf, |process| -> OsResult<(u64, u64)> {
         //TODO: pick a better heap base / allow more sbrks / something might be wrong with is_valid
-        let heap_base = USER_IMG_BASE + PAGE_SIZE;
+        let mut heap_base = USER_IMG_BASE + PAGE_SIZE;
+        while process.vmap.is_valid(VirtualAddr::from(heap_base - USER_IMG_BASE)) {
+            heap_base += PAGE_SIZE;
+        }
         process.vmap.alloc(VirtualAddr::from(heap_base), PagePermissions::RW);
         Ok((heap_base as u64, PAGE_SIZE as u64))
     })??;
@@ -200,9 +206,17 @@ fn sys_execute(tf: &mut TrapFrame) -> OsResult<()> {
 }
 
 fn sys_wait(tf: &mut TrapFrame) -> OsResult<()> {
-    SCHEDULER.switch(State::Waiting(Box::new(|process| {
+    let use_timeout = tf.xs[1] == 1;
+    let timeout_end = pi::timer::current_time() + Duration::from_millis(tf.xs[2]);
+
+    SCHEDULER.switch(State::Waiting(Box::new(move |process| {
         if let Some(id) = process.dead_children.pop() {
             process.context.xs[0] = id;
+            process.context.xs[1] = 0;
+            true
+        } else if use_timeout &&  timeout_end < timer::current_time() {
+            process.context.xs[0] = 0;
+            process.context.xs[1] = 1;
             true
         } else {
             false
@@ -212,6 +226,7 @@ fn sys_wait(tf: &mut TrapFrame) -> OsResult<()> {
 }
 
 //TODO: make the functions work across page boundaries
+//TODO: this is fundamentally unsafe
 fn copy_from_userspace(_: &TrapFrame, ptr: u64, buf: &mut [u8]) -> OsResult<()> {
     let virtual_address = VirtualAddr::from(ptr);
 

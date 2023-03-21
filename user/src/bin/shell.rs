@@ -119,7 +119,7 @@ fn main() {
                 }
             }
             Some(child) => {
-                wait(child).expect("could not wait for child");
+                wait(child, None).expect("could not wait for child");
             }
         }
 

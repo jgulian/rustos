@@ -188,11 +188,16 @@ pub fn execute(arguments: &[u8], environment: &[u8]) -> OsResult<u64> {
     }
 }
 
-pub fn wait(process: u64) -> OsResult<u64> {
-    unsafe {
-        syscall_args!(process);
+pub fn wait(process: u64, timeout: Option<u64>) -> OsResult<Option<u64>> {
+    let (pid, timed_out) = unsafe {
+        syscall_args!(process, timeout.is_some() as u64, timeout.unwrap_or(0));
         syscall!(Syscall::Wait);
-        syscall_receive1!()
+        syscall_receive2!()
+    }?;
+    if timed_out == 1 {
+        Ok(None)
+    } else {
+        Ok(Some(pid))
     }
 }
 

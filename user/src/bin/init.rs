@@ -28,8 +28,8 @@ fn main() {
             }
             Some(child_pid) => {
                 while {
-                    let wait_pid = wait(child_pid)
-                        .expect("unable to wait for process");
+                    let wait_pid = wait(child_pid, None)
+                        .expect("unable to wait for process").unwrap();
                     wait_pid != child_pid
                 } {}
             }

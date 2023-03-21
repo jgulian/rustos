@@ -21,8 +21,8 @@ pub enum OsError {
     BadAddress = 50,
     FileExists = 60,
     InvalidArgument = 70,
-
     UnknownResourceId = 80,
+    WouldBlock = 90,
 
     IoError = 101,
     IoErrorEof = 102,

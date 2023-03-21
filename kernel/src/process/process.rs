@@ -12,7 +12,7 @@ use aarch64;
 use aarch64::SPSR_EL1;
 use filesystem::filesystem::Filesystem;
 use filesystem::path::Path;
-use kernel_api::{OsError, OsResult};
+use kernel_api::{OsError, OsResult, println};
 use shim::{io, newioerr};
 use shim::io::{Write};
 
