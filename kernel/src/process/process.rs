@@ -3,16 +3,14 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::borrow::{Borrow};
 use core::mem;
-use core::mem::zeroed;
 
-use core::ptr::write_volatile;
 use core::slice::from_raw_parts;
 
 use aarch64;
 use aarch64::SPSR_EL1;
 use filesystem::filesystem::Filesystem;
 use filesystem::path::Path;
-use kernel_api::{OsError, OsResult, println};
+use kernel_api::{OsError, OsResult};
 use shim::{io, newioerr};
 use shim::io::{Write};
 
@@ -20,22 +18,31 @@ use crate::{FILESYSTEM, VMM};
 
 use crate::memory::*;
 use crate::param::*;
-use crate::process::{Stack, State};
+use crate::process::State;
 use crate::process::pipe::PipeResource;
 use crate::process::resource::{Resource, ResourceId, ResourceList};
 use crate::traps::TrapFrame;
 
-/// Type alias for the type of a process ID.
-pub type Id = u64;
+#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+pub struct ProcessId(u64);
+
+impl Into<u64> for ProcessId {
+    fn into(self) -> u64 {
+        self.0
+    }
+}
+
+impl From<u64> for ProcessId {
+    fn from(value: u64) -> Self {
+        Self(value)
+    }
+}
 
 /// A structure that represents the complete state of a process.
 #[derive(Debug)]
 pub struct Process {
     /// The saved trap frame of a process.
     pub context: Box<TrapFrame>,
-    /// The memory allocation used for the process's stack.
-    /// TODO: remove this its not useful
-    pub stack: Stack,
     /// The page table describing the Virtual Memory of the process
     pub vmap: Box<UserPageTable>,
     /// The scheduling state of the process.
@@ -43,9 +50,9 @@ pub struct Process {
     /// The resources (files) open by a process
     pub(crate) resources: ResourceList,
     /// Parent process
-    pub(crate) parent: Option<Id>,
+    pub(crate) parent: Option<ProcessId>,
     /// Last dead process
-    pub(crate) dead_children: Vec<Id>,
+    pub(crate) dead_children: Vec<ProcessId>,
     /// Current Working Directory
     current_directory: Path,
 }
@@ -57,10 +64,8 @@ impl Process {
     /// If enough memory could not be allocated to start the process, returns
     /// `None`. Otherwise returns `Some` of the new `Process`.
     pub fn new() -> OsResult<Process> {
-        let stack = Stack::new().ok_or(OsError::NoMemory)?;
         Ok(Process {
             context: Box::default(),
-            stack,
             vmap: Box::new(UserPageTable::new()),
             state: State::Ready,
             resources: ResourceList::new(),
@@ -107,11 +112,6 @@ impl Process {
         Ok(process)
     }
 
-    /// Returns the highest `VirtualAddr` that is supported by this system.
-    pub fn get_max_va() -> VirtualAddr {
-        VirtualAddr::from(u64::MAX)
-    }
-
     /// Returns the `VirtualAddr` represents the base address of the user
     /// memory space.
     pub fn get_image_base() -> VirtualAddr {
@@ -127,7 +127,7 @@ impl Process {
     /// Returns the `VirtualAddr` represents the top of the user process's
     /// stack.
     pub fn get_stack_top() -> VirtualAddr {
-        VirtualAddr::from(u64::max_value())
+        VirtualAddr::from(u64::MAX)
     }
 
     /// Returns `true` if this process is ready to be scheduled.
@@ -144,9 +144,7 @@ impl Process {
     ///     function returns `true`.
     ///
     /// Returns `false` in all other cases.
-    pub fn is_ready(&mut self) -> bool {
-        //TODO: clean up, also go through code base and replace a lot of match statements with these
-        // lol
+    pub fn can_run(&mut self) -> bool {
         if let State::Waiting(p) = &mut self.state {
             let mut poll = mem::replace(p, Box::new(|_| false));
             if poll(self) {
@@ -160,6 +158,10 @@ impl Process {
             State::Ready => true,
             _ => false,
         }
+    }
+
+    pub fn id(&self) -> ProcessId {
+        ProcessId(self.context.tpidr)
     }
 
     //TODO: limit number of open files
@@ -215,11 +217,9 @@ impl Process {
         self.resources.insert_with_id(new_id, duplicate)
     }
 
-    pub fn fork(&mut self, id: Id) -> OsResult<Process> {
-        let stack = Stack::new().ok_or(newioerr!(OutOfMemory))?;
+    pub fn fork(&mut self, id: ProcessId) -> OsResult<Process> {
         let mut new_process = Process {
             context: Box::new(*self.context),
-            stack,
             vmap: Box::new(UserPageTable::new()),
             state: State::Ready,
             resources: self.resources.duplicate()?,
@@ -233,7 +233,7 @@ impl Process {
         new_process.context.xs[7] = OsError::Ok as u64;
         new_process.context.ttbr0 = VMM.get_baddr().as_u64();
         new_process.context.ttbr1 = new_process.vmap.get_baddr().as_u64();
-        new_process.context.tpidr = id;
+        new_process.context.tpidr = id.into();
 
         if cfg!(feature = "cow_fork") {
             self.vmap.allocated().try_for_each(|(virtual_address, l3_entry)| {
@@ -306,14 +306,4 @@ fn parse_execute(data: &[u8]) -> Vec<String> {
     }
 
     result
-}
-
-unsafe fn zero_page(va: VirtualAddr) {
-    let mut iter: *mut u64 = va.as_ptr() as *mut u64;
-    let end: *mut u64 = iter.add(PAGE_ALIGN / core::mem::size_of::<u64>() - 1);
-
-    while iter < end {
-        write_volatile(iter, zeroed());
-        iter = iter.add(1);
-    }
 }

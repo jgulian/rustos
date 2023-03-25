@@ -5,6 +5,7 @@
 #![feature(negative_impls)]
 #![feature(raw_vec_internals)]
 #![feature(panic_info_message)]
+#![feature(is_some_and)]
 
 #![no_std]
 #![no_main]
@@ -21,30 +22,30 @@ use disk::FileSystem;
 
 use filesystem::path::Path;
 use memory::VMManager;
-use process::GlobalScheduler;
 
 use traps::irq::{Fiq, GlobalIrq};
 
 use crate::kalloc::KernelAllocator;
 use crate::process::Process;
+use crate::scheduling::{GlobalScheduler, RoundRobinScheduler};
 
-// #[cfg(not(test))]
 mod init;
 
-pub mod kalloc;
-pub mod console;
-pub mod disk;
-pub mod logger;
-pub mod param;
-pub mod process;
-pub mod traps;
-pub mod memory;
-pub mod multiprocessing;
+mod kalloc;
+mod console;
+mod disk;
+mod logger;
+mod param;
+mod process;
+mod scheduling;
+mod traps;
+mod memory;
+mod multiprocessing;
 
 #[cfg_attr(not(test), global_allocator)]
 pub static ALLOCATOR: KernelAllocator = KernelAllocator::uninitialized();
 pub static FILESYSTEM: FileSystem = FileSystem::uninitialized();
-pub static SCHEDULER: GlobalScheduler = GlobalScheduler::uninitialized();
+pub static SCHEDULER: GlobalScheduler<RoundRobinScheduler> = GlobalScheduler::uninitialized();
 pub static VMM: VMManager = VMManager::uninitialized();
 pub static GLOABAL_IRQ: GlobalIrq = GlobalIrq::new();
 pub static FIQ: Fiq = Fiq::new();
