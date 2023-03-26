@@ -61,8 +61,10 @@ unsafe fn kernel_main() -> ! {
     init::initialize_app_cores();
     VMM.wait();
 
-    let init = Path::try_from("/init").expect("unable to open init");
-    SCHEDULER.add(Process::load(&init).expect("unable to run init"));
+    let init = Path::try_from("/init")
+        .expect("unable to open init");
+    let init_process = Process::load(&init).expect("unable to setup init");
+    SCHEDULER.add(init_process).expect("unable to add init process");
 
     SCHEDULER.bootstrap();
 }

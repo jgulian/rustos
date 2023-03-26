@@ -78,7 +78,7 @@ pub extern "C" fn receive_exception(info: Info, esr: u32, trap_frame: &mut TrapF
 }
 
 fn handle_exception(info: Info, syndrome: Syndrome, trap_frame: &mut TrapFrame) -> OsResult<()> {
-    //info!("exception {} {}", info, syndrome);
+    //info!("exception {} {} {} {}", info, syndrome, aarch64::affinity(), trap_frame.tpidr);
 
     match info.kind {
         Kind::Synchronous => {

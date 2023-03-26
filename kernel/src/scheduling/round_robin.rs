@@ -7,7 +7,6 @@ use crate::param::TICK;
 use crate::process::{Process, ProcessId, State};
 use crate::SCHEDULER;
 use crate::scheduling::scheduler::{Scheduler, SchedulerError, SchedulerResult, SwitchTrigger};
-use crate::scheduling::scheduler::SchedulerError::{FailedToAllocateProcessId, ProcessNotFound};
 use crate::traps::irq::IrqHandlerRegistry;
 use crate::traps::TrapFrame;
 
@@ -46,7 +45,7 @@ impl RoundRobinScheduler {
             .enumerate()
             .filter_map(|(i, process)|
                 if process.context.tpidr == trap_frame.tpidr { Some(i) } else { None })
-            .next().ok_or(ProcessNotFound)?;
+            .next().ok_or(SchedulerError::ProcessNotFound)?;
 
 
         let mut process = self.processes.remove(found_process).unwrap();
@@ -60,19 +59,30 @@ impl RoundRobinScheduler {
 
 impl Scheduler for RoundRobinScheduler {
     fn new() -> Self where Self: Sized {
-        initialize_local_timer_interrupt();
-        let core = aarch64::affinity();
-        local_tick_in(core, TICK);
-
         RoundRobinScheduler {
             processes: Default::default(),
             last_id: None,
         }
     }
 
+    fn setup_core(&mut self, core: usize) -> SchedulerResult<()> {
+        let mut controller = LocalController::new(core);
+        controller.enable_local_timer();
+
+        local_irq().register(LocalInterrupt::CntPnsIrq, Box::new(|trap_frame| {
+            let core = aarch64::affinity();
+            SCHEDULER.switch(trap_frame, SwitchTrigger::Timer, State::Ready)
+                .expect("failed to switch processes");
+            local_tick_in(core, TICK);
+        }));
+        local_tick_in(core, TICK);
+
+        Ok(())
+    }
+
     fn add(&mut self, mut process: Process) -> SchedulerResult<ProcessId> {
         let new_pid = self.allocate_process_id()
-            .ok_or(FailedToAllocateProcessId)?;
+            .ok_or(SchedulerError::FailedToAllocateProcessId)?;
 
         process.context.tpidr = new_pid.into();
         self.processes.push_back(process);
@@ -95,7 +105,8 @@ impl Scheduler for RoundRobinScheduler {
             self.schedule_out(trap_frame, state)?;
 
             if is_dying {
-                let process = self.processes.pop_back().ok_or(ProcessNotFound)?;
+                let process = self.processes.pop_back()
+                    .ok_or(SchedulerError::ProcessNotFound)?;
 
                 if let Some(parent_id) = process.parent {
                     self.processes.iter_mut()
@@ -130,7 +141,11 @@ impl Scheduler for RoundRobinScheduler {
             .filter(|process| process.id() == ProcessId::from(trap_frame.tpidr))
             .next().ok_or(SchedulerError::ProcessNotFound)?;
 
-        Ok(function(process))
+        *process.context = *trap_frame;
+        let result = function(process);
+        *trap_frame = *process.context;
+
+        Ok(result)
     }
 }
 
@@ -147,18 +162,4 @@ impl fmt::Debug for RoundRobinScheduler {
         }
         Ok(())
     }
-}
-
-pub fn initialize_local_timer_interrupt() {
-    let core = aarch64::affinity();
-    let mut controller = LocalController::new(core);
-    controller.enable_local_timer();
-
-    local_irq().register(LocalInterrupt::CntPnsIrq, Box::new(|trap_frame| {
-        let core = aarch64::affinity();
-        SCHEDULER.switch(trap_frame, SwitchTrigger::Timer, State::Ready)
-            .expect("failed to switch processes");
-        local_tick_in(core, TICK);
-    }));
-    local_tick_in(core, TICK);
 }

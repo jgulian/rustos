@@ -1,0 +1,2 @@
+target create "target/aarch64-unknown-none/release/kernel"
+gdb-remote localhost:1234

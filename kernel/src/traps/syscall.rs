@@ -279,10 +279,10 @@ fn syscall_to_function(call: Syscall) -> fn(tf: &mut TrapFrame) -> OsResult<()> 
     }
 }
 
-pub fn handle_syscall(num: u16, tf: &mut TrapFrame) {
+pub fn handle_syscall(num: u16, trap_frame: &mut TrapFrame) {
     let call = Syscall::from(num);
-    let result = syscall_to_function(call)(tf);
-    tf.xs[7] = match result {
+    let result = syscall_to_function(call)(trap_frame);
+    trap_frame.xs[7] = match result {
         Ok(_) => 1,
         Err(err) => err as u64
     }

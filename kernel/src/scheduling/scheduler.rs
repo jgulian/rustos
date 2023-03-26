@@ -26,13 +26,14 @@ pub enum SwitchTrigger {
 
 pub trait Scheduler: Send {
     fn new() -> Self where Self: Sized;
+    fn setup_core(&mut self, core: usize) -> SchedulerResult<()>;
 
     fn add(&mut self, process: Process) -> SchedulerResult<ProcessId>;
     fn remove(&mut self, trap_frame: &mut TrapFrame) -> SchedulerResult<Process>;
 
     fn switch(&mut self, trap_frame: &mut TrapFrame, trigger: SwitchTrigger, state: State) -> SchedulerResult<()>;
     fn schedule_in(&mut self, trap_frame: &mut TrapFrame) -> SchedulerResult<ProcessId>;
-    
+
     fn on_process<F, R>(&mut self, trap_frame: &mut TrapFrame, function: F) -> SchedulerResult<R>
         where F: FnOnce(&mut Process) -> R, Self: Sized;
 }

@@ -1,6 +1,8 @@
 use alloc::boxed::Box;
 
 use core::arch::asm;
+use core::ops::Add;
+use core::time::Duration;
 
 use aarch64::SP;
 
@@ -70,17 +72,17 @@ impl<T: Scheduler> GlobalScheduler<T> {
         }
 
         aarch64::sev();
-        self.schedule_in(trap_frame).map(|_| ())
+        self.schedule_in(trap_frame)
     }
 
-    pub fn schedule_in(&self, trap_frame: &mut TrapFrame) -> SchedulerResult<ProcessId> {
+    pub fn schedule_in(&self, trap_frame: &mut TrapFrame) -> SchedulerResult<()> {
         loop {
             let result = self.0.lock(|scheduler| {
                 scheduler
                     .as_mut()
                     .expect("scheduler uninitialized")
                     .schedule_in(trap_frame)
-            }).expect("failed to lock scheduler");
+            }).expect("failed to lock scheduler").map(|_| ());
 
             if result.is_ok() || result.is_err_and(|err| err != SchedulerError::NoRunnableProcess) {
                 return result;
@@ -101,18 +103,27 @@ impl<T: Scheduler> GlobalScheduler<T> {
     }
 
     pub fn bootstrap(&self) -> ! {
+        self.0.lock(|scheduler| {
+            scheduler
+                .as_mut()
+                .expect("scheduler uninitialized")
+                .setup_core(aarch64::affinity())
+                .expect("unable to setup core");
+        }).expect("failed to lock scheduler");
+
         let mut trap_frame: TrapFrame = Default::default();
-        self.schedule_in(&mut trap_frame).expect("unable to schedule in process");
+        self.schedule_in(&mut trap_frame).expect("unable to schedule initial process");
 
         unsafe {
-            SP.set((&mut trap_frame) as *const TrapFrame as u64);
-            context_restore();
-            asm!("ldp x28, x29, [SP], #16");
-            asm!("ldp lr, xzr, [SP], #16");
-        }
-
-        unsafe {
-            aarch64::eret();
+            asm!(
+            "mov sp, {stack}",
+            "bl {context_restore}",
+            "ldp x28, x29, [SP], #16",
+            "ldp lr, xzr, [SP], #16",
+            "eret",
+            stack = in(reg) (&mut trap_frame) as *const TrapFrame as u64,
+            context_restore = sym context_restore,
+            );
         }
 
         panic!("unable to bootstrap to userspace");

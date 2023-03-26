@@ -147,7 +147,7 @@ pub unsafe fn initialize_app_cores() {
         address.write_volatile(start2 as usize);
     }
 
-    aarch64::sev();
+    sev();
 
     for i in 1..4 {
         let address = SPINNING_BASE.add(i);
