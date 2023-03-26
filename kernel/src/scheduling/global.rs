@@ -34,7 +34,7 @@ impl<T: Scheduler> GlobalScheduler<T> {
             } else {
                 *scheduler = Some(T::new());
             }
-        }).expect("failed to lock scheduler")?;
+        }).expect("failed to lock scheduler");
     }
 
     pub fn add(&self, process: Process) -> SchedulerResult<ProcessId> {
@@ -48,7 +48,7 @@ impl<T: Scheduler> GlobalScheduler<T> {
         Ok(id)
     }
 
-    pub fn remove(&self, trap_frame: &mut TrapFrame) -> SchedulerResult<ProcessId> {
+    pub fn remove(&self, trap_frame: &mut TrapFrame) -> SchedulerResult<Process> {
         self.0.lock(|scheduler| {
             scheduler
                 .as_mut()
@@ -57,12 +57,12 @@ impl<T: Scheduler> GlobalScheduler<T> {
         }).expect("failed to lock scheduler")
     }
 
-    pub fn switch(&self, trap_frame: &mut TrapFrame, trigger: SwitchTrigger) -> SchedulerResult<()> {
+    pub fn switch(&self, trap_frame: &mut TrapFrame, trigger: SwitchTrigger, state: State) -> SchedulerResult<()> {
         let result = self.0.lock(|scheduler| {
             scheduler
                 .as_mut()
                 .expect("scheduler uninitialized")
-                .switch(trap_frame, trigger)
+                .switch(trap_frame, trigger, state)
         }).expect("failed to lock scheduler");
 
         if result.is_ok() || result.is_err_and(|err| err != SchedulerError::NoRunnableProcess) {
@@ -90,22 +90,13 @@ impl<T: Scheduler> GlobalScheduler<T> {
         }
     }
 
-    pub fn on_process<F, R>(&self, id: ProcessId, function: F) -> R where F: FnOnce(&mut Process) -> R {
-        self.0.lock(|scheduler| {
-            scheduler
-                .as_mut()
-                .expect("scheduler uninitialized")
-                .on_process(id, function)
-        }).expect("failed to lock scheduler")
-    }
-
-    pub fn on_process_with_trap_frame<F, R>(&self, trap_frame: &mut TrapFrame, function: F) -> R
+    pub fn on_process<F, R>(&self, trap_frame: &mut TrapFrame, function: F) -> SchedulerResult<R>
         where F: FnOnce(&mut Process) -> R {
         self.0.lock(|scheduler| {
             scheduler
                 .as_mut()
                 .expect("scheduler uninitialized")
-                .on_process_with_trap_frame(trap_frame, function)
+                .on_process(trap_frame, function)
         }).expect("failed to lock scheduler")
     }
 

@@ -12,6 +12,7 @@ use crate::{SCHEDULER};
 use crate::memory::{PagePermissions, VirtualAddr};
 use crate::param::{PAGE_SIZE, USER_IMG_BASE};
 use crate::process::{ResourceId, State};
+use crate::scheduling::SwitchTrigger;
 use crate::traps::TrapFrame;
 
 /// Sleep for `ms` milliseconds.
@@ -21,8 +22,8 @@ use crate::traps::TrapFrame;
 /// In addition to the usual status value, this system call returns one
 /// parameter: the approximate true elapsed time from when `sleep` was called to
 /// when `sleep` returned.
-pub fn sys_sleep(tf: &mut TrapFrame) -> OsResult<()> {
-    let ms = tf.xs[0];
+pub fn sys_sleep(trap_frame: &mut TrapFrame) -> OsResult<()> {
+    let ms = trap_frame.xs[0];
     info!("sleeping for {} ms", ms);
     let started = timer::current_time();
     let sleep_until = started + Duration::from_millis(ms);
@@ -39,7 +40,7 @@ pub fn sys_sleep(tf: &mut TrapFrame) -> OsResult<()> {
         passed
     }));
 
-    SCHEDULER.switch(waiting, tf);
+    SCHEDULER.switch(trap_frame, SwitchTrigger::Force, waiting)?;
 
     Ok(())
 }
@@ -62,10 +63,8 @@ pub fn sys_time(tf: &mut TrapFrame) -> OsResult<()> {
 /// Kills the current process.
 ///
 /// This system call does not take paramer and does not return any value.
-pub fn sys_exit(tf: &mut TrapFrame) -> OsResult<()> {
-    SCHEDULER.kill(tf).expect("failed to kill process");
-    SCHEDULER.switch_to(tf);
-
+pub fn sys_exit(trap_frame: &mut TrapFrame) -> OsResult<()> {
+    SCHEDULER.switch(trap_frame, SwitchTrigger::Force, State::Dead)?;
     Ok(())
 }
 
@@ -186,9 +185,14 @@ fn sys_seek(_tf: &mut TrapFrame) -> OsResult<()> {
     Err(OsError::Unknown)
 }
 
-fn sys_fork(tf: &mut TrapFrame) -> OsResult<()> {
-    tf.xs[0] = SCHEDULER.fork(tf).ok_or(OsError::NoVmSpace)?;
-    tf.xs[1] = 0;
+fn sys_fork(trap_frame: &mut TrapFrame) -> OsResult<()> {
+    let process = SCHEDULER.on_process(trap_frame, |process| {
+        process.fork()
+    })??;
+    let process_id = SCHEDULER.add(process)?;
+
+    trap_frame.xs[0] = process_id.into();
+    trap_frame.xs[1] = 0;
 
     Ok(())
 }
@@ -205,13 +209,13 @@ fn sys_execute(tf: &mut TrapFrame) -> OsResult<()> {
     Ok(())
 }
 
-fn sys_wait(tf: &mut TrapFrame) -> OsResult<()> {
-    let use_timeout = tf.xs[1] == 1;
-    let timeout_end = pi::timer::current_time() + Duration::from_millis(tf.xs[2]);
+fn sys_wait(trap_frame: &mut TrapFrame) -> OsResult<()> {
+    let use_timeout = trap_frame.xs[1] == 1;
+    let timeout_end = pi::timer::current_time() + Duration::from_millis(trap_frame.xs[2]);
 
-    SCHEDULER.switch(State::Waiting(Box::new(move |process| {
+    SCHEDULER.switch(trap_frame, SwitchTrigger::Force, State::Waiting(Box::new(move |process| {
         if let Some(id) = process.dead_children.pop() {
-            process.context.xs[0] = id;
+            process.context.xs[0] = id.into();
             process.context.xs[1] = 0;
             true
         } else if use_timeout &&  timeout_end < timer::current_time() {
@@ -221,7 +225,8 @@ fn sys_wait(tf: &mut TrapFrame) -> OsResult<()> {
         } else {
             false
         }
-    })), tf);
+    })))?;
+
     Ok(())
 }
 

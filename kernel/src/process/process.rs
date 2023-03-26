@@ -23,7 +23,7 @@ use crate::process::pipe::PipeResource;
 use crate::process::resource::{Resource, ResourceId, ResourceList};
 use crate::traps::TrapFrame;
 
-#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]
 pub struct ProcessId(u64);
 
 impl Into<u64> for ProcessId {
@@ -217,13 +217,13 @@ impl Process {
         self.resources.insert_with_id(new_id, duplicate)
     }
 
-    pub fn fork(&mut self, id: ProcessId) -> OsResult<Process> {
+    pub fn fork(&mut self) -> OsResult<Process> {
         let mut new_process = Process {
             context: Box::new(*self.context),
             vmap: Box::new(UserPageTable::new()),
             state: State::Ready,
             resources: self.resources.duplicate()?,
-            parent: Some(self.context.tpidr),
+            parent: Some(ProcessId::from(self.context.tpidr)),
             dead_children: Vec::new(),
             current_directory: self.current_directory.clone(),
         };
@@ -233,7 +233,6 @@ impl Process {
         new_process.context.xs[7] = OsError::Ok as u64;
         new_process.context.ttbr0 = VMM.get_baddr().as_u64();
         new_process.context.ttbr1 = new_process.vmap.get_baddr().as_u64();
-        new_process.context.tpidr = id.into();
 
         if cfg!(feature = "cow_fork") {
             self.vmap.allocated().try_for_each(|(virtual_address, l3_entry)| {

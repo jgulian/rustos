@@ -10,6 +10,7 @@ use pi::local_interrupt::{LocalController, LocalInterrupt};
 use crate::{GLOABAL_IRQ, SCHEDULER};
 use crate::multiprocessing::per_core::local_irq;
 use crate::process::State;
+use crate::scheduling::SwitchTrigger;
 use crate::traps::irq::IrqHandlerRegistry;
 use crate::traps::memory::handle_memory_abort;
 
@@ -70,7 +71,8 @@ pub extern "C" fn receive_exception(info: Info, esr: u32, trap_frame: &mut TrapF
     match handle_exception(info, syndrome, trap_frame) {
         Ok(_) => {}
         Err(_) => {
-            SCHEDULER.switch(State::Dead, trap_frame);
+            SCHEDULER.switch(trap_frame, SwitchTrigger::Force, State::Dead)
+                .expect("failed to kill trapping process");
         }
     }
 }

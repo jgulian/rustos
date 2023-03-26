@@ -32,6 +32,8 @@ pub enum OsError {
 
     InvalidSocket = 200,
     IllegalSocketOperation = 201,
+
+    SchedulerError = 210,
 }
 
 impl From<u64> for OsError {
@@ -54,6 +56,7 @@ impl From<u64> for OsError {
 
             200 => OsError::InvalidSocket,
             201 => OsError::IllegalSocketOperation,
+            210 => OsError::SchedulerError,
 
             _ => OsError::Unknown,
         }

@@ -22,6 +22,14 @@ pub enum State {
     Dead,
 }
 
+impl PartialEq<Self> for State {
+    fn eq(&self, other: &Self) -> bool {
+        matches!(self, State::Ready) && matches!(other, State::Ready) ||
+            matches!(self, State::Running) && matches!(other, State::Running) ||
+            matches!(self, State::Dead) && matches!(other, State::Dead)
+    }
+}
+
 impl fmt::Debug for State {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {

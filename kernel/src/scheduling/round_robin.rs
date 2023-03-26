@@ -20,16 +20,17 @@ pub struct RoundRobinScheduler {
 impl RoundRobinScheduler {
     fn allocate_process_id(&mut self) -> Option<ProcessId> {
         let next_id = match self.last_id {
-            None => 0u64,
+            None => ProcessId::from(0u64),
             Some(pid) => {
-                if pid == u64::MAX {
+                if pid == ProcessId::from(u64::MAX) {
                     return None;
                 }
-                pid.into() + 1
+                let raw: u64 = pid.into();
+                ProcessId::from(raw + 1u64)
             }
         };
 
-        self.last_id = Some(ProcessId::from(next_id));
+        self.last_id = Some(next_id);
         self.last_id
     }
 
@@ -40,23 +41,20 @@ impl RoundRobinScheduler {
     ///
     /// If the `processes` queue is empty or there is no current process,
     /// returns `false`. Otherwise, returns `true`.
-    fn schedule_out(&mut self, state: State, trap_frame: &mut TrapFrame) -> bool {
+    fn schedule_out(&mut self, trap_frame: &mut TrapFrame, state: State) -> SchedulerResult<()> {
         let found_process = self.processes.iter_mut()
             .enumerate()
             .filter_map(|(i, process)|
                 if process.context.tpidr == trap_frame.tpidr { Some(i) } else { None })
-            .find();
+            .next().ok_or(ProcessNotFound)?;
 
-        if let Some(i) = found_process {
-            let mut process = self.processes.remove(i).unwrap();
-            process.state = state;
-            *process.context = *trap_frame;
-            self.processes.push_back(process);
 
-            true
-        } else {
-            false
-        }
+        let mut process = self.processes.remove(found_process).unwrap();
+        process.state = state;
+        *process.context = *trap_frame;
+        self.processes.push_back(process);
+
+        Ok(())
     }
 }
 
@@ -83,25 +81,29 @@ impl Scheduler for RoundRobinScheduler {
         Ok(new_pid)
     }
 
-    fn remove(&mut self, trap_frame: &mut TrapFrame) -> SchedulerResult<ProcessId> {
-        self.schedule_out(State::Dead, trap_frame);
-        let process = self.processes.pop_back().ok_or(ProcessNotFound)?;
-        let process_id = ProcessId::from(trap_frame.tpidr);
-
-        if let Some(parent_id) = process.parent {
-            self.processes.iter_mut()
-                .filter(|process| process.id() == parent_id)
-                .for_each(|process| process.dead_children.push(process.id()));
-        }
-
+    fn remove(&mut self, trap_frame: &mut TrapFrame) -> SchedulerResult<Process> {
+        self.schedule_out(trap_frame, State::Ready)?;
+        let process = self.processes.pop_back().unwrap();
         self.schedule_in(trap_frame)?;
 
-        Ok(process_id)
+        Ok(process)
     }
 
-    fn switch(&mut self, trap_frame: &mut TrapFrame, trigger: SwitchTrigger) -> SchedulerResult<()> {
-        if trigger == SwitchTrigger::Timer {
-            self.schedule_out(State::Ready, trap_frame);
+    fn switch(&mut self, trap_frame: &mut TrapFrame, trigger: SwitchTrigger, state: State) -> SchedulerResult<()> {
+        if matches!(trigger, SwitchTrigger::Force | SwitchTrigger::Timer)  {
+            let is_dying = matches!(state, State::Dead);
+            self.schedule_out(trap_frame, state)?;
+
+            if is_dying {
+                let process = self.processes.pop_back().ok_or(ProcessNotFound)?;
+
+                if let Some(parent_id) = process.parent {
+                    self.processes.iter_mut()
+                        .filter(|process| process.id() == parent_id)
+                        .for_each(|process| process.dead_children.push(process.id()));
+                }
+            }
+
             self.schedule_in(trap_frame)?;
         }
 
@@ -111,7 +113,7 @@ impl Scheduler for RoundRobinScheduler {
     fn schedule_in(&mut self, trap_frame: &mut TrapFrame) -> SchedulerResult<ProcessId> {
         let runnable_process = self.processes.iter_mut()
             .enumerate()
-            .filter_map(|(i, process)| if process.can_run() {Some(i)} else {None})
+            .filter_map(|(i, process)| if process.can_run() { Some(i) } else { None })
             .next().ok_or(SchedulerError::NoRunnableProcess)?;
 
         let mut process = self.processes.remove(runnable_process).unwrap();
@@ -122,8 +124,13 @@ impl Scheduler for RoundRobinScheduler {
         Ok(id)
     }
 
-    fn on_process<F, R>(&mut self, id: ProcessId, function: F) -> R where F: FnOnce(&mut Process) -> R {
-        todo!()
+    fn on_process<F, R>(&mut self, trap_frame: &mut TrapFrame, function: F) -> SchedulerResult<R>
+        where F: FnOnce(&mut Process) -> R, Self: Sized {
+        let process = self.processes.iter_mut()
+            .filter(|process| process.id() == ProcessId::from(trap_frame.tpidr))
+            .next().ok_or(SchedulerError::ProcessNotFound)?;
+
+        Ok(function(process))
     }
 }
 
@@ -149,7 +156,8 @@ pub fn initialize_local_timer_interrupt() {
 
     local_irq().register(LocalInterrupt::CntPnsIrq, Box::new(|trap_frame| {
         let core = aarch64::affinity();
-        SCHEDULER.switch(trap_frame, SwitchTrigger::Timer);
+        SCHEDULER.switch(trap_frame, SwitchTrigger::Timer, State::Ready)
+            .expect("failed to switch processes");
         local_tick_in(core, TICK);
     }));
     local_tick_in(core, TICK);

@@ -136,7 +136,7 @@ unsafe fn kmain2() -> ! {
     address.write_volatile(0);
     VMM.wait();
 
-    SCHEDULER.start();
+    SCHEDULER.bootstrap();
 }
 
 /// Wakes up each app core by writing the address of `init::start2`

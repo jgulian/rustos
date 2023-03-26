@@ -64,5 +64,5 @@ unsafe fn kernel_main() -> ! {
     let init = Path::try_from("/init").expect("unable to open init");
     SCHEDULER.add(Process::load(&init).expect("unable to run init"));
 
-    SCHEDULER.start();
+    SCHEDULER.bootstrap();
 }
