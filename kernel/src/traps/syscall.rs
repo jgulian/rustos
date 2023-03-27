@@ -8,7 +8,7 @@ use kernel_api::OsError::BadAddress;
 use pi::timer;
 
 use crate::{SCHEDULER};
-use crate::memory::{PagePermissions, VirtualAddress};
+use crate::memory::VirtualAddress;
 use crate::param::{PAGE_SIZE, USER_IMG_BASE};
 use crate::process::{ResourceId, State};
 use crate::scheduling::SwitchTrigger;

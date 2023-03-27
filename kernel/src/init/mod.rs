@@ -4,7 +4,7 @@ use core::ptr::write_volatile;
 
 use aarch64::*;
 
-use crate::{kernel_main, SCHEDULER};
+use crate::{kernel_main, SCHEDULER, VIRTUAL_MEMORY};
 use crate::param::*;
 use crate::VMM;
 
@@ -134,7 +134,7 @@ unsafe fn kmain2() -> ! {
     let core_index = MPIDR_EL1.get() & 0b11;
     let address = SPINNING_BASE.add(core_index as usize);
     address.write_volatile(0);
-    VMM.wait();
+    VIRTUAL_MEMORY.wait();
 
     SCHEDULER.bootstrap();
 }

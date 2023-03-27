@@ -3,7 +3,7 @@ use alloc::collections::BinaryHeap;
 use alloc::vec::Vec;
 use core::cmp::Ordering;
 use core::time::Duration;
-use pi::local_interrupt::{local_tick_in, LocalController, LocalInterrupt};
+use pi::local_interrupt::{LocalController, LocalInterrupt};
 use crate::multiprocessing::per_core::local_irq;
 use crate::process::{Process, ProcessId, State};
 use crate::SCHEDULER;

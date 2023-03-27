@@ -1,4 +1,4 @@
-use core::sync::atomic::{AtomicBool, AtomicI64, Ordering};
+use core::sync::atomic::{AtomicBool, Ordering};
 
 use crate::param::NCORES;
 use crate::traps::irq::LocalIrq;

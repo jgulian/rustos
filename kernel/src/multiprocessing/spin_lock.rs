@@ -38,6 +38,13 @@ impl<T: Send> SpinLock<T> {
         };
 
         //TODO: Review
+        //let exchange = self.lock.compare_exchange(false, true, ordering, ordering);
+        //
+        //match exchange {
+        //    Ok(_) => Ok(SpinLockGuard(self)),
+        //    Err(_) => Err(LockError::WouldBlock),
+        //}
+
         if self.lock.compare_and_swap(false, true, ordering) {
             return Err(LockError::WouldBlock);
         }
