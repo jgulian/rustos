@@ -1,16 +1,6 @@
-use alloc::boxed::Box;
-
 use core::arch::asm;
-use core::ops::Add;
-use core::time::Duration;
-
-use aarch64::SP;
-
-use pi::local_interrupt::{LocalController, LocalInterrupt};
-use shim::newioerr;
 use sync::Mutex;
 
-use crate::VMM;
 use crate::multiprocessing::spin_lock::SpinLock;
 use crate::process::{Process, ProcessId, State};
 use crate::scheduling::scheduler::{Scheduler, SchedulerError, SchedulerResult, SwitchTrigger};

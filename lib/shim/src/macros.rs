@@ -19,12 +19,6 @@ macro_rules! const_assert_eq {
     }
 }
 
-//
-// TODO. make it
-// 
-//   #[assert_size(N)]
-//   struct S {..}
-//   
 #[macro_export]
 macro_rules! const_assert_size {
     ($struct:ident, $size:expr) => {

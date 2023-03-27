@@ -1,3 +1,4 @@
+use alloc::vec::Vec;
 use kernel_api::OsError;
 use crate::process::{Process, ProcessId, State};
 use crate::traps::TrapFrame;
@@ -24,7 +25,7 @@ pub enum SwitchTrigger {
     Timer,
 }
 
-pub trait Scheduler: Send {
+pub trait Scheduler: From<Vec<Process>> + Into<Vec<Process>> + Send {
     fn new() -> Self where Self: Sized;
     fn setup_core(&mut self, core: usize) -> SchedulerResult<()>;
 

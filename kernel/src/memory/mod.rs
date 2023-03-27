@@ -10,17 +10,17 @@ use crate::multiprocessing::spin_lock::SpinLock;
 use crate::multiprocessing::per_core::{is_mmu_ready, set_mmu_ready};
 use crate::param::{KERNEL_MASK_BITS, USER_MASK_BITS};
 
-pub use self::address::{PhysicalAddr, VirtualAddr};
-pub use self::pagetable::*;
+pub use self::address::{PhysicalAddress, VirtualAddress};
+pub use self::page_table::*;
 
 mod address;
-mod pagetable;
+mod page_table;
+mod entry;
 
 pub struct VMManager {
     kern_pt: SpinLock<Option<KernPageTable>>,
     kern_pt_addr: AtomicUsize,
     ready_core_cnt: AtomicUsize,
-    frame_reference_counts: SpinLock<BTreeMap<PhysicalAddr, usize>>,
 }
 
 impl VMManager {
@@ -33,7 +33,6 @@ impl VMManager {
             kern_pt: SpinLock::new(None),
             kern_pt_addr: AtomicUsize::new(0),
             ready_core_cnt: AtomicUsize::new(0),
-            frame_reference_counts: SpinLock::new(BTreeMap::new()),
         }
     }
 
@@ -119,39 +118,7 @@ impl VMManager {
     }
 
     /// Returns the base address of the kernel2 page table as `PhysicalAddr`.
-    pub fn get_baddr(&self) -> PhysicalAddr {
+    pub fn get_baddr(&self) -> PhysicalAddress {
         self.kern_pt.lock(|kern_pt| kern_pt.as_ref().unwrap().get_baddr()).unwrap()
-    }
-
-    pub fn pin_frame(&self, physical_address: PhysicalAddr) {
-        self.frame_reference_counts.lock(|reference_counts| {
-            *reference_counts.entry(physical_address).or_insert(0) += 1;
-        }).unwrap()
-    }
-
-    pub fn unpin_frame(&self, physical_address: PhysicalAddr) -> bool {
-        self.frame_reference_counts.lock(|reference_counts| {
-            match reference_counts.entry(physical_address) {
-                Entry::Occupied(mut e) => {
-                    match *e.get() {
-                        1 => {
-                            e.remove();
-                            true
-                        }
-                        x => {
-                            *e.get_mut() = x - 1;
-                            false
-                        }
-                    }
-                }
-                Entry::Vacant(_) => false,
-            }
-        }).unwrap()
-    }
-
-    pub fn get_frame_pin_count(&self, physical_address: PhysicalAddr) -> usize  {
-        self.frame_reference_counts.lock(|reference_counts| {
-            reference_counts.get(&physical_address).copied().unwrap_or(0usize)
-        }).unwrap()
     }
 }

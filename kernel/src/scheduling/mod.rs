@@ -1,7 +1,10 @@
 mod global;
-mod scheduler;
 mod round_robin;
+mod scheduler;
+mod proportional_share;
 
-pub use scheduler::{Scheduler, SwitchTrigger};
+pub(self) use scheduler::Scheduler;
+
+pub use scheduler::SwitchTrigger;
 pub use global::GlobalScheduler;
 pub use round_robin::RoundRobinScheduler;

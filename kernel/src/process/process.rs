@@ -6,13 +6,11 @@ use core::mem;
 
 use core::slice::from_raw_parts;
 
-use aarch64;
 use aarch64::SPSR_EL1;
 use filesystem::filesystem::Filesystem;
 use filesystem::path::Path;
 use kernel_api::{OsError, OsResult};
 use shim::{io, newioerr};
-use shim::io::{Write};
 
 use crate::{FILESYSTEM, VMM};
 
@@ -38,6 +36,7 @@ impl From<u64> for ProcessId {
     }
 }
 
+//TODO: fields should be private
 /// A structure that represents the complete state of a process.
 #[derive(Debug)]
 pub struct Process {
@@ -48,11 +47,11 @@ pub struct Process {
     /// The scheduling state of the process.
     pub state: State,
     /// The resources (files) open by a process
-    pub(crate) resources: ResourceList,
+    pub resources: ResourceList,
     /// Parent process
-    pub(crate) parent: Option<ProcessId>,
+    pub parent: Option<ProcessId>,
     /// Last dead process
-    pub(crate) dead_children: Vec<ProcessId>,
+    pub dead_children: Vec<ProcessId>,
     /// Current Working Directory
     current_directory: Path,
 }
@@ -114,20 +113,20 @@ impl Process {
 
     /// Returns the `VirtualAddr` represents the base address of the user
     /// memory space.
-    pub fn get_image_base() -> VirtualAddr {
-        VirtualAddr::from(USER_IMG_BASE)
+    pub fn get_image_base() -> VirtualAddress {
+        VirtualAddress::from(USER_IMG_BASE)
     }
 
     /// Returns the `VirtualAddr` represents the base address of the user
     /// process's stack.
-    pub fn get_stack_base() -> VirtualAddr {
-        VirtualAddr::from(u64::MAX & PAGE_MASK as u64)
+    pub fn get_stack_base() -> VirtualAddress {
+        VirtualAddress::from(u64::MAX & PAGE_MASK as u64)
     }
 
     /// Returns the `VirtualAddr` represents the top of the user process's
     /// stack.
-    pub fn get_stack_top() -> VirtualAddr {
-        VirtualAddr::from(u64::MAX)
+    pub fn get_stack_top() -> VirtualAddress {
+        VirtualAddress::from(u64::MAX)
     }
 
     /// Returns `true` if this process is ready to be scheduled.

@@ -1,15 +1,14 @@
 use core::fmt;
 use core::ops::{Add, AddAssign, BitAnd, BitOr, Sub, SubAssign};
 
-//TODO: this should probably just be usize since 64 bit is only supported
 /// A virtual address.
 #[derive(Copy, Clone, PartialEq)]
-pub struct VirtualAddr(usize);
+pub struct VirtualAddress(usize);
 
 // TODO: add separate type for user virtual address and kernel virtual address, so there's no
 // confusion
 
-impl VirtualAddr {
+impl VirtualAddress {
     pub fn level2_index(&self) -> u64 {
         (self.as_u64() & ((1 << 42) - (1 << 29))) >> 29
     }
@@ -23,14 +22,14 @@ impl VirtualAddr {
         self.as_u64() & ((1 << 16) - 1)
     }
 
-    pub fn page_aligned(&self) -> VirtualAddr {
-        VirtualAddr::from(self.as_u64() & (!((1u64 << 16) - 1)))
+    pub fn page_aligned(&self) -> VirtualAddress {
+        VirtualAddress::from(self.as_u64() & (!((1u64 << 16) - 1)))
     }
 }
 
 /// A physical address.
 #[derive(Copy, Clone, PartialEq, Ord, PartialOrd, Eq)]
-pub struct PhysicalAddr(usize);
+pub struct PhysicalAddress(usize);
 
 macro_rules! impl_for {
     ($T:tt) => {
@@ -135,5 +134,5 @@ macro_rules! impl_for {
     };
 }
 
-impl_for!(VirtualAddr);
-impl_for!(PhysicalAddr);
+impl_for!(VirtualAddress);
+impl_for!(PhysicalAddress);

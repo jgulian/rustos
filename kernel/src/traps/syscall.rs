@@ -1,7 +1,6 @@
 use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 use alloc::vec;
-use core::ops::Add;
 use core::time::Duration;
 
 use kernel_api::*;
@@ -9,7 +8,7 @@ use kernel_api::OsError::BadAddress;
 use pi::timer;
 
 use crate::{SCHEDULER};
-use crate::memory::{PagePermissions, VirtualAddr};
+use crate::memory::{PagePermissions, VirtualAddress};
 use crate::param::{PAGE_SIZE, USER_IMG_BASE};
 use crate::process::{ResourceId, State};
 use crate::scheduling::SwitchTrigger;
@@ -157,10 +156,10 @@ pub fn sys_sbrk(tf: &mut TrapFrame) -> OsResult<()> {
     let result = SCHEDULER.on_process(tf, |process| -> OsResult<(u64, u64)> {
         //TODO: pick a better heap base / allow more sbrks / something might be wrong with is_valid
         let mut heap_base = USER_IMG_BASE + PAGE_SIZE;
-        while process.vmap.is_valid(VirtualAddr::from(heap_base - USER_IMG_BASE)) {
+        while process.vmap.is_valid(VirtualAddress::from(heap_base - USER_IMG_BASE)) {
             heap_base += PAGE_SIZE;
         }
-        process.vmap.alloc(VirtualAddr::from(heap_base), PagePermissions::RW);
+        process.vmap.alloc(VirtualAddress::from(heap_base), PagePermissions::RW);
         Ok((heap_base as u64, PAGE_SIZE as u64))
     })??;
 
@@ -233,7 +232,7 @@ fn sys_wait(trap_frame: &mut TrapFrame) -> OsResult<()> {
 //TODO: make the functions work across page boundaries
 //TODO: this is fundamentally unsafe
 fn copy_from_userspace(_: &TrapFrame, ptr: u64, buf: &mut [u8]) -> OsResult<()> {
-    let virtual_address = VirtualAddr::from(ptr);
+    let virtual_address = VirtualAddress::from(ptr);
 
     if virtual_address.offset() as usize + buf.len() > PAGE_SIZE {
         Err(BadAddress)
@@ -244,7 +243,7 @@ fn copy_from_userspace(_: &TrapFrame, ptr: u64, buf: &mut [u8]) -> OsResult<()> 
 }
 
 fn copy_into_userspace(_: &TrapFrame, ptr: u64, buf: &[u8]) -> OsResult<()> {
-    let virtual_address = VirtualAddr::from(ptr);
+    let virtual_address = VirtualAddress::from(ptr);
     if virtual_address.offset() as usize + buf.len() > PAGE_SIZE {
         return Err(BadAddress);
     }

@@ -1,5 +1,6 @@
 use alloc::boxed::Box;
 use alloc::collections::VecDeque;
+use alloc::vec::Vec;
 use core::fmt;
 use pi::local_interrupt::{local_tick_in, LocalController, LocalInterrupt};
 use crate::multiprocessing::per_core::local_irq;
@@ -146,6 +147,18 @@ impl Scheduler for RoundRobinScheduler {
         *trap_frame = *process.context;
 
         Ok(result)
+    }
+}
+
+impl From<Vec<Process>> for RoundRobinScheduler {
+    fn from(value: Vec<Process>) -> Self {
+        todo!()
+    }
+}
+
+impl Into<Vec<Process>> for RoundRobinScheduler {
+    fn into(self) -> Vec<Process> {
+        todo!()
     }
 }
 
