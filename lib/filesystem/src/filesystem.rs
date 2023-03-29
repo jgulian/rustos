@@ -12,10 +12,10 @@ use std::string::String;
 #[cfg(not(feature = "no_std"))]
 use std::vec::Vec;
 
-use shim::io;
 use crate::device::BlockDevice;
 use crate::master_boot_record::PartitionEntry;
 use crate::path::{Component, Path};
+use shim::io;
 
 type BoxedFile = Box<dyn File>;
 type BoxedDirectory = Box<dyn Directory>;
@@ -57,7 +57,7 @@ pub trait Directory: Send + Sync {
         match self.open_entry(name) {
             Ok(_) => Ok(true),
             Err(ref e) if e.kind() == io::ErrorKind::NotFound => Ok(false),
-            Err(e) => Err(e)
+            Err(e) => Err(e),
         }
     }
 }
@@ -109,25 +109,35 @@ pub trait Filesystem: Send + Sync {
                     components.push(Entry::Directory(self.root()?));
                 }
                 Component::Parent => {
-                    components.pop().ok_or(io::Error::from(io::ErrorKind::NotFound))?;
+                    components
+                        .pop()
+                        .ok_or(io::Error::from(io::ErrorKind::NotFound))?;
                 }
                 Component::Current => {}
                 Component::Child(child) => {
-                    let new_entry = components.last_mut()
+                    let new_entry = components
+                        .last_mut()
                         .ok_or(io::Error::from(io::ErrorKind::NotFound))
                         .map(|entry| {
                             let a = entry.as_directory()?;
-                            a.open_entry(child.as_str()) })??;
+                            a.open_entry(child.as_str())
+                        })??;
                     components.push(new_entry);
                 }
             }
         }
 
-        components.pop()
+        components
+            .pop()
             .map(|entry| Ok(entry))
             .unwrap_or(Err(io::Error::from(io::ErrorKind::NotFound)))
     }
 
-    fn format(device: &mut dyn BlockDevice, partition: &mut PartitionEntry, sector_size: usize) -> io::Result<()> where Self: Sized;
+    fn format(
+        device: &mut dyn BlockDevice,
+        partition: &mut PartitionEntry,
+        sector_size: usize,
+    ) -> io::Result<()>
+    where
+        Self: Sized;
 }
-

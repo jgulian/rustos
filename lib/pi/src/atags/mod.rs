@@ -38,7 +38,7 @@ impl Iterator for Atags {
 
 #[cfg(test)]
 mod test {
-    use super::{Atag, Atags, raw};
+    use super::{raw, Atag, Atags};
 
     const MEM: [u32; 23] = [
         // CORE

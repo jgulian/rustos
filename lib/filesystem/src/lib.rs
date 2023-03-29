@@ -8,10 +8,10 @@ pub mod device;
 pub mod error;
 pub mod filesystem;
 pub mod master_boot_record;
+pub mod partition;
 pub mod path;
 pub mod pseudo;
 pub mod virtual_file_system;
-pub mod partition;
 
 #[cfg(not(feature = "no_std"))]
 pub mod image;

@@ -1,10 +1,10 @@
 use core::fmt;
 use core::fmt::Write;
 
+use log::{LevelFilter, Metadata, Record};
 use pi::uart::MiniUart;
 use shim::io;
 use sync::Mutex;
-use log::{LevelFilter, Metadata, Record};
 
 use crate::multiprocessing::spin_lock::SpinLock;
 
@@ -80,9 +80,9 @@ pub static CONSOLE: SpinLock<Console> = SpinLock::new(Console::new());
 /// Internal function called by the `kprint[ln]!` macros.
 #[doc(hidden)]
 pub fn _print(args: fmt::Arguments) {
-    CONSOLE.lock(|console| {
-        console.write_fmt(args).unwrap()
-    }).unwrap()
+    CONSOLE
+        .lock(|console| console.write_fmt(args).unwrap())
+        .unwrap()
 }
 
 /// Like `println!`, but for kernel2-space.
@@ -96,7 +96,6 @@ pub macro kprintln {
 pub macro kprint($($arg:tt)*) {
 _print(core::format_args!($($arg)*))
 }
-
 
 struct KernelLogger;
 

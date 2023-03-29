@@ -1,14 +1,14 @@
 #[cfg(feature = "no_std")]
-use alloc::vec::Vec;
-#[cfg(feature = "no_std")]
 use alloc::vec;
-#[cfg(not(feature = "no_std"))]
-use std::vec::Vec;
+#[cfg(feature = "no_std")]
+use alloc::vec::Vec;
 #[cfg(not(feature = "no_std"))]
 use std::vec;
+#[cfg(not(feature = "no_std"))]
+use std::vec::Vec;
 
-use shim::io;
 use crate::device::BlockDevice;
+use shim::io;
 
 struct CacheEntry {
     block: u64,
@@ -38,15 +38,13 @@ impl<T: BlockDevice> CachedBlockDevice<T> {
     }
 
     fn get_cache_entry_or_load(&mut self, block: u64) -> io::Result<&mut CacheEntry> {
-        let i = self.cache.iter()
-            .enumerate()
-            .find_map(|(i, cache_entry)| {
-                if cache_entry.block == block {
-                    Some(i)
-                } else {
-                    None
-                }
-            });
+        let i = self.cache.iter().enumerate().find_map(|(i, cache_entry)| {
+            if cache_entry.block == block {
+                Some(i)
+            } else {
+                None
+            }
+        });
         match i {
             None => {
                 self.make_room_in_cache();
@@ -54,7 +52,8 @@ impl<T: BlockDevice> CachedBlockDevice<T> {
                     block,
                     data: vec![0u8; self.block_size()],
                 };
-                self.device.read_block(cache_entry.block, cache_entry.data.as_mut_slice())?;
+                self.device
+                    .read_block(cache_entry.block, cache_entry.data.as_mut_slice())?;
                 self.cache.push(cache_entry);
                 Ok(self.cache.last_mut().unwrap())
             }

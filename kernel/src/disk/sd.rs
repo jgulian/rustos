@@ -77,7 +77,7 @@ impl BlockDevice for Sd {
         if did_err {
             match unsafe { sd_err } {
                 -1 => Err(io::Error::from(io::ErrorKind::TimedOut)),
-                _ => Err(io::Error::from(io::ErrorKind::Other))
+                _ => Err(io::Error::from(io::ErrorKind::Other)),
             }
         } else {
             Ok(())

@@ -6,7 +6,6 @@
 #![feature(raw_vec_internals)]
 #![feature(panic_info_message)]
 #![feature(is_some_and)]
-
 #![no_std]
 #![no_main]
 // #![cfg_attr(not(test), no_std)]
@@ -32,12 +31,12 @@ mod init;
 
 mod console;
 mod disk;
+mod memory;
+mod multiprocessing;
 mod param;
 mod process;
 mod scheduling;
 mod traps;
-mod memory;
-mod multiprocessing;
 
 #[cfg_attr(not(test), global_allocator)]
 pub static ALLOCATOR: KernelAllocator = KernelAllocator::uninitialized();
@@ -61,10 +60,11 @@ unsafe fn kernel_main() -> ! {
     init::initialize_app_cores();
     VIRTUAL_MEMORY.wait();
 
-    let init = Path::try_from("/init")
-        .expect("unable to open init");
+    let init = Path::try_from("/init").expect("unable to open init");
     let init_process = Process::load(&init).expect("unable to setup init");
-    SCHEDULER.add(init_process).expect("unable to add init process");
+    SCHEDULER
+        .add(init_process)
+        .expect("unable to add init process");
 
     SCHEDULER.bootstrap();
 }

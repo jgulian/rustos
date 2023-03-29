@@ -5,8 +5,8 @@ use alloc::vec::Vec;
 use core::cmp::min;
 use filesystem::filesystem::File;
 
-use shim::{io, ioerr};
 use shim::io::{Seek, SeekFrom};
+use shim::{io, ioerr};
 use sync::Mutex;
 
 use crate::multiprocessing::spin_lock::SpinLock;
@@ -31,10 +31,8 @@ impl PipeResource {
 impl File for PipeResource {
     fn duplicate(&mut self) -> io::Result<Box<dyn File>> {
         Ok(Box::new(match self {
-            PipeResource::Writer(writer) =>
-                PipeResource::Writer(writer.clone()),
-            PipeResource::Reader(reader) =>
-                PipeResource::Reader(reader.clone()),
+            PipeResource::Writer(writer) => PipeResource::Writer(writer.clone()),
+            PipeResource::Reader(reader) => PipeResource::Reader(reader.clone()),
         }))
     }
 }
@@ -45,14 +43,14 @@ impl io::Read for PipeResource {
             PipeResource::Writer(_) => {
                 ioerr!(Unsupported)
             }
-            PipeResource::Reader(pipe) => {
-                pipe.lock(|pipe| {
+            PipeResource::Reader(pipe) => pipe
+                .lock(|pipe| {
                     let amount = min(pipe.0.len(), buf.len());
                     buf[..amount].copy_from_slice(&pipe.0.as_slice()[..amount]);
                     pipe.0.drain(0..amount);
                     Ok(amount)
-                }).unwrap()
-            }
+                })
+                .unwrap(),
         }
     }
 }
@@ -60,12 +58,12 @@ impl io::Read for PipeResource {
 impl io::Write for PipeResource {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         match self {
-            PipeResource::Writer(pipe) => {
-                pipe.lock(|pipe| {
+            PipeResource::Writer(pipe) => pipe
+                .lock(|pipe| {
                     pipe.0.extend_from_slice(buf);
                     Ok(buf.len())
-                }).unwrap()
-            }
+                })
+                .unwrap(),
             PipeResource::Reader(_pipe_arc) => {
                 ioerr!(Unsupported)
             }

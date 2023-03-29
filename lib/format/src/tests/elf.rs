@@ -1,10 +1,12 @@
 use crate::Format;
-use std::io::{Read, Seek, SeekFrom, Result, Write, Cursor};
+use std::io::{Cursor, Read, Result, Seek, SeekFrom, Write};
 
 #[derive(format_derive::Format, Debug, Eq, PartialEq)]
 struct ElfTableInfo {
-    #[endianness(little)] entry_size: u16,
-    #[endianness(little)] entry_count: u16,
+    #[endianness(little)]
+    entry_size: u16,
+    #[endianness(little)]
+    entry_count: u16,
 }
 
 #[derive(format_derive::Format, Debug, Eq, PartialEq)]
@@ -16,29 +18,40 @@ struct ElfFileHeader {
     os_abi: u8,
     abi_version: u8,
     #[padding(7)]
-    #[endianness(little)] object_type: u16,
-    #[endianness(little)] machine: u16,
-    #[endianness(little)] original_version: u32,
-    #[endianness(little)] entry_point: u64,
-    #[endianness(little)] program_header_table_offset: u64,
-    #[endianness(little)] section_header_table_offset: u64,
-    #[endianness(little)] flags: u32,
-    #[endianness(little)] header_size: u16,
+    #[endianness(little)]
+    object_type: u16,
+    #[endianness(little)]
+    machine: u16,
+    #[endianness(little)]
+    original_version: u32,
+    #[endianness(little)]
+    entry_point: u64,
+    #[endianness(little)]
+    program_header_table_offset: u64,
+    #[endianness(little)]
+    section_header_table_offset: u64,
+    #[endianness(little)]
+    flags: u32,
+    #[endianness(little)]
+    header_size: u16,
     program_header_table: ElfTableInfo,
     section_header_table: ElfTableInfo,
-    #[endianness(little)] section_name_index: u16,
+    #[endianness(little)]
+    section_name_index: u16,
 }
 
 #[derive(format_derive::Format, Debug)]
 struct ManyElfs {
     headers: [ElfFileHeader; 4],
-    data: [u8; 256]
+    data: [u8; 256],
 }
 
-const SAMPLE_HEADER: [u8; 64] = [0x7f, 0x45, 0x4c, 0x46, 0x2, 0x1, 0x1, 0x0, 0x0, 0x0, 0x0, 0x0,
-    0x0, 0x0, 0x0, 0x0, 0x2, 0x0, 0xb7, 0x0, 0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x8, 0x0, 0x0, 0x0, 0x0,
-    0x0, 0x40, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x88, 0x7f, 0x44, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
-    0x0, 0x0, 0x0, 0x40, 0x0, 0x38, 0x0, 0x4, 0x0, 0x40, 0x0, 0x12, 0x0, 0x10, 0x0];
+const SAMPLE_HEADER: [u8; 64] = [
+    0x7f, 0x45, 0x4c, 0x46, 0x2, 0x1, 0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x2, 0x0,
+    0xb7, 0x0, 0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x8, 0x0, 0x0, 0x0, 0x0, 0x0, 0x40, 0x0, 0x0, 0x0,
+    0x0, 0x0, 0x0, 0x0, 0x88, 0x7f, 0x44, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x40, 0x0,
+    0x38, 0x0, 0x4, 0x0, 0x40, 0x0, 0x12, 0x0, 0x10, 0x0,
+];
 
 // ELF Header:
 //   Magic:   7f 45 4c 46 02 01 01 00 00 00 00 00 00 00 00 00
@@ -81,8 +94,20 @@ fn elf() {
     assert_eq!(header.section_header_table_offset, 4489096);
     assert_eq!(header.flags, 0);
     assert_eq!(header.header_size, 64);
-    assert_eq!(header.program_header_table, ElfTableInfo { entry_size: 56, entry_count: 4 });
-    assert_eq!(header.section_header_table, ElfTableInfo { entry_size: 64, entry_count: 18 });
+    assert_eq!(
+        header.program_header_table,
+        ElfTableInfo {
+            entry_size: 56,
+            entry_count: 4
+        }
+    );
+    assert_eq!(
+        header.section_header_table,
+        ElfTableInfo {
+            entry_size: 64,
+            entry_count: 18
+        }
+    );
     assert_eq!(header.section_name_index, 16);
 }
 
@@ -98,7 +123,9 @@ fn many_elfs() {
     let many_elfs = ManyElfs::load_readable(&mut cursor).expect("should be ok");
 
     let mut result = Cursor::new(vec![0u8; sample_header.len()]);
-    many_elfs.headers[0].save_writable_seekable(&mut result).expect("should be ok");
+    many_elfs.headers[0]
+        .save_writable_seekable(&mut result)
+        .expect("should be ok");
 
     assert_eq!(many_elfs.headers[0], many_elfs.headers[1]);
     assert_eq!(many_elfs.headers[1], many_elfs.headers[2]);

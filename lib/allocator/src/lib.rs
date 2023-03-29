@@ -1,12 +1,12 @@
 #![no_std]
 
-use core::alloc::Layout;
 use crate::statistics::AllocatorStatistics;
+use core::alloc::Layout;
 
 pub mod bin;
 pub mod linked_list;
-pub mod util;
 pub mod statistics;
+pub mod util;
 
 #[cfg(test)]
 pub mod tests;

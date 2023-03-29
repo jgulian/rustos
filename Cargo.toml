@@ -10,6 +10,7 @@ members = [
     "kernel",
     "lib/aarch64",
     "lib/allocator",
+    "lib/architecture",
     "lib/filesystem",
     #"lib/filesystem/pseudo_filesystem",
     "lib/format",

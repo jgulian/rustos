@@ -1,6 +1,6 @@
 use core::cell::UnsafeCell;
 
-use core::ops::{Drop};
+use core::ops::Drop;
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use sync::{LockError, LockResult};
 
@@ -18,7 +18,7 @@ unsafe impl<T: Send> Send for SpinLock<T> {}
 unsafe impl<T: Send> Sync for SpinLock<T> {}
 
 impl<T: Send> SpinLock<T> {
-    pub const fn new(value: T) ->  Self {
+    pub const fn new(value: T) -> Self {
         SpinLock {
             lock: AtomicBool::new(false),
             owner: AtomicUsize::new(usize::MAX),
@@ -76,18 +76,21 @@ impl<T: Send> SpinLock<T> {
 }
 
 impl<T: Send> sync::Mutex<T> for SpinLock<T> {
-    fn new(value: T) -> Self where Self: Sized {
+    fn new(value: T) -> Self
+    where
+        Self: Sized,
+    {
         SpinLock::new(value)
     }
 
     fn lock<R>(&self, f: impl FnOnce(&mut T) -> R) -> LockResult<R> {
         let lock = self.acquire()?;
-        Ok(f(unsafe {&mut *lock.0.data.get()}))
+        Ok(f(unsafe { &mut *lock.0.data.get() }))
     }
 
     fn try_lock<R>(&self, f: impl FnOnce(&mut T) -> R) -> LockResult<R> {
         let lock = self.try_acquire()?;
-        Ok(f(unsafe {&mut *lock.0.data.get()}))
+        Ok(f(unsafe { &mut *lock.0.data.get() }))
     }
 
     fn is_poisoned(&self) -> bool {

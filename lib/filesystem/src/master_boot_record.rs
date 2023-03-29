@@ -1,13 +1,13 @@
+use crate::device::BlockDevice;
+use crate::error::FilesystemError;
 #[cfg(feature = "no_std")]
 use alloc::boxed::Box;
-#[cfg(not(feature = "no_std"))]
-use std::boxed::Box;
 use core::fmt::{Debug, Formatter};
 use core::ops::{Index, IndexMut};
 use core::slice::SliceIndex;
 use format::Format;
-use crate::device::BlockDevice;
-use crate::error::FilesystemError;
+#[cfg(not(feature = "no_std"))]
+use std::boxed::Box;
 
 #[derive(Copy, Clone, Format)]
 pub struct CHS {
@@ -58,7 +58,10 @@ pub struct MasterBootRecord {
     pub(crate) valid_boot_sector: [u8; 2],
 }
 
-impl<I> Index<I> for MasterBootRecord where I: SliceIndex<[PartitionEntry], Output=PartitionEntry> {
+impl<I> Index<I> for MasterBootRecord
+where
+    I: SliceIndex<[PartitionEntry], Output = PartitionEntry>,
+{
     type Output = PartitionEntry;
 
     fn index(&self, index: I) -> &Self::Output {
@@ -66,7 +69,10 @@ impl<I> Index<I> for MasterBootRecord where I: SliceIndex<[PartitionEntry], Outp
     }
 }
 
-impl<I> IndexMut<I> for MasterBootRecord where I: SliceIndex<[PartitionEntry], Output=PartitionEntry> {
+impl<I> IndexMut<I> for MasterBootRecord
+where
+    I: SliceIndex<[PartitionEntry], Output = PartitionEntry>,
+{
     fn index_mut(&mut self, index: I) -> &mut Self::Output {
         self.partition_table.index_mut(index)
     }
@@ -74,7 +80,6 @@ impl<I> IndexMut<I> for MasterBootRecord where I: SliceIndex<[PartitionEntry], O
 
 impl TryFrom<&mut Box<dyn BlockDevice + Send + Sync>> for MasterBootRecord {
     type Error = FilesystemError;
-
 
     /// Reads and returns the master boot record (MBR) from `device`.
     ///
@@ -90,8 +95,9 @@ impl TryFrom<&mut Box<dyn BlockDevice + Send + Sync>> for MasterBootRecord {
 
         let master_boot_record = MasterBootRecord::load_slice(&buffer)?;
 
-        if master_boot_record.valid_boot_sector[0] != 0x55 ||
-            master_boot_record.valid_boot_sector[1] != 0xAA {
+        if master_boot_record.valid_boot_sector[0] != 0x55
+            || master_boot_record.valid_boot_sector[1] != 0xAA
+        {
             return Err(FilesystemError::BadSignature);
         }
 
@@ -112,9 +118,17 @@ impl Default for MasterBootRecord {
             disk_id: [0, 0, 0, 0, 199, 93, 147, 39, 0, 0],
             partition_table: [PartitionEntry {
                 boot_indicator: 0,
-                starting_chs: CHS { header: 0, sector: 0, cylinder: 0, },
+                starting_chs: CHS {
+                    header: 0,
+                    sector: 0,
+                    cylinder: 0,
+                },
                 partition_type: 0,
-                ending_chs: CHS { header: 0, sector: 0, cylinder: 0, },
+                ending_chs: CHS {
+                    header: 0,
+                    sector: 0,
+                    cylinder: 0,
+                },
                 relative_sector: 0,
                 total_sectors: 0,
             }; 4],

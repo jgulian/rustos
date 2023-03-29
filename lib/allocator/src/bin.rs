@@ -1,10 +1,10 @@
 use core::alloc::Layout;
 use core::ptr;
 
-use crate::GenericAllocator;
 use crate::linked_list::LinkedList;
 use crate::statistics::AllocatorStatistics;
 use crate::util::{align_down, align_up};
+use crate::GenericAllocator;
 
 const BIN_COUNT: usize = 20;
 
@@ -135,15 +135,16 @@ impl BinAllocator {
 
 impl GenericAllocator for BinAllocator {
     unsafe fn alloc(&mut self, layout: Layout) -> *mut u8 {
-        self.statistics.allocated_size += layout.size();    // technically this needs to be rounded
+        self.statistics.allocated_size += layout.size(); // technically this needs to be rounded
         self.statistics.allocation_count += 1;
 
         let bin = Self::size_to_bin(layout.size()).unwrap_or(0);
-        self.buddy_down(bin, layout.align()).unwrap_or(ptr::null_mut()) as *mut u8
+        self.buddy_down(bin, layout.align())
+            .unwrap_or(ptr::null_mut()) as *mut u8
     }
 
     unsafe fn dealloc(&mut self, ptr: *mut u8, layout: Layout) {
-        self.statistics.allocated_size -= layout.size();    // technically this needs to be rounded
+        self.statistics.allocated_size -= layout.size(); // technically this needs to be rounded
         self.statistics.allocation_count -= 1;
 
         let bin = Self::size_to_bin(layout.size()).unwrap_or(0);

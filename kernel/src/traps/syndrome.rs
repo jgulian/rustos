@@ -1,7 +1,9 @@
 use core::fmt;
 use core::fmt::Formatter;
 
-use crate::traps::syndrome::Fault::{AccessFlag, AddressSize, Alignment, Permission, TlbConflict, Translation};
+use crate::traps::syndrome::Fault::{
+    AccessFlag, AddressSize, Alignment, Permission, TlbConflict, Translation,
+};
 
 pub enum Fault {
     AddressSize,
@@ -22,7 +24,7 @@ impl From<u32> for Fault {
             0b001101..=0b001111 => Permission,
             100001 => Alignment,
             110000 => TlbConflict,
-            _ => Fault::Other(val as u8)
+            _ => Fault::Other(val as u8),
         }
     }
 }
@@ -60,7 +62,7 @@ pub enum FaultStatusCode {
     UnsupportedExclusiveOrAtomicAccess,
     SectionDomainFault,
     PageDomainFault,
-    Unknown(u32)
+    Unknown(u32),
 }
 
 impl From<u32> for FaultStatusCode {
@@ -97,7 +99,7 @@ impl From<u32> for FaultStatusCode {
             0b110101 => FaultStatusCode::UnsupportedExclusiveOrAtomicAccess,
             0b111101 => FaultStatusCode::SectionDomainFault,
             0b111110 => FaultStatusCode::PageDomainFault,
-            v => FaultStatusCode::Unknown(v)
+            v => FaultStatusCode::Unknown(v),
         }
     }
 }
@@ -179,44 +181,35 @@ impl fmt::Display for Syndrome {
             Syndrome::WfiWfe => f.write_str("WfiWfe"),
             Syndrome::SimdFp => f.write_str("SimdFp"),
             Syndrome::IllegalExecutionState => f.write_str("IllegalExecutionState"),
-            Syndrome::Svc(data) =>
-                f.debug_struct("Svc")
-                    .field("data", data)
-                    .finish(),
-            Syndrome::Hvc(data) =>
-                f.debug_struct("Hvc")
-                    .field("data", data)
-                    .finish(),
-            Syndrome::Smc(data) =>
-                f.debug_struct("Smc")
-                    .field("data", data)
-                    .finish(),
+            Syndrome::Svc(data) => f.debug_struct("Svc").field("data", data).finish(),
+            Syndrome::Hvc(data) => f.debug_struct("Hvc").field("data", data).finish(),
+            Syndrome::Smc(data) => f.debug_struct("Smc").field("data", data).finish(),
             Syndrome::MsrMrsSystem => f.write_str("MsrMrsSystem"),
-            Syndrome::InstructionAbort(AbortData{ write, fault_status_code }) =>
-                f.debug_struct("InstructionAbort")
-                    .field("write", write)
-                    .field("fault_status_code", fault_status_code)
-                    .finish(),
+            Syndrome::InstructionAbort(AbortData {
+                write,
+                fault_status_code,
+            }) => f
+                .debug_struct("InstructionAbort")
+                .field("write", write)
+                .field("fault_status_code", fault_status_code)
+                .finish(),
             Syndrome::PCAlignmentFault => f.write_str("PCAlignmentFault"),
-            Syndrome::DataAbort(AbortData{ write, fault_status_code }) =>
-                f.debug_struct("DataAbort")
-                    .field("write", write)
-                    .field("fault_status_code", fault_status_code)
-                    .finish(),
+            Syndrome::DataAbort(AbortData {
+                write,
+                fault_status_code,
+            }) => f
+                .debug_struct("DataAbort")
+                .field("write", write)
+                .field("fault_status_code", fault_status_code)
+                .finish(),
             Syndrome::SpAlignmentFault => f.write_str("SpAlignmentFault"),
             Syndrome::TrappedFpu => f.write_str("TrappedFpu"),
             Syndrome::SError => f.write_str("SError"),
             Syndrome::Breakpoint => f.write_str("Breakpoint"),
             Syndrome::Step => f.write_str("Step"),
             Syndrome::Watchpoint => f.write_str("Watchpoint"),
-            Syndrome::Brk(data) =>
-                f.debug_struct("Brk")
-                    .field("data", data)
-                    .finish(),
-            Syndrome::Other(data) =>
-                f.debug_struct("Other")
-                    .field("data", data)
-                    .finish(),
+            Syndrome::Brk(data) => f.debug_struct("Brk").field("data", data).finish(),
+            Syndrome::Other(data) => f.debug_struct("Other").field("data", data).finish(),
         }
     }
 }

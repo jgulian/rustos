@@ -82,15 +82,32 @@ pub trait BlockDevice {
     fn write_block(&mut self, block: u64, data: &[u8]) -> io::Result<()>;
 }
 
-pub fn stream_read<I>(device: &mut dyn BlockDevice, offset: usize, blocks: I, data: &mut [u8]) -> io::Result<(u64, usize)> where I: Iterator<Item=u64> {
+pub fn stream_read<I>(
+    device: &mut dyn BlockDevice,
+    offset: usize,
+    blocks: I,
+    data: &mut [u8],
+) -> io::Result<(u64, usize)>
+where
+    I: Iterator<Item = u64>,
+{
     let block_size = device.block_size();
     let (block_offset, small_offset) = offset_data(offset, block_size);
     let (prefix_data, main_data) = data.split_at_mut(min(block_size - small_offset, data.len()));
-    let prefix_option = if prefix_data.is_empty() { None } else { Some(prefix_data) };
+    let prefix_option = if prefix_data.is_empty() {
+        None
+    } else {
+        Some(prefix_data)
+    };
     let (mut last_block, mut amount_read) = (0, 0);
 
-    blocks.skip(block_offset)
-        .zip(prefix_option.into_iter().chain(main_data.chunks_mut(block_size)))
+    blocks
+        .skip(block_offset)
+        .zip(
+            prefix_option
+                .into_iter()
+                .chain(main_data.chunks_mut(block_size)),
+        )
         .enumerate()
         .try_for_each(|(i, (block, chunk_data))| -> io::Result<()> {
             if chunk_data.len() == block_size {
@@ -112,15 +129,32 @@ pub fn stream_read<I>(device: &mut dyn BlockDevice, offset: usize, blocks: I, da
 }
 
 //TODO: this is broken but read should work so copy that
-pub fn stream_write<I>(device: &mut dyn BlockDevice, offset: usize, blocks: I, data: &[u8]) -> io::Result<(u64, usize)> where I: Iterator<Item=u64> {
+pub fn stream_write<I>(
+    device: &mut dyn BlockDevice,
+    offset: usize,
+    blocks: I,
+    data: &[u8],
+) -> io::Result<(u64, usize)>
+where
+    I: Iterator<Item = u64>,
+{
     let block_size = device.block_size();
     let (block_offset, small_offset) = offset_data(offset, block_size);
     let (prefix_data, main_data) = data.split_at(min(block_size - small_offset, data.len()));
-    let prefix_option = if prefix_data.is_empty() { None } else { Some(prefix_data) };
+    let prefix_option = if prefix_data.is_empty() {
+        None
+    } else {
+        Some(prefix_data)
+    };
     let (mut last_block, mut amount_written) = (0, 0);
 
-    blocks.skip(block_offset)
-        .zip(prefix_option.into_iter().chain(main_data.chunks(block_size)))
+    blocks
+        .skip(block_offset)
+        .zip(
+            prefix_option
+                .into_iter()
+                .chain(main_data.chunks(block_size)),
+        )
         .enumerate()
         .try_for_each(|(i, (block, chunk_data))| -> io::Result<()> {
             if chunk_data.len() == block_size {

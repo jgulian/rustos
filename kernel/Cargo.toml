@@ -14,6 +14,7 @@ edition = "2021"
 [dependencies]
 aarch64 = { path = "../lib/aarch64/" }
 allocator = { path = "../lib/allocator" }
+architecture = { path = "../lib/architecture" }
 vfat = { path = "../lib/vfat/", features = ["no_std"] }
 filesystem = { path = "../lib/filesystem/", features = ["no_std"] }
 kernel_api = { path = "../lib/kernel_api" }

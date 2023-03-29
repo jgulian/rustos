@@ -7,7 +7,7 @@ extern crate alloc;
 use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 use core::time::Duration;
-use kernel_api::{println};
+use kernel_api::println;
 use kernel_api::syscall::{exit, fork, getpid, sbrk, wait};
 
 use crate::user::get_arguments;
@@ -24,8 +24,15 @@ fn name_to_test(name: &str) -> Box<dyn Fn()> {
     let test_name = name.to_string();
 
     match name {
-        "fork_tree" => Box::new(|| { sbrk(); sbrk(); sbrk(); fork_tree_test(); }),
-        _ => Box::new(move || { println!("unknown test: {}", test_name); }),
+        "fork_tree" => Box::new(|| {
+            sbrk();
+            sbrk();
+            sbrk();
+            fork_tree_test();
+        }),
+        _ => Box::new(move || {
+            println!("unknown test: {}", test_name);
+        }),
     }
 }
 

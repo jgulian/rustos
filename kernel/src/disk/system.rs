@@ -1,3 +1,5 @@
+use crate::multiprocessing::spin_lock::SpinLock;
+use crate::ALLOCATOR;
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::format;
@@ -7,8 +9,6 @@ use core::cmp::min;
 use filesystem::path::Path;
 use filesystem::pseudo::{EntryType, PseudoDirectory, PseudoDirectoryCollection, PseudoFilesystem};
 use shim::io;
-use crate::ALLOCATOR;
-use crate::multiprocessing::spin_lock::SpinLock;
 
 struct AllocatorInformation;
 
@@ -17,10 +17,9 @@ impl PseudoDirectory for AllocatorInformation {
         match offset.as_str() {
             "allocator" => {
                 let statistics = ALLOCATOR.stats();
-                let data = format!("allocated_size: {}\nallocation_count: {}\ntotal_memory: {}\n",
-                                   statistics.allocated_size,
-                                   statistics.allocation_count,
-                                   statistics.total_memory
+                let data = format!(
+                    "allocated_size: {}\nallocation_count: {}\ntotal_memory: {}\n",
+                    statistics.allocated_size, statistics.allocation_count, statistics.total_memory
                 );
 
                 let len = min(data.len(), buf.len());
@@ -28,7 +27,7 @@ impl PseudoDirectory for AllocatorInformation {
                 buf[..len].copy_from_slice(bytes);
                 Ok(len)
             }
-            _ => Err(io::Error::from(io::ErrorKind::NotFound))
+            _ => Err(io::Error::from(io::ErrorKind::NotFound)),
         }
     }
 
@@ -43,7 +42,7 @@ impl PseudoDirectory for AllocatorInformation {
                 result.push(String::from("allocator"));
                 Ok(result)
             }
-            _ => Err(io::Error::from(io::ErrorKind::NotFound))
+            _ => Err(io::Error::from(io::ErrorKind::NotFound)),
         }
     }
 
@@ -55,9 +54,12 @@ impl PseudoDirectory for AllocatorInformation {
     }
 }
 
-pub(super) fn new_system_filesystem() -> io::Result<PseudoFilesystem<SpinLock<PseudoDirectoryCollection>>> {
+pub(super) fn new_system_filesystem(
+) -> io::Result<PseudoFilesystem<SpinLock<PseudoDirectoryCollection>>> {
     let mut directories: BTreeMap<Path, Box<dyn PseudoDirectory>> = BTreeMap::new();
     directories.insert(Path::try_from("allocator")?, Box::new(AllocatorInformation));
 
-    Ok(PseudoFilesystem::new(PseudoDirectoryCollection::new(directories)))
+    Ok(PseudoFilesystem::new(PseudoDirectoryCollection::new(
+        directories,
+    )))
 }

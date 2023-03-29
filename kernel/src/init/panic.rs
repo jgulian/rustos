@@ -24,7 +24,9 @@ fn panic(panic_info: &PanicInfo) -> ! {
             kprintln!("LINE: {}", location.line());
             kprintln!("COL: {}", location.column());
         }
-        None => { kprintln!("unknown location"); }
+        None => {
+            kprintln!("unknown location");
+        }
     }
 
     kprintln!("");
@@ -35,7 +37,6 @@ fn panic(panic_info: &PanicInfo) -> ! {
         }
         None => {}
     }
-
 
     loop {}
 }

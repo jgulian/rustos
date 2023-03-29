@@ -19,11 +19,11 @@ use core::ops::{Deref, DerefMut};
 use log::info;
 use shim::io;
 
-use shim::io::SeekFrom;
-use sync::Mutex;
 use crate::device::{BlockDevice, ByteDevice};
 use crate::filesystem::{Directory, Entry, File, Filesystem, Metadata};
 use crate::master_boot_record::PartitionEntry;
+use shim::io::SeekFrom;
+use sync::Mutex;
 
 use crate::path::Path;
 
@@ -40,9 +40,14 @@ pub struct VirtualFilesystem<M: Mutex<Mounts>> {
 
 impl<M: Mutex<Mounts>> VirtualFilesystem<M> {
     pub fn mount(&mut self, mount_point: Path, filesystem: Box<dyn Filesystem>) -> io::Result<()> {
-        self.mounts.lock(|mounts| {
-            mounts.0.push(Mount { mount_point, filesystem, });
-        }).map_err(|_| io::Error::from(io::ErrorKind::Other))
+        self.mounts
+            .lock(|mounts| {
+                mounts.0.push(Mount {
+                    mount_point,
+                    filesystem,
+                });
+            })
+            .map_err(|_| io::Error::from(io::ErrorKind::Other))
     }
 }
 
@@ -62,7 +67,10 @@ impl<M: Mutex<Mounts> + 'static> Filesystem for VirtualFilesystem<M> {
         }))
     }
 
-    fn format(_: &mut dyn BlockDevice, _: &mut PartitionEntry, _: usize) -> io::Result<()> where Self: Sized {
+    fn format(_: &mut dyn BlockDevice, _: &mut PartitionEntry, _: usize) -> io::Result<()>
+    where
+        Self: Sized,
+    {
         Err(io::Error::from(io::ErrorKind::Unsupported))
     }
 }
@@ -77,31 +85,41 @@ impl<M: Mutex<Mounts> + 'static> Directory for VFSDirectory<M> {
         let mut new_path = self.path.clone();
         new_path.join_str(name)?;
 
-        self.mounts.lock(|mounts| {
-            mounts.0.iter_mut()
-                .filter(|mount| mount.mount_point.starts_with(&self.path))
-                .find_map(|mount| -> Option<Entry> {
-                    if mount.mount_point == self.path {
-                        mount.filesystem.root().ok()?.open_entry(name).ok()
-                    } else if mount.mount_point.starts_with(&new_path) {
-                        Some(Entry::Directory(Box::new(VFSDirectory {
-                            path: new_path.clone(),
-                            mounts: self.mounts.clone(),
-                        })))
-                    } else {
-                        None
-                    }
-                }).ok_or(io::Error::from(io::ErrorKind::NotFound))
-        }).map_err(|_| io::Error::from(io::ErrorKind::Other))?
+        self.mounts
+            .lock(|mounts| {
+                mounts
+                    .0
+                    .iter_mut()
+                    .filter(|mount| mount.mount_point.starts_with(&self.path))
+                    .find_map(|mount| -> Option<Entry> {
+                        if mount.mount_point == self.path {
+                            mount.filesystem.root().ok()?.open_entry(name).ok()
+                        } else if mount.mount_point.starts_with(&new_path) {
+                            Some(Entry::Directory(Box::new(VFSDirectory {
+                                path: new_path.clone(),
+                                mounts: self.mounts.clone(),
+                            })))
+                        } else {
+                            None
+                        }
+                    })
+                    .ok_or(io::Error::from(io::ErrorKind::NotFound))
+            })
+            .map_err(|_| io::Error::from(io::ErrorKind::Other))?
     }
 
     fn create_file(&mut self, name: &str) -> io::Result<()> {
-        self.mounts.lock(|mounts| {
-            mounts.0.iter_mut()
-                .filter(|mount| mount.mount_point == self.path)
-                .next().map(|mount| mount.filesystem.root()?.create_file(name))
-                .unwrap_or(Err(io::Error::from(io::ErrorKind::Unsupported)))
-        }).map_err(|_| io::Error::from(io::ErrorKind::Other))?
+        self.mounts
+            .lock(|mounts| {
+                mounts
+                    .0
+                    .iter_mut()
+                    .filter(|mount| mount.mount_point == self.path)
+                    .next()
+                    .map(|mount| mount.filesystem.root()?.create_file(name))
+                    .unwrap_or(Err(io::Error::from(io::ErrorKind::Unsupported)))
+            })
+            .map_err(|_| io::Error::from(io::ErrorKind::Other))?
     }
 
     fn create_directory(&mut self, _: &str) -> io::Result<()> {
@@ -113,23 +131,30 @@ impl<M: Mutex<Mounts> + 'static> Directory for VFSDirectory<M> {
     }
 
     fn list(&mut self) -> io::Result<Vec<String>> {
-        self.mounts.deref().lock(|mounts| {
-            mounts.0.iter_mut()
-                .try_fold(Vec::new(), |mut result: Vec<String>, mount| {
-                    match self.path.relative_from(&mount.mount_point) {
-                        Some(sub_path) => {
-                            let entries = mount.filesystem.open(&sub_path)
-                                .and_then(|entry| entry.into_directory())
-                                .map(|mut directory| directory.list())
-                                .unwrap_or(Ok(Vec::new()))?;
-                            result.extend(entries.into_iter());
+        self.mounts
+            .deref()
+            .lock(|mounts| {
+                mounts
+                    .0
+                    .iter_mut()
+                    .try_fold(Vec::new(), |mut result: Vec<String>, mount| {
+                        match self.path.relative_from(&mount.mount_point) {
+                            Some(sub_path) => {
+                                let entries = mount
+                                    .filesystem
+                                    .open(&sub_path)
+                                    .and_then(|entry| entry.into_directory())
+                                    .map(|mut directory| directory.list())
+                                    .unwrap_or(Ok(Vec::new()))?;
+                                result.extend(entries.into_iter());
+                            }
+                            None => return Err(io::Error::from(io::ErrorKind::NotFound)),
                         }
-                        None => return Err(io::Error::from(io::ErrorKind::NotFound)),
-                    }
 
-                    Ok(result)
-                })
-        }).map_err(|_| io::Error::from(io::ErrorKind::Other))?
+                        Ok(result)
+                    })
+            })
+            .map_err(|_| io::Error::from(io::ErrorKind::Other))?
     }
 
     fn metadata(&mut self) -> io::Result<Box<dyn Metadata>> {
@@ -147,12 +172,24 @@ impl<Device: ByteDevice + Clone + Send + Sync + 'static> ByteDeviceFilesystem<De
     }
 }
 
-impl<Device: ByteDevice + Clone + Send + Sync + 'static> Filesystem for ByteDeviceFilesystem<Device> {
+impl<Device: ByteDevice + Clone + Send + Sync + 'static> Filesystem
+    for ByteDeviceFilesystem<Device>
+{
     fn root(&mut self) -> io::Result<Box<dyn Directory>> {
-        Ok(Box::new(ByteDeviceDirectory(self.0.clone(), self.1.clone())))
+        Ok(Box::new(ByteDeviceDirectory(
+            self.0.clone(),
+            self.1.clone(),
+        )))
     }
 
-    fn format(device: &mut dyn BlockDevice, partition: &mut PartitionEntry, sector_size: usize) -> io::Result<()> where Self: Sized {
+    fn format(
+        device: &mut dyn BlockDevice,
+        partition: &mut PartitionEntry,
+        sector_size: usize,
+    ) -> io::Result<()>
+    where
+        Self: Sized,
+    {
         todo!()
     }
 }

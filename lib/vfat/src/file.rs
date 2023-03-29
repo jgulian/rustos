@@ -1,18 +1,18 @@
+use crate::chain::Chain;
+use crate::directory::Directory;
+use crate::metadata::Metadata;
+use crate::virtual_fat::VirtualFat;
 #[cfg(feature = "no_std")]
 use alloc::boxed::Box;
 #[cfg(feature = "no_std")]
 use alloc::string::String;
 use log::info;
+use shim::io::{self, SeekFrom};
 #[cfg(not(feature = "no_std"))]
 use std::boxed::Box;
 #[cfg(not(feature = "no_std"))]
 use std::string::String;
-use shim::io::{self, SeekFrom};
 use sync::Mutex;
-use crate::chain::Chain;
-use crate::directory::Directory;
-use crate::metadata::Metadata;
-use crate::virtual_fat::VirtualFat;
 
 #[derive(Clone)]
 pub(crate) struct File<M: Mutex<VirtualFat>> {
@@ -49,7 +49,6 @@ impl<M: Mutex<VirtualFat>> io::Write for File<M> {
     }
 }
 
-
 impl<M: Mutex<VirtualFat>> io::Read for File<M> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.chain.read(buf)
@@ -77,7 +76,8 @@ impl<M: Mutex<VirtualFat>> io::Seek for File<M> {
 
 impl<M: Mutex<VirtualFat>> Drop for File<M> {
     fn drop(&mut self) {
-        self.directory.update_file_size(self.name.as_str(), self.file_size)
+        self.directory
+            .update_file_size(self.name.as_str(), self.file_size)
             .expect("unable to update file size");
     }
 }

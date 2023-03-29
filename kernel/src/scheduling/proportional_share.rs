@@ -1,16 +1,16 @@
+use crate::multiprocessing::per_core::local_irq;
+use crate::process::{Process, ProcessId, State};
+use crate::scheduling::scheduler::SchedulerResult;
+use crate::scheduling::{Scheduler, SwitchTrigger};
+use crate::traps::irq::IrqHandlerRegistry;
+use crate::traps::TrapFrame;
+use crate::SCHEDULER;
 use alloc::boxed::Box;
 use alloc::collections::BinaryHeap;
 use alloc::vec::Vec;
 use core::cmp::Ordering;
 use core::time::Duration;
 use pi::local_interrupt::{LocalController, LocalInterrupt};
-use crate::multiprocessing::per_core::local_irq;
-use crate::process::{Process, ProcessId, State};
-use crate::SCHEDULER;
-use crate::scheduling::{Scheduler, SwitchTrigger};
-use crate::scheduling::scheduler::SchedulerResult;
-use crate::traps::irq::IrqHandlerRegistry;
-use crate::traps::TrapFrame;
 
 pub struct ProportionalShareScheduler {
     processes: BinaryHeap<ProcessInformation>,
@@ -19,7 +19,10 @@ pub struct ProportionalShareScheduler {
 }
 
 impl Scheduler for ProportionalShareScheduler {
-    fn new() -> Self where Self: Sized {
+    fn new() -> Self
+    where
+        Self: Sized,
+    {
         Self {
             processes: BinaryHeap::default(),
             scheduler_latency: Duration::from_millis(48),
@@ -31,10 +34,14 @@ impl Scheduler for ProportionalShareScheduler {
         let mut controller = LocalController::new(core);
         controller.enable_local_timer();
 
-        local_irq().register(LocalInterrupt::CntPnsIrq, Box::new(|trap_frame| {
-            SCHEDULER.switch(trap_frame, SwitchTrigger::Timer, State::Ready)
-                .expect("failed to switch processes");
-        }));
+        local_irq().register(
+            LocalInterrupt::CntPnsIrq,
+            Box::new(|trap_frame| {
+                SCHEDULER
+                    .switch(trap_frame, SwitchTrigger::Timer, State::Ready)
+                    .expect("failed to switch processes");
+            }),
+        );
 
         Ok(())
     }
@@ -47,17 +54,25 @@ impl Scheduler for ProportionalShareScheduler {
         todo!()
     }
 
-    fn switch(&mut self, trap_frame: &mut TrapFrame, trigger: SwitchTrigger, state: State) -> SchedulerResult<()> {
+    fn switch(
+        &mut self,
+        trap_frame: &mut TrapFrame,
+        trigger: SwitchTrigger,
+        state: State,
+    ) -> SchedulerResult<()> {
         todo!()
     }
 
     fn schedule_in(&mut self, trap_frame: &mut TrapFrame) -> SchedulerResult<ProcessId> {
-
         //local_tick_in(core, TICK);
         todo!()
     }
 
-    fn on_process<F, R>(&mut self, trap_frame: &mut TrapFrame, function: F) -> SchedulerResult<R> where F: FnOnce(&mut Process) -> R, Self: Sized {
+    fn on_process<F, R>(&mut self, trap_frame: &mut TrapFrame, function: F) -> SchedulerResult<R>
+    where
+        F: FnOnce(&mut Process) -> R,
+        Self: Sized,
+    {
         todo!()
     }
 }

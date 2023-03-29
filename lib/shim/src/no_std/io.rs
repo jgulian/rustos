@@ -3,8 +3,8 @@ use alloc::boxed::Box;
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 
-use core::{cmp, result};
 use core::fmt::{Debug, Formatter};
+use core::{cmp, result};
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum ErrorKind {
@@ -57,17 +57,11 @@ pub struct Error {
 
 impl Error {
     pub fn new(kind: ErrorKind, repr: &'static str) -> Error {
-        Error {
-            kind,
-            repr,
-        }
+        Error { kind, repr }
     }
 
     pub fn from(kind: ErrorKind) -> Error {
-        Error {
-            kind,
-            repr: "",
-        }
+        Error { kind, repr: "" }
     }
 
     pub fn kind(&self) -> ErrorKind {
@@ -115,9 +109,7 @@ pub trait Read {
         let mut i = 0;
         while i < buf.len() {
             match self.read(&mut buf[i..]) {
-                Ok(0) => {
-                    Err(Error::from(ErrorKind::UnexpectedEof))
-                }
+                Ok(0) => Err(Error::from(ErrorKind::UnexpectedEof)),
                 Ok(n) => {
                     i += n;
                     Ok(())
@@ -184,20 +176,21 @@ pub struct Cursor<T> {
 
 impl<T> Cursor<T> {
     pub fn new(data: T) -> Self {
-        Self {
-            data,
-            position: 0,
-        }
+        Self { data, position: 0 }
     }
 }
 
-impl<T> Seek for Cursor<T> where T: AsRef<[u8]> {
+impl<T> Seek for Cursor<T>
+where
+    T: AsRef<[u8]>,
+{
     fn seek(&mut self, pos: SeekFrom) -> Result<u64> {
         let new_position = match pos {
             SeekFrom::Start(n) => Some(n as i64),
             SeekFrom::End(n) => (self.data.as_ref().len() as i64).checked_sub(n),
             SeekFrom::Current(n) => (self.position as i64).checked_add(n),
-        }.ok_or(Error::from(ErrorKind::InvalidInput))?;
+        }
+        .ok_or(Error::from(ErrorKind::InvalidInput))?;
 
         if new_position < 0 || self.data.as_ref().len() <= new_position as usize {
             Err(Error::from(ErrorKind::InvalidInput))

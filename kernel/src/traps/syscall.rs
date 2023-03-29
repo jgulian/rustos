@@ -3,16 +3,16 @@ use alloc::string::{String, ToString};
 use alloc::vec;
 use core::time::Duration;
 
-use kernel_api::*;
 use kernel_api::OsError::BadAddress;
+use kernel_api::*;
 use pi::timer;
 
-use crate::{SCHEDULER};
 use crate::memory::VirtualAddress;
 use crate::param::{PAGE_SIZE, USER_IMG_BASE};
 use crate::process::{ResourceId, State};
 use crate::scheduling::SwitchTrigger;
 use crate::traps::TrapFrame;
+use crate::SCHEDULER;
 
 /// Sleep for `ms` milliseconds.
 ///
@@ -30,7 +30,10 @@ pub fn sys_sleep(trap_frame: &mut TrapFrame) -> OsResult<()> {
     let waiting = State::Waiting(Box::new(move |process| {
         let current_time = timer::current_time();
         let passed = sleep_until < current_time;
-        info!("checking {:?} < {:?}, {}", sleep_until, current_time, passed);
+        info!(
+            "checking {:?} < {:?}, {}",
+            sleep_until, current_time, passed
+        );
         if passed {
             let millis: u64 = (current_time - started).as_millis() as u64;
             process.context.xs[0] = millis;
@@ -75,9 +78,9 @@ pub fn sys_open(tf: &mut TrapFrame) -> OsResult<()> {
     copy_from_userspace(tf, ptr, buffer.as_mut_slice())?;
     let path = String::from_utf8_lossy(buffer.as_slice()).to_string();
 
-    tf.xs[0] = SCHEDULER.on_process(tf, |process| {
-        process.open(path)
-    })??.into();
+    tf.xs[0] = SCHEDULER
+        .on_process(tf, |process| process.open(path))??
+        .into();
 
     Ok(())
 }
@@ -124,9 +127,7 @@ pub fn sys_write(tf: &mut TrapFrame) -> OsResult<()> {
 }
 
 fn sys_pipe(tf: &mut TrapFrame) -> OsResult<()> {
-    let (ingress, egress) = SCHEDULER.on_process(tf, |process| {
-        process.pipe()
-    })??;
+    let (ingress, egress) = SCHEDULER.on_process(tf, |process| process.pipe())??;
 
     tf.xs[0] = ingress.into();
     tf.xs[1] = egress.into();
@@ -156,10 +157,15 @@ pub fn sys_sbrk(tf: &mut TrapFrame) -> OsResult<()> {
     let result = SCHEDULER.on_process(tf, |process| -> OsResult<(u64, u64)> {
         //TODO: pick a better heap base / allow more sbrks / something might be wrong with is_valid
         let mut heap_base = USER_IMG_BASE + PAGE_SIZE;
-        while process.vmap.is_valid(VirtualAddress::from(heap_base - USER_IMG_BASE)) {
+        while process
+            .vmap
+            .is_valid(VirtualAddress::from(heap_base - USER_IMG_BASE))
+        {
             heap_base += PAGE_SIZE;
         }
-        process.vmap.alloc(VirtualAddress::from(heap_base), PagePermissions::RW);
+        process
+            .vmap
+            .alloc(VirtualAddress::from(heap_base), PagePermissions::RW);
         Ok((heap_base as u64, PAGE_SIZE as u64))
     })??;
 
@@ -173,9 +179,7 @@ fn sys_duplicate(tf: &mut TrapFrame) -> OsResult<()> {
     let descriptor = ResourceId::from(tf.xs[0]);
     let new_descriptor = ResourceId::from(tf.xs[1]);
 
-    SCHEDULER.on_process(tf, |process| {
-        process.duplicate(descriptor, new_descriptor)
-    })??;
+    SCHEDULER.on_process(tf, |process| process.duplicate(descriptor, new_descriptor))??;
 
     Ok(())
 }
@@ -185,9 +189,7 @@ fn sys_seek(_tf: &mut TrapFrame) -> OsResult<()> {
 }
 
 fn sys_fork(trap_frame: &mut TrapFrame) -> OsResult<()> {
-    let process = SCHEDULER.on_process(trap_frame, |process| {
-        process.fork()
-    })??;
+    let process = SCHEDULER.on_process(trap_frame, |process| process.fork())??;
     let process_id = SCHEDULER.add(process)?;
 
     trap_frame.xs[0] = process_id.into();
@@ -203,8 +205,9 @@ fn sys_execute(tf: &mut TrapFrame) -> OsResult<()> {
     copy_from_userspace(tf, tf.xs[0], arguments.as_mut_slice())?;
     copy_from_userspace(tf, tf.xs[2], environment.as_mut_slice())?;
 
-    SCHEDULER.on_process(tf, |process|
-        process.execute(arguments.as_slice(), environment.as_slice()))??;
+    SCHEDULER.on_process(tf, |process| {
+        process.execute(arguments.as_slice(), environment.as_slice())
+    })??;
     Ok(())
 }
 
@@ -212,19 +215,23 @@ fn sys_wait(trap_frame: &mut TrapFrame) -> OsResult<()> {
     let use_timeout = trap_frame.xs[1] == 1;
     let timeout_end = pi::timer::current_time() + Duration::from_millis(trap_frame.xs[2]);
 
-    SCHEDULER.switch(trap_frame, SwitchTrigger::Force, State::Waiting(Box::new(move |process| {
-        if let Some(id) = process.dead_children.pop() {
-            process.context.xs[0] = id.into();
-            process.context.xs[1] = 0;
-            true
-        } else if use_timeout &&  timeout_end < timer::current_time() {
-            process.context.xs[0] = 0;
-            process.context.xs[1] = 1;
-            true
-        } else {
-            false
-        }
-    })))?;
+    SCHEDULER.switch(
+        trap_frame,
+        SwitchTrigger::Force,
+        State::Waiting(Box::new(move |process| {
+            if let Some(id) = process.dead_children.pop() {
+                process.context.xs[0] = id.into();
+                process.context.xs[1] = 0;
+                true
+            } else if use_timeout && timeout_end < timer::current_time() {
+                process.context.xs[0] = 0;
+                process.context.xs[1] = 1;
+                true
+            } else {
+                false
+            }
+        })),
+    )?;
 
     Ok(())
 }
@@ -274,7 +281,7 @@ fn syscall_to_function(call: Syscall) -> fn(tf: &mut TrapFrame) -> OsResult<()> 
         Syscall::Sbrk => sys_sbrk,
         Syscall::Sleep => sys_sleep,
         Syscall::Time => sys_time,
-        Syscall::Unknown => |_| Err(OsError::Unknown)
+        Syscall::Unknown => |_| Err(OsError::Unknown),
     }
 }
 
@@ -283,6 +290,6 @@ pub fn handle_syscall(num: u16, trap_frame: &mut TrapFrame) {
     let result = syscall_to_function(call)(trap_frame);
     trap_frame.xs[7] = match result {
         Ok(_) => 1,
-        Err(err) => err as u64
+        Err(err) => err as u64,
     }
 }

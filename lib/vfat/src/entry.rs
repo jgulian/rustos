@@ -1,19 +1,19 @@
+use crate::cluster::Cluster;
+use crate::entry::EntryAttribute::LongFileName;
+use crate::metadata::Metadata;
 #[cfg(feature = "no_std")]
 use alloc::string::String;
 #[cfg(feature = "no_std")]
 use alloc::vec::Vec;
 use core::char::TryFromCharError;
+use format::Format;
 use log::info;
+use shim::io;
+use shim::io::{Read, Seek, Write};
 #[cfg(not(feature = "no_std"))]
 use std::string::String;
 #[cfg(not(feature = "no_std"))]
 use std::vec::Vec;
-use shim::io::{Read, Seek, Write};
-use format::Format;
-use shim::io;
-use crate::cluster::Cluster;
-use crate::entry::EntryAttribute::LongFileName;
-use crate::metadata::Metadata;
 
 pub(crate) enum EntryAttribute {
     ReadOnly = 0x01,
@@ -62,7 +62,10 @@ impl RegularDirectoryEntry {
 
     pub(crate) fn update_file_size(&mut self, file_size: u32) -> io::Result<()> {
         if self.attributes & EntryAttribute::Directory as u8 > 0 {
-            return Err(io::Error::new(io::ErrorKind::Unsupported, "can't set size on directory"));
+            return Err(io::Error::new(
+                io::ErrorKind::Unsupported,
+                "can't set size on directory",
+            ));
         }
 
         self.file_size = file_size;
@@ -71,7 +74,7 @@ impl RegularDirectoryEntry {
 
     fn copy_in_name(&mut self, name: &str) {
         let (mut i, mut in_extension) = (0, false);
-        name.chars().for_each(|mut c|{
+        name.chars().for_each(|mut c| {
             if c == '.' {
                 if in_extension {
                     self.extension = [0; 3];
@@ -107,7 +110,6 @@ impl RegularDirectoryEntry {
                 }
             }
         })
-
     }
 }
 
@@ -140,7 +142,8 @@ impl LongFileNameEntry {
         let mut buffer = [0u8; 26];
         (&mut buffer[..name.len()]).copy_from_slice(name);
         let vec_u16: Vec<u16> = String::from_utf8_lossy(&buffer).encode_utf16().collect();
-        let vec_u8: Vec<u8> = vec_u16.iter()
+        let vec_u8: Vec<u8> = vec_u16
+            .iter()
             .flat_map(|d| [(d & 0xFF) as u8, (d >> 8 & 0xFF) as u8])
             .collect();
         let slice = vec_u8.as_slice();
@@ -201,7 +204,10 @@ impl format::Format for DirectoryEntry {
     }
 }
 
-pub(crate) fn parse_name(long_file_names: &mut Vec<LongFileNameEntry>, regular: &RegularDirectoryEntry) -> String {
+pub(crate) fn parse_name(
+    long_file_names: &mut Vec<LongFileNameEntry>,
+    regular: &RegularDirectoryEntry,
+) -> String {
     if long_file_names.is_empty() {
         let mut result = String::new();
         for c in regular.name.iter() {
@@ -223,8 +229,7 @@ pub(crate) fn parse_name(long_file_names: &mut Vec<LongFileNameEntry>, regular: 
         }
         result
     } else {
-        long_file_names.sort_by(|a, b|
-            (a.order & 0b11111).cmp(&(b.order & 0b11111)));
+        long_file_names.sort_by(|a, b| (a.order & 0b11111).cmp(&(b.order & 0b11111)));
 
         let mut bytes = Vec::<u8>::new();
         for long_file_name in long_file_names.iter() {
@@ -247,8 +252,8 @@ pub(crate) fn parse_name(long_file_names: &mut Vec<LongFileNameEntry>, regular: 
 }
 
 pub(crate) fn parse_entry(regular_entry: &RegularDirectoryEntry) -> (u32, Metadata, Option<u32>) {
-    let starting_cluster = ((regular_entry.first_cluster_high as u32) << 16) |
-        (regular_entry.first_cluster_low as u32);
+    let starting_cluster = ((regular_entry.first_cluster_high as u32) << 16)
+        | (regular_entry.first_cluster_low as u32);
 
     let metadata = Metadata {
         attributes: regular_entry.attributes,
@@ -265,9 +270,12 @@ pub(crate) fn parse_entry(regular_entry: &RegularDirectoryEntry) -> (u32, Metada
 }
 
 pub(crate) fn create_long_file_name_entries(name: &str) -> Vec<LongFileNameEntry> {
-    let buffer: Vec<u8> = String::from(name).encode_utf16()
-        .flat_map(|d| [(d & 0xFF) as u8, (d >> 8 & 0xFF) as u8]).collect();
-    buffer.chunks(26)
+    let buffer: Vec<u8> = String::from(name)
+        .encode_utf16()
+        .flat_map(|d| [(d & 0xFF) as u8, (d >> 8 & 0xFF) as u8])
+        .collect();
+    buffer
+        .chunks(26)
         .enumerate()
         .map(|(i, chunk)| {
             let mut result = LongFileNameEntry {
@@ -282,12 +290,15 @@ pub(crate) fn create_long_file_name_entries(name: &str) -> Vec<LongFileNameEntry
             };
 
             //TODO: this doesn't feel perf
-            result.name_one.iter_mut()
+            result
+                .name_one
+                .iter_mut()
                 .chain(result.name_two.iter_mut())
                 .chain(result.name_three.iter_mut())
                 .zip(chunk.into_iter())
                 .for_each(|(target, source)| *target = *source);
 
             result
-        }).collect()
+        })
+        .collect()
 }

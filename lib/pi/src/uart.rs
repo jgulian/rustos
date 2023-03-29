@@ -1,11 +1,10 @@
 use core::fmt;
 use core::time::Duration;
 
-
 use shim::io;
 use shim::ioerr;
-use volatile::{Reserved, Volatile};
 use volatile::prelude::*;
+use volatile::{Reserved, Volatile};
 
 use crate::common::IO_BASE;
 use crate::gpio::{Function, Gpio};

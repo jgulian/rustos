@@ -1,5 +1,4 @@
 #![no_std]
-
 #![feature(asm_const)]
 
 use shim::io;
