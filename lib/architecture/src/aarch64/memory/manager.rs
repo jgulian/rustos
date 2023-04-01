@@ -1,8 +1,11 @@
 use core::arch::asm;
+use core::cmp::min;
 use core::sync::atomic::Ordering;
 use aarch64::{ID_AA64MMFR0_EL1, isb, MAIR_EL1, TCR_EL1};
-use crate::aarch64::memory::attributes::DescriptorAttributes;
+use crate::aarch64::memory::attributes::{AccessPermissions, DescriptorAttributes, EntryAttributes, Shareability};
 use crate::aarch64::memory::page_table::{GranuleSize, TableDescriptor, TranslationTable};
+use crate::aarch64::memory::table_entry::TableDescriptor;
+use crate::aarch64::memory::translation_table::TranslationTable;
 use crate::primitives;
 
 const GRANULE_SIZE: GranuleSize = GranuleSize::Kb4;
@@ -52,17 +55,57 @@ impl primitives::MemoryManager for Aarch64Memory {
         }
         isb();
 
+        let kernel_memory_table_pages = EntryAttributes::default()
+            .validate()
+            .table()
+            .access_flag(true)
+            .mair_index(0)
+            .access_permissions(AccessPermissions::ReadWrite)
+            .shareability(Shareability::InnerSharable);
+        let kernel_memory_data_pages = kernel_memory_table_pages.block();
+
         let level_0_translation_table = TranslationTable::new(GRANULE_SIZE);
 
+        let granule_table_len = level_0_translation_table.len();
+        let memory_limit = 0x3c_000_000;
+        let level_two_page_size = 0x200_000;
+        let level_2_translation_table_count = memory_limit / level_two_page_size;
+        let level_1_translation_table_count: usize = level_2_translation_table_count / granule_table_len;
+
+        for i in 0..level_1_translation_table_count {
+            let is_last = i == level_1_translation_table_count - 1;
+            let specific_level_1_count = if !is_last { granule_table_len } else { level_2_translation_table_count % granule_table_len };
+            let mut level_1_translation_table = TranslationTable::new(GRANULE_SIZE);
+
+            for j in 0..specific_level_1_count {
+                let entry = level_1_translation_table.entry(j)
+                    .expect("unable to get entry from level 1 table");
+                let location = (i * granule_table_len + j) * level_two_page_size;
+                entry.update(kernel_memory_data_pages, TableDescriptor::Transparent {
+                    address: location as u64,
+                    length: level_two_page_size as u64,
+                });
+            }
+
+
+        }
+
+
         let mut level_1_translation_table = TranslationTable::new(GRANULE_SIZE);
+        let level_2_translation_table_count
+
+        (0..)
+        .skip(0x200_000)
+
+
         for i in 0..level_1_translation_table.len() {
             let entry = level_1_translation_table.entry(i).unwrap();
-            entry.update(TableDescriptor::Transparent {
-                address: 0,
-                length: 0,
-                attributes: DescriptorAttributes {},
+            entry.update(kernel_memory_pages, TableDescriptor::Transparent {
+                address: (0x40_000_000 * i) as u64,
+                length: 0x40_000_000,
             });
         }
+
 
         let baddr = self.kern_pt_addr.load(Ordering::Relaxed);
 

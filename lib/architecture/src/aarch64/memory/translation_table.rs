@@ -4,13 +4,14 @@ use crate::aarch64::memory::allocation::{
     DataBlockRaw, TranslationTable16Kb, TranslationTable4Kb, TranslationTable64Kb,
     TranslationTableRaw,
 };
-use crate::aarch64::memory::attributes::DescriptorAttributes;
 use crate::primitives::memory::{VirtualMemoryError, VirtualMemoryResult};
 
-use core::sync::atomic::{AtomicUsize, Ordering};
-use alloc::sync::Arc;
+
+
 use alloc::vec::Vec;
-use core::ops::{Index, IndexMut};
+use core::ops::IndexMut;
+use crate::aarch64::memory::attributes::EntryAttributes;
+use crate::aarch64::memory::table_entry::{TableDescriptor, TranslationTableEntry};
 
 pub(super) struct TranslationTable {
     translation_table: TranslationTableRaw,
@@ -67,41 +68,18 @@ impl TranslationTable {
             .find_map(|(i, (entry_index, _))| if *entry_index == index { Some(i) } else { None });
 
         Ok(match entry_index {
-            None => TranslationTableEntry::Vacant(TranslationTableVacantEntry(index, raw_entry, &mut self.table_descriptors)),
-            Some(index) => TranslationTableEntry::Occupied(TranslationTableOccupiedEntry(index, raw_entry, &mut self.table_descriptors, index)),
+            None => TranslationTableEntry::new_vacant(index, raw_entry, &mut self.table_descriptors),
+            Some(descriptor_index) => TranslationTableEntry::new_occupied(index, raw_entry, &mut self.table_descriptors, descriptor_index),
         })
     }
-}
 
-pub(super) enum TranslationTableEntry<'a> {
-    Occupied(TranslationTableOccupiedEntry<'a>),
-    Vacant(TranslationTableVacantEntry<'a>),
-}
-
-impl<'a> TranslationTableEntry<'a> {
-    pub(super) fn update(self, table_descriptor: TableDescriptor) -> Self {
-        match self {
-            TranslationTableEntry::Occupied(occupied_entry) => {
-                *occupied_entry.1 = table_descriptor.value();
-                occupied_entry.2[occupied_entry.3] = (occupied_entry.0, table_descriptor);
-                TranslationTableEntry::Occupied(occupied_entry)
-            }
-            TranslationTableEntry::Vacant(vacant_entry) => {
-                *vacant_entry.1 = table_descriptor.value();
-                let descriptor_index = vacant_entry.2.len();
-                vacant_entry.2.push((vacant_entry.0, table_descriptor));
-                TranslationTableEntry::Occupied(TranslationTableOccupiedEntry(
-                    vacant_entry.0,
-                    vacant_entry.1,
-                    vacant_entry.2,
-                    descriptor_index,
-                ))
-            }
-        }
+    pub(super) fn allocate_region<F, R>(&mut self, first_block: usize, block_count: usize, attributes: EntryAttributes) -> VirtualMemoryResult<()>
+    where F: FnMut(u64) -> R {
+        Ok(())
     }
 }
 
-struct DataBlock {
+pub(super) struct DataBlock {
     data_block: DataBlockRaw,
 }
 
