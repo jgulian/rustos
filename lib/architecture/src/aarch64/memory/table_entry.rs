@@ -5,57 +5,6 @@ use crate::aarch64::memory::attributes::EntryAttributes;
 
 use crate::aarch64::memory::translation_table::{DataBlock, TranslationTable};
 
-pub(super) enum TranslationTableEntry<'a> {
-    Occupied(TranslationTableOccupiedEntry<'a>),
-    Vacant(TranslationTableVacantEntry<'a>),
-}
-
-impl<'a> TranslationTableEntry<'a> {
-    pub(super) fn new_occupied(index: usize, raw_entry: &mut u64, table_descriptors: &mut Vec<(usize, TableDescriptor)>, descriptor_index: usize) -> Self {
-        Self::Occupied(TranslationTableOccupiedEntry(
-            index,
-            raw_entry,
-            table_descriptors,
-            descriptor_index,
-        ))
-    }
-
-    pub(super) fn new_vacant(index: usize, raw_entry: &mut u64, table_descriptors: &mut Vec<(usize, TableDescriptor)>) -> Self {
-        Self::Vacant(TranslationTableVacantEntry(
-            index,
-            raw_entry,
-            table_descriptors,
-        ))
-    }
-
-    pub(super) fn update(self, attributes: EntryAttributes, table_descriptor: TableDescriptor) -> Self {
-        let attributes_with_address = table_descriptor.update_attributes(attributes);
-        match self {
-            TranslationTableEntry::Occupied(occupied_entry) => {
-                *occupied_entry.1 = attributes_with_address.value();
-                occupied_entry.2[occupied_entry.3] = (occupied_entry.0, table_descriptor);
-                TranslationTableEntry::Occupied(occupied_entry)
-            }
-            TranslationTableEntry::Vacant(vacant_entry) => {
-                *vacant_entry.1 = attributes_with_address.value();
-                let descriptor_index = vacant_entry.2.len();
-                vacant_entry.2.push((vacant_entry.0, table_descriptor));
-                TranslationTableEntry::Occupied(TranslationTableOccupiedEntry(
-                    vacant_entry.0,
-                    vacant_entry.1,
-                    vacant_entry.2,
-                    descriptor_index,
-                ))
-            }
-        }
-    }
-}
-
-struct TranslationTableOccupiedEntry<'a>(usize, &'a mut u64, &'a mut Vec<(usize, TableDescriptor)>, usize);
-
-struct TranslationTableVacantEntry<'a>(usize, &'a mut u64, &'a mut Vec<(usize, TableDescriptor)>);
-
-
 pub(super) enum TableDescriptor {
     Block {
         data_block: Arc<DataBlock>,

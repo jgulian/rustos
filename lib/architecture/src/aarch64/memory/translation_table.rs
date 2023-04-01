@@ -1,4 +1,5 @@
 use alloc::boxed::Box;
+use alloc::sync::Arc;
 use crate::aarch64::memory::allocation::{
     DataBlock16Kb, DataBlock2Mb, DataBlock32Mb, DataBlock4Kb, DataBlock512Mb, DataBlock64Kb,
     DataBlockRaw, TranslationTable16Kb, TranslationTable4Kb, TranslationTable64Kb,
@@ -6,20 +7,21 @@ use crate::aarch64::memory::allocation::{
 };
 use crate::primitives::memory::{VirtualMemoryError, VirtualMemoryResult};
 
-
-
 use alloc::vec::Vec;
-use core::ops::IndexMut;
+use core::cmp;
+
 use crate::aarch64::memory::attributes::EntryAttributes;
-use crate::aarch64::memory::table_entry::{TableDescriptor, TranslationTableEntry};
+use crate::aarch64::memory::table_entry::TableDescriptor;
 
 pub(super) struct TranslationTable {
+    granule_size: GranuleSize,
+    translation_level: usize,
     translation_table: TranslationTableRaw,
     table_descriptors: Vec<(usize, TableDescriptor)>,
 }
 
 impl TranslationTable {
-    pub(super) fn new(granule_size: GranuleSize) -> Self {
+    pub(super) fn root(granule_size: GranuleSize) -> Self {
         let translation_table = match granule_size {
             GranuleSize::Kb4 => TranslationTableRaw::Kb4(Box::new(TranslationTable4Kb::default())),
             GranuleSize::Kb16 => {
@@ -31,51 +33,107 @@ impl TranslationTable {
         };
 
         TranslationTable {
+            granule_size,
+            translation_level: 0,
             translation_table,
             table_descriptors: Vec::new(),
         }
     }
 
-    pub(super) fn insert(&mut self, offset: usize, table_descriptor: TableDescriptor) -> VirtualMemoryResult<()> {}
-
-    pub(super) fn remove(&mut self, offset: usize) -> VirtualMemoryResult<()> {}
-
-    pub(super) fn len(&self) -> usize {
-        match self.translation_table {
-            TranslationTableRaw::Kb4(_) => TranslationTable4Kb::len(),
-            TranslationTableRaw::Kb16(_) => TranslationTable16Kb::len(),
-            TranslationTableRaw::Kb64(_) => TranslationTable64Kb::len(),
-        }
+    pub(super) fn allocate_region<F>(&mut self, region_start: usize, region_size: usize, attributes: EntryAttributes, function: F) -> VirtualMemoryResult<()>
+        where F: FnMut(u64, u64) -> TableDescriptor {
+        self.allocate_region_offset(region_start, region_size, 0, attributes, function)
     }
 
-    pub(super) fn entry<'a>(&mut self, index: usize) -> VirtualMemoryResult<TranslationTableEntry<'a>> {
-        if self.len() <= index {
-            return Err(VirtualMemoryError::DescriptorOutOfBounds);
+    fn allocate_region_offset<F>(&mut self, region_start: usize, region_size: usize, offset: usize, attributes: EntryAttributes, function: F) -> VirtualMemoryResult<()>
+        where F: FnMut(u64, u64) -> TableDescriptor {
+        if !self.is_region_free(region_start, region_size)? {
+            return Err(VirtualMemoryError::AlreadyAllocated);
         }
 
-        let raw_entry = match &mut self.translation_table {
-            TranslationTableRaw::Kb4(table) =>
-                table.index_mut(index),
-            TranslationTableRaw::Kb16(table) =>
-                table.index_mut(index),
-            TranslationTableRaw::Kb64(table) =>
-                table.index_mut(index),
-        };
+        let block_size = block_sizes_in_granule(self.granule_size)[self.translation_level] as usize;
+        let first_index = region_start / block_size;
+        let block_count = region_size / block_size;
+        //TODO: make atomic
+        (0..block_count).try_for_each(|i| {
+            let index = first_index + i;
+            let sub_region_start = if i == 0 { region_start % block_size } else { 0 };
+            let sub_region_size = cmp::min(block_size - sub_region_start, region_size - block_size * i);
 
-        let entry_index = self.table_descriptors
-            .iter()
-            .enumerate()
-            .find_map(|(i, (entry_index, _))| if *entry_index == index { Some(i) } else { None });
+            let descriptor = match self.get(index) {
+                None => {
+                    return self.allocate_sub_region(index, sub_region_start, sub_region_size, block_size);
+                }
+                Some(descriptor) => descriptor,
+            };
 
-        Ok(match entry_index {
-            None => TranslationTableEntry::new_vacant(index, raw_entry, &mut self.table_descriptors),
-            Some(descriptor_index) => TranslationTableEntry::new_occupied(index, raw_entry, &mut self.table_descriptors, descriptor_index),
+            match descriptor {
+                TableDescriptor::Table { translation_table, .. } =>
+                    translation_table.allocate_region_offset(first_sub_block, sub_region_size),
+                _ => return Err(VirtualMemoryError::AlreadyAllocated),
+            }
+
+            Ok(())
         })
     }
 
-    pub(super) fn allocate_region<F, R>(&mut self, first_block: usize, block_count: usize, attributes: EntryAttributes) -> VirtualMemoryResult<()>
-    where F: FnMut(u64) -> R {
+    fn allocate_sub_region(&mut self, index: usize, sub_region_start: usize, sub_region_size: usize, block_size: usize) -> VirtualMemoryResult<()> {
+        if sub_region_size == block_size {
+
+        } else {
+
+        }
+
         Ok(())
+    }
+
+
+    fn is_region_free(&self, region_start: usize, region_size: usize) -> VirtualMemoryResult<bool> {
+        let minimum_block_size = minimum_block_size(self.granule_size) as usize;
+        if region_start % minimum_block_size != 0 || region_size % minimum_block_size != 0 {
+            return Err(VirtualMemoryError::NotPageAligned)
+        }
+
+        let block_size = block_sizes_in_granule(self.granule_size)[self.translation_level] as usize;
+        let first_index = region_start / block_size;
+        let block_count = region_size / block_size;
+        (0..block_count).try_fold(true, |ok, i| {
+            if !ok {
+                return Ok(false);
+            }
+
+            let descriptor = match self.get(first_index + i) {
+                None => return Ok(true),
+                Some(descriptor) => descriptor
+            };
+
+            let sub_region_start = if i == 0 { region_start % block_size } else { 0 };
+            let sub_region_size = cmp::min(block_size, region_size - block_size * i);
+
+            match descriptor {
+                TableDescriptor::Table { translation_table, .. } =>
+                    translation_table.is_region_free(sub_region_start, sub_region_size),
+                _ => return Ok(false),
+            }
+        })
+    }
+
+    fn get(&self, index: usize) -> Option<&TableDescriptor> {
+        self.table_descriptors.iter()
+            .find_map(|(i, table)| if *i == index { Some(table) } else { None })
+    }
+
+    fn get_mut(&mut self, index: usize) -> Option<&mut TableDescriptor> {
+        self.table_descriptors.iter_mut()
+            .find_map(|(i, table)| if *i == index { Some(table) } else { None })
+    }
+
+    pub(super) fn len(granule_size: GranuleSize) -> usize {
+        match granule_size {
+            GranuleSize::Kb4 => TranslationTable4Kb::len(),
+            GranuleSize::Kb16 => TranslationTable16Kb::len(),
+            GranuleSize::Kb64 => TranslationTable64Kb::len(),
+        }
     }
 }
 
@@ -110,4 +168,34 @@ pub(super) enum GranuleSize {
     Kb4 = 0b10,
     Kb16 = 0b01,
     Kb64 = 0b11,
+}
+
+fn block_sizes_in_granule(granule_size: GranuleSize) -> &'static [u64] {
+    match granule_size {
+        GranuleSize::Kb4 => &[0x40_000_000, 0x200_000, 0x1_000],
+        GranuleSize::Kb16 => &[0x2_000_000, 0x4_000],
+        GranuleSize::Kb64 => &[0x20_000_000, 0x10_000],
+    }
+}
+
+fn minimum_block_size(granule_size: GranuleSize) -> u64 {
+    match granule_size {
+        GranuleSize::Kb4 => 0x1_000,
+        GranuleSize::Kb16 => 0x4_000,
+        GranuleSize::Kb64 => 0x10_000,
+    }
+}
+
+fn get_alignment(mut address: u64) -> Option<usize> {
+    let i = 0;
+
+    while address != 0 {
+        if address == 1 {
+            return Some(i);
+        } else {
+            address >>= 1;
+        }
+    }
+
+    None
 }

@@ -37,6 +37,8 @@ pub enum VirtualMemoryError {
     AllocationFailed,
     DescriptorDoesNotExist,
     DescriptorOutOfBounds,
+    NotPageAligned,
+    AlreadyAllocated,
 }
 
 pub type VirtualMemoryResult<T> = Result<T, VirtualMemoryError>;
