@@ -74,7 +74,7 @@ impl GlobalScheduler {
                 panic!("scheduler already initialized");
             } else {
                 *scheduler = Some(SchedulerInformation {
-                    scheduler: Schedulers::RoundRobin(RoundRobinScheduler::new()),
+                    scheduler: Schedulers::ProportionalShare(ProportionalShareScheduler::new()),
                     last_process_id: None,
                 })
             }
@@ -97,7 +97,8 @@ impl GlobalScheduler {
         Ok(id)
     }
 
-    pub fn remove(&self, trap_frame: &mut TrapFrame) -> SchedulerResult<Process> {
+    #[deprecated]
+    fn remove(&self, trap_frame: &mut TrapFrame) -> SchedulerResult<Process> {
         self.0.lock(|scheduler| {
             scheduler
                 .as_mut()

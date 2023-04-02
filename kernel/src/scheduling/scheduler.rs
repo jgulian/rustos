@@ -29,6 +29,7 @@ pub trait Scheduler: Send {
     fn setup_core(&mut self, core: usize) -> SchedulerResult<()>;
 
     fn add(&mut self, process: Process) -> SchedulerResult<()>;
+    #[deprecated]
     fn remove(&mut self, trap_frame: &mut TrapFrame) -> SchedulerResult<Process>;
 
     fn switch(&mut self, trap_frame: &mut TrapFrame, trigger: SwitchTrigger, state: State) -> SchedulerResult<()>;
