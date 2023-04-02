@@ -45,7 +45,7 @@ mod multiprocessing;
 #[cfg_attr(not(test), global_allocator)]
 pub static ALLOCATOR: KernelAllocator = KernelAllocator::uninitialized();
 pub static FILESYSTEM: FileSystem = FileSystem::uninitialized();
-pub static SCHEDULER: GlobalScheduler<RoundRobinScheduler> = GlobalScheduler::uninitialized();
+pub static SCHEDULER: GlobalScheduler = GlobalScheduler::uninitialized();
 pub static VMM: VMManager = VMManager::uninitialized();
 pub static GLOABAL_IRQ: GlobalIrq = GlobalIrq::new();
 pub static FIQ: Fiq = Fiq::new();

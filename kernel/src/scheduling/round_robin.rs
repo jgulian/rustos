@@ -17,22 +17,6 @@ pub struct RoundRobinScheduler {
 }
 
 impl RoundRobinScheduler {
-    fn allocate_process_id(&mut self) -> Option<ProcessId> {
-        let next_id = match self.last_id {
-            None => ProcessId::from(0u64),
-            Some(pid) => {
-                if pid == ProcessId::from(u64::MAX) {
-                    return None;
-                }
-                let raw: u64 = pid.into();
-                ProcessId::from(raw + 1u64)
-            }
-        };
-
-        self.last_id = Some(next_id);
-        self.last_id
-    }
-
     /// Finds the currently running process, sets the current process's state
     /// to `new_state`, prepares the context switch on `tf` by saving `tf`
     /// into the current process, and push the current process back to the
@@ -80,15 +64,9 @@ impl Scheduler for RoundRobinScheduler {
         Ok(())
     }
 
-    fn add(&mut self, mut process: Process) -> SchedulerResult<ProcessId> {
-        let new_pid = self.allocate_process_id()
-            .ok_or(SchedulerError::FailedToAllocateProcessId)?;
-
-        process.context.tpidr = new_pid.into();
+    fn add(&mut self, process: Process) -> SchedulerResult<()> {
         self.processes.push_back(process);
-
-        self.last_id = Some(new_pid);
-        Ok(new_pid)
+        Ok(())
     }
 
     fn remove(&mut self, trap_frame: &mut TrapFrame) -> SchedulerResult<Process> {
