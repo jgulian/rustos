@@ -43,25 +43,6 @@ pub fn get_preemptive_counter() -> i64 {
     PER_CORE_DATA[cpu].preemption.load(Ordering::Relaxed)
 }
 
-/// Increases the preemption counter of this core and returns the current core number.
-pub fn getcpu() -> usize {
-    let cpu = aarch64::affinity();
-    PER_CORE_DATA[cpu]
-        .preemption
-        .fetch_add(1, Ordering::Relaxed);
-    cpu
-}
-
-/// Decreases the preemption counter of this core. This function asserts that
-/// `cpu` parameter matches the current core number.
-pub fn putcpu(cpu: usize) {
-    assert!(aarch64::affinity() == cpu, "Incorrect putcpu()");
-    let cnt = PER_CORE_DATA[cpu]
-        .preemption
-        .fetch_sub(1, Ordering::Relaxed);
-    assert!(cnt > 0, "Preemption count goes to negative!")
-}
-
 /// Returns true if MMU is initialized on the current core.
 pub fn is_mmu_ready() -> bool {
     let cpu = aarch64::affinity();

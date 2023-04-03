@@ -1,13 +1,12 @@
 #![feature(negative_impls)]
 #![feature(decl_macro)]
-
 #![no_std]
 
 use macros::*;
 pub use traits::*;
 
-mod traits;
 mod macros;
+mod traits;
 
 /// Reexports all of the traits in this crate.
 ///
@@ -57,7 +56,7 @@ ptr!(ReadVolatile, |self| &self.0);
 readable!(ReadVolatile, |self| &self.0);
 unsafe impl<T: Send> Send for ReadVolatile<T> {}
 
-impl<T> ! Sync for ReadVolatile<T> {}
+impl<T> !Sync for ReadVolatile<T> {}
 
 // Implementations for `Volatile`.
 ptr!(Volatile, |self| &self.0);
@@ -66,14 +65,14 @@ writeable!(Volatile, |self| &mut self.0);
 readable_writeable!(Volatile);
 unsafe impl<T: Send> Send for Volatile<T> {}
 
-impl<T> ! Sync for Volatile<T> {}
+impl<T> !Sync for Volatile<T> {}
 
 // Implementations for `WriteVolatile`.
 writeable!(WriteVolatile, |self| &mut self.0);
 ptr!(WriteVolatile, |self| &self.0);
 unsafe impl<T: Send> Send for WriteVolatile<T> {}
 
-impl<T> ! Sync for WriteVolatile<T> {}
+impl<T> !Sync for WriteVolatile<T> {}
 
 // Implementations for `Reserved`.
 ptr!(Reserved, |self| &self.0);
@@ -98,4 +97,8 @@ impl<T, R: Writeable<T>> Writeable<T> for Unique<R> {
 }
 
 impl<T, R: ReadableWriteable<T>> ReadableWriteable<T> for Unique<R>
-    where T: ::core::ops::BitAnd<Output=T>, T: ::core::ops::BitOr<Output=T> {}
+where
+    T: ::core::ops::BitAnd<Output = T>,
+    T: ::core::ops::BitOr<Output = T>,
+{
+}

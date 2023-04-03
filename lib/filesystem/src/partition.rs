@@ -1,9 +1,9 @@
 #[cfg(feature = "no_std")]
 use alloc::boxed::Box;
-use log::info;
+
+use shim::io;
 #[cfg(not(feature = "no_std"))]
 use std::boxed::Box;
-use shim::io;
 
 //TODO: this has a huge design flaw: i.e. it can't
 // handle more than one filesystem on the same device
@@ -24,11 +24,16 @@ pub struct BlockPartition {
 }
 
 impl BlockPartition {
-    pub fn new(mut device: Box<dyn BlockDevice + Send + Sync>, filesystem_id: u8) -> Result<Self, FilesystemError> {
+    pub fn new(
+        mut device: Box<dyn BlockDevice + Send + Sync>,
+        filesystem_id: u8,
+    ) -> Result<Self, FilesystemError> {
         let block_size = device.block_size() as u64;
         let master_boot_record = MasterBootRecord::try_from(&mut device)?;
 
-        let partition = *master_boot_record.partition_table.iter()
+        let partition = *master_boot_record
+            .partition_table
+            .iter()
             .find(|partition| partition.partition_type == filesystem_id)
             .ok_or(FilesystemError::BadSignature)?;
 
@@ -75,7 +80,8 @@ impl BlockDevice for BlockPartition {
             return Err(io::Error::from(io::ErrorKind::Unsupported));
         }
 
-        let physical_block = self.virtual_to_physical(block)
+        let physical_block = self
+            .virtual_to_physical(block)
             .ok_or(io::Error::from(io::ErrorKind::NotFound))?;
 
         data.chunks_mut(self.device.block_size())
@@ -96,7 +102,8 @@ impl BlockDevice for BlockPartition {
             return Err(io::Error::from(io::ErrorKind::Unsupported));
         }
 
-        let physical_block = self.virtual_to_physical(block)
+        let physical_block = self
+            .virtual_to_physical(block)
             .ok_or(io::Error::from(io::ErrorKind::NotFound))?;
 
         data.chunks(self.device.block_size())

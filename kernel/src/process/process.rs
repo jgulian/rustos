@@ -1,34 +1,34 @@
 use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
-use core::borrow::{Borrow};
+use core::borrow::Borrow;
 use core::mem;
 
 use core::slice::from_raw_parts;
 
-use aarch64;
+
 use aarch64::SPSR_EL1;
 use filesystem::filesystem::Filesystem;
 use filesystem::path::Path;
 use kernel_api::{OsError, OsResult};
+use shim::io::Write;
 use shim::{io, newioerr};
-use shim::io::{Write};
 
 use crate::{FILESYSTEM, VMM};
 
 use crate::memory::*;
 use crate::param::*;
-use crate::process::State;
 use crate::process::pipe::PipeResource;
 use crate::process::resource::{Resource, ResourceId, ResourceList};
+use crate::process::State;
 use crate::traps::TrapFrame;
 
 #[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]
 pub struct ProcessId(u64);
 
-impl Into<u64> for ProcessId {
-    fn into(self) -> u64 {
-        self.0
+impl From<ProcessId> for u64 {
+    fn from(val: ProcessId) -> Self {
+        val.0
     }
 }
 
@@ -101,12 +101,19 @@ impl Process {
     /// permission to load file's contents.
     fn do_load(pn: &Path) -> OsResult<Process> {
         let mut process = Process::new()?;
-        process.vmap.alloc(Process::get_stack_base(), PagePermissions::RW);
-        let user_image = process.vmap.alloc(Process::get_image_base(), PagePermissions::RWX);
+        process
+            .vmap
+            .alloc(Process::get_stack_base(), PagePermissions::RW);
+        let user_image = process
+            .vmap
+            .alloc(Process::get_image_base(), PagePermissions::RWX);
 
-        let mut file = FILESYSTEM.borrow().open(pn)
+        let mut file = FILESYSTEM
+            .borrow()
+            .open(pn)
             .map_err(|_| OsError::IoError)?
-            .into_file().map_err(|_| OsError::NoEntry)?;
+            .into_file()
+            .map_err(|_| OsError::NoEntry)?;
 
         let _amount_read = file.read(user_image).map_err(|_| OsError::IoError)?;
         Ok(process)
@@ -167,9 +174,11 @@ impl Process {
     //TODO: limit number of open files
     pub fn open(&mut self, path_name: String) -> OsResult<ResourceId> {
         let path = Path::try_from(path_name.as_str())?;
-        let file = FILESYSTEM.borrow()
+        let file = FILESYSTEM
+            .borrow()
             .open(&path)?
-            .into_file().map_err(|_| newioerr!(NotFound))?;
+            .into_file()
+            .map_err(|_| newioerr!(NotFound))?;
         Ok(self.resources.insert(Resource::File(file)))
     }
 
@@ -180,23 +189,19 @@ impl Process {
     //TODO: fix seek/clean and make write have the same semantics
     pub fn read(&mut self, id: ResourceId, buffer: &mut [u8]) -> OsResult<usize> {
         match self.resources.get(id)? {
-            Resource::File(ref mut file) => {
-                match file.read(buffer) {
-                    Ok(value) => Ok(value),
-                    Err(err) => Err(err.into())
-                }
-            }
+            Resource::File(ref mut file) => match file.read(buffer) {
+                Ok(value) => Ok(value),
+                Err(err) => Err(err.into()),
+            },
         }
     }
 
     pub fn write(&mut self, id: ResourceId, buffer: &[u8]) -> OsResult<usize> {
         match self.resources.get(id)? {
-            Resource::File(ref mut file) => {
-                match file.write(buffer) {
-                    Ok(value) => Ok(value),
-                    Err(err) => Err(err.into())
-                }
-            }
+            Resource::File(ref mut file) => match file.write(buffer) {
+                Ok(value) => Ok(value),
+                Err(err) => Err(err.into()),
+            },
         }
     }
 
@@ -210,9 +215,7 @@ impl Process {
     pub fn duplicate(&mut self, id: ResourceId, new_id: ResourceId) -> OsResult<()> {
         let resource = self.resources.get(id)?;
         let duplicate = match resource {
-            Resource::File(file) => {
-                Resource::File(file.duplicate()?)
-            }
+            Resource::File(file) => Resource::File(file.duplicate()?),
         };
         self.resources.insert_with_id(new_id, duplicate)
     }
@@ -235,17 +238,20 @@ impl Process {
         new_process.context.ttbr1 = new_process.vmap.get_baddr().as_u64();
 
         if cfg!(feature = "cow_fork") {
-            self.vmap.allocated().try_for_each(|(virtual_address, l3_entry)| {
-                new_process.vmap.cow(virtual_address, l3_entry)
-            })?;
+            self.vmap
+                .allocated()
+                .try_for_each(|(virtual_address, l3_entry)| {
+                    new_process.vmap.cow(virtual_address, l3_entry)
+                })?;
         } else {
             for (virtual_address, l3_entry) in self.vmap.allocated() {
-                let page = new_process.vmap.alloc(virtual_address, l3_entry.permissions());
+                let page = new_process
+                    .vmap
+                    .alloc(virtual_address, l3_entry.permissions());
                 let source = unsafe { from_raw_parts(l3_entry.address() as *const u8, PAGE_SIZE) };
                 page.copy_from_slice(source);
             }
         }
-
 
         Ok(new_process)
     }
@@ -255,29 +261,43 @@ impl Process {
         let _environment_vec = parse_execute(environment);
 
         let mut absolute_path = Path::root();
-        absolute_path.join_str(argument_vec.first().ok_or(newioerr!(InvalidFilename))?.as_str())?;
+        absolute_path.join_str(
+            argument_vec
+                .first()
+                .ok_or(newioerr!(InvalidFilename))?
+                .as_str(),
+        )?;
 
-        let mut program_file = FILESYSTEM.borrow().open(&absolute_path)?
-            .into_file().map_err(|_| newioerr!(InvalidFilename))?;
+        let mut program_file = FILESYSTEM
+            .borrow()
+            .open(&absolute_path)?
+            .into_file()
+            .map_err(|_| newioerr!(InvalidFilename))?;
 
         self.vmap = Box::new(UserPageTable::new());
 
-        let stack = self.vmap.alloc(Process::get_stack_base(), PagePermissions::RW);
+        let stack = self
+            .vmap
+            .alloc(Process::get_stack_base(), PagePermissions::RW);
         let mut stack_data = Vec::new();
 
         // TODO: clean this; actually this is just broken
         stack_data.extend_from_slice(&(arguments.len() as u64).to_be_bytes());
         stack_data.extend_from_slice(&(environment.len() as u64).to_be_bytes());
-        arguments.split(|x| *x == 0).for_each(|arg|
-            stack_data.extend(arg.iter().rev().chain(&[0])));
-        environment.split(|x| *x == 0).for_each(|arg|
-            stack_data.extend(arg.iter().rev().chain(&[0])));
+        arguments
+            .split(|x| *x == 0)
+            .for_each(|arg| stack_data.extend(arg.iter().rev().chain(&[0])));
+        environment
+            .split(|x| *x == 0)
+            .for_each(|arg| stack_data.extend(arg.iter().rev().chain(&[0])));
 
         let stack_size = stack.len();
         stack_data.reverse();
         stack[stack_size - stack_data.len()..].copy_from_slice(stack_data.as_slice());
 
-        let user_image = self.vmap.alloc(Process::get_image_base(), PagePermissions::RWX);
+        let user_image = self
+            .vmap
+            .alloc(Process::get_image_base(), PagePermissions::RWX);
         program_file.read(user_image)?;
 
         self.context.sp = Process::get_stack_top().as_u64() - (stack_data.len() as u64);

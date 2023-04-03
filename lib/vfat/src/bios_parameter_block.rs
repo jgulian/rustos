@@ -1,9 +1,9 @@
 use core::fmt;
 
-use format::Format;
 use filesystem::device::BlockDevice;
 use filesystem::error::FilesystemError;
 use filesystem::partition::BlockPartition;
+use format::Format;
 use shim::const_assert_size;
 
 //TODO: go through all repr C and remove
@@ -58,8 +58,9 @@ impl TryFrom<&mut BlockPartition> for BiosParameterBlock {
         use format::Format;
         let bios_parameter_block: BiosParameterBlock = BiosParameterBlock::load_slice(&buffer)?;
 
-        if bios_parameter_block.bp_signature[0] != 0x55 ||
-            bios_parameter_block.bp_signature[1] != 0xAA {
+        if bios_parameter_block.bp_signature[0] != 0x55
+            || bios_parameter_block.bp_signature[1] != 0xAA
+        {
             return Err(FilesystemError::BadSignature);
         }
 
@@ -82,7 +83,10 @@ impl fmt::Debug for BiosParameterBlock {
             .field("sectors_per_track", &self.sectors_per_track)
             .field("number_of_heads", &self.number_of_heads)
             .field("number_of_hidden_sectors", &self.number_of_hidden_sectors)
-            .field("total_logical_sectors_extended", &self.total_logical_sectors_extended)
+            .field(
+                "total_logical_sectors_extended",
+                &self.total_logical_sectors_extended,
+            )
             .field("sectors_per_fat_two", &self.sectors_per_fat_two)
             .field("flags", &self.flags)
             .field("version", &self.version)
@@ -101,7 +105,7 @@ impl fmt::Debug for BiosParameterBlock {
 }
 
 impl BiosParameterBlock {
-    pub(crate) fn new(sector_size: u16, ) -> Self {
+    pub(crate) fn new(sector_size: u16) -> Self {
         let mut boot_code = [0u8; 420];
         boot_code[..DEFAULT_BOOT_CODE_HEAD.len()].copy_from_slice(&DEFAULT_BOOT_CODE_HEAD);
 

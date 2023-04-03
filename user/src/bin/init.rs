@@ -5,8 +5,6 @@
 
 extern crate alloc;
 
-
-
 use kernel_api::println;
 use kernel_api::syscall::{duplicate, execute, fork, open, wait};
 
@@ -23,13 +21,13 @@ fn main() {
 
         match shell_pid {
             None => {
-                execute("shell".as_bytes(), "".as_bytes())
-                    .expect("unable to execute shell");
+                execute("shell".as_bytes(), "".as_bytes()).expect("unable to execute shell");
             }
             Some(child_pid) => {
                 while {
                     let wait_pid = wait(child_pid, None)
-                        .expect("unable to wait for process").unwrap();
+                        .expect("unable to wait for process")
+                        .unwrap();
                     wait_pid != child_pid
                 } {}
             }

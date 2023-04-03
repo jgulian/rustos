@@ -4,13 +4,13 @@
 
 extern crate alloc;
 
+use crate::user::get_arguments;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::cmp::{max, min};
-use kernel_api::{OsError, OsResult, print, println};
-use kernel_api::syscall::{execute, exit, File, fork, open, time, wait};
+use kernel_api::syscall::{execute, exit, fork, open, time, wait, File};
+use kernel_api::{print, println, OsError, OsResult};
 use shim::io::Read;
-use crate::user::get_arguments;
 
 mod user;
 
@@ -19,9 +19,27 @@ fn parse(bytes: &[u8]) -> Option<(usize, usize, usize)> {
     let mut lines = string.split('\n');
 
     Some((
-        lines.next()?.split(' ').skip(1).next()?.parse::<usize>().ok()?,
-        lines.next()?.split(' ').skip(1).next()?.parse::<usize>().ok()?,
-        lines.next()?.split(' ').skip(1).next()?.parse::<usize>().ok()?,
+        lines
+            .next()?
+            .split(' ')
+            .skip(1)
+            .next()?
+            .parse::<usize>()
+            .ok()?,
+        lines
+            .next()?
+            .split(' ')
+            .skip(1)
+            .next()?
+            .parse::<usize>()
+            .ok()?,
+        lines
+            .next()?
+            .split(' ')
+            .skip(1)
+            .next()?
+            .parse::<usize>()
+            .ok()?,
     ))
 }
 
@@ -47,7 +65,9 @@ fn main() {
                     }
                 }
 
-                let read = allocator.read(&mut buffer).expect("unable to read from allocator");
+                let read = allocator
+                    .read(&mut buffer)
+                    .expect("unable to read from allocator");
                 if let Some(allocator_data) = parse(&buffer[..read]) {
                     if data.len() == total_number {
                         for i in (0..total_number).step_by(total_number / 80).rev() {
@@ -86,12 +106,14 @@ fn print_heap_data(data: Vec<(usize, usize, usize)>) -> Option<()> {
         .map(|samples| {
             let total_size: usize = samples.iter().map(|(size, _, _)| *size).sum();
             let average_size = total_size / samples.len();
-            let size_magnitude = (average_size - min_size) as f32 / (max_size - min_size) as f32 * scale as f32;
+            let size_magnitude =
+                (average_size - min_size) as f32 / (max_size - min_size) as f32 * scale as f32;
             //println!("size: {}", size_magnitude);
 
             let total_count: usize = samples.iter().map(|(_, count, _)| *count).sum();
             let average_count = total_count / samples.len();
-            let count_magnitude = (average_count - min_count) as f32 / (max_count - min_count) as f32 * scale as f32;
+            let count_magnitude =
+                (average_count - min_count) as f32 / (max_count - min_count) as f32 * scale as f32;
             (size_magnitude, count_magnitude)
         })
         .collect();

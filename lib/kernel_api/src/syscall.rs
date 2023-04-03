@@ -37,9 +37,9 @@ macro_rules! syscall_args {
 }
 
 macro_rules! syscall {
-    ($syscall_number:expr) => (
+    ($syscall_number:expr) => {
         asm!("svc {}", const { $syscall_number as u16 })
-    );
+    };
 }
 
 macro_rules! syscall_receive0 {
@@ -166,7 +166,7 @@ pub fn fork() -> OsResult<Option<u64>> {
 
     match is_child {
         0 => Ok(Some(child_id)),
-        _ => Ok(None)
+        _ => Ok(None),
     }
 }
 
@@ -181,8 +181,12 @@ pub fn duplicate(file: u64, new: u64) -> OsResult<u64> {
 //TODO: this should not return on success; codify that
 pub fn execute(arguments: &[u8], environment: &[u8]) -> OsResult<u64> {
     unsafe {
-        syscall_args!(arguments.as_ptr() as u64, arguments.len() as u64,
-            environment.as_ptr() as u64, environment.len() as u64);
+        syscall_args!(
+            arguments.as_ptr() as u64,
+            arguments.len() as u64,
+            environment.as_ptr() as u64,
+            environment.len() as u64
+        );
         syscall!(Syscall::Execute);
         syscall_receive1!()
     }
@@ -229,7 +233,6 @@ pub fn vprint(args: fmt::Arguments) {
     c.write_fmt(args).unwrap();
 }
 
-
 // TODO: move to jlib
 pub struct File(u64);
 //TODO: Drop to close syscall
@@ -242,15 +245,13 @@ impl File {
 
 impl io::Read for File {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        read(self.0, buf)
-            .map_err(|_| newioerr!(Interrupted))
+        read(self.0, buf).map_err(|_| newioerr!(Interrupted))
     }
 }
 
 impl io::Write for File {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        write(self.0, buf)
-            .map_err(|_| newioerr!(Interrupted))
+        write(self.0, buf).map_err(|_| newioerr!(Interrupted))
     }
 
     fn flush(&mut self) -> io::Result<()> {

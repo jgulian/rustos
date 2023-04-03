@@ -1,22 +1,22 @@
-use alloc::boxed::Box;
+
 
 use core::arch::asm;
 use core::ops::Add;
-use core::time::Duration;
 
-use aarch64::SP;
 
-use pi::local_interrupt::{LocalController, LocalInterrupt};
-use shim::newioerr;
+
+
+
+
 use sync::Mutex;
 
-use crate::VMM;
 use crate::multiprocessing::spin_lock::SpinLock;
 use crate::process::{Process, ProcessId, State};
 use crate::scheduling::proportional_share::ProportionalShareScheduler;
-use crate::scheduling::RoundRobinScheduler;
 use crate::scheduling::scheduler::{Scheduler, SchedulerError, SchedulerResult, SwitchTrigger};
+use crate::scheduling::RoundRobinScheduler;
 use crate::traps::TrapFrame;
+
 
 extern "C" {
     fn context_restore();
@@ -31,7 +31,7 @@ impl Schedulers {
     fn get_scheduler(&mut self) -> &mut dyn Scheduler {
         match self {
             Schedulers::ProportionalShare(proportional_share) => proportional_share,
-            Schedulers::RoundRobin(round_robin) => round_robin
+            Schedulers::RoundRobin(round_robin) => round_robin,
         }
     }
 }
@@ -69,53 +69,69 @@ impl GlobalScheduler {
 
     /// Initializes the scheduler and add userspace processes to the Scheduler.
     pub unsafe fn initialize(&self) {
-        self.0.lock(|scheduler| {
-            if scheduler.is_some() {
-                panic!("scheduler already initialized");
-            } else {
-                *scheduler = Some(SchedulerInformation {
-                    scheduler: Schedulers::ProportionalShare(ProportionalShareScheduler::new()),
-                    last_process_id: None,
-                })
-            }
-        }).expect("failed to lock scheduler");
+        self.0
+            .lock(|scheduler| {
+                if scheduler.is_some() {
+                    panic!("scheduler already initialized");
+                } else {
+                    *scheduler = Some(SchedulerInformation {
+                        scheduler: Schedulers::ProportionalShare(ProportionalShareScheduler::new()),
+                        last_process_id: None,
+                    })
+                }
+            })
+            .expect("failed to lock scheduler");
     }
 
     pub fn add(&self, mut process: Process) -> SchedulerResult<ProcessId> {
-        let id = self.0.lock(|scheduler| {
-            let scheduler_information = scheduler
-                .as_mut()
-                .expect("scheduler uninitialized");
-            let process_id = scheduler_information.allocate_process_id();
-            process.context.tpidr = process_id.into();
-            scheduler_information
-                .scheduler.get_scheduler()
-                .add(process)?;
-            Ok(process_id)
-        }).expect("failed to lock scheduler")?;
+        let id = self
+            .0
+            .lock(|scheduler| {
+                let scheduler_information = scheduler.as_mut().expect("scheduler uninitialized");
+                let process_id = scheduler_information.allocate_process_id();
+                process.context.tpidr = process_id.into();
+                scheduler_information
+                    .scheduler
+                    .get_scheduler()
+                    .add(process)?;
+                Ok(process_id)
+            })
+            .expect("failed to lock scheduler")?;
         aarch64::sev();
         Ok(id)
     }
 
     #[deprecated]
     fn remove(&self, trap_frame: &mut TrapFrame) -> SchedulerResult<Process> {
-        self.0.lock(|scheduler| {
-            scheduler
-                .as_mut()
-                .expect("scheduler uninitialized")
-                .scheduler.get_scheduler()
-                .remove(trap_frame)
-        }).expect("failed to lock scheduler")
+        self.0
+            .lock(|scheduler| {
+                scheduler
+                    .as_mut()
+                    .expect("scheduler uninitialized")
+                    .scheduler
+                    .get_scheduler()
+                    .remove(trap_frame)
+            })
+            .expect("failed to lock scheduler")
     }
 
-    pub fn switch(&self, trap_frame: &mut TrapFrame, trigger: SwitchTrigger, state: State) -> SchedulerResult<()> {
-        let result = self.0.lock(|scheduler| {
-            scheduler
-                .as_mut()
-                .expect("scheduler uninitialized")
-                .scheduler.get_scheduler()
-                .switch(trap_frame, trigger, state)
-        }).expect("failed to lock scheduler");
+    pub fn switch(
+        &self,
+        trap_frame: &mut TrapFrame,
+        trigger: SwitchTrigger,
+        state: State,
+    ) -> SchedulerResult<()> {
+        let result = self
+            .0
+            .lock(|scheduler| {
+                scheduler
+                    .as_mut()
+                    .expect("scheduler uninitialized")
+                    .scheduler
+                    .get_scheduler()
+                    .switch(trap_frame, trigger, state)
+            })
+            .expect("failed to lock scheduler");
 
         if result.is_ok() || result.is_err_and(|err| err != SchedulerError::NoRunnableProcess) {
             return result;
@@ -127,13 +143,18 @@ impl GlobalScheduler {
 
     pub fn schedule_in(&self, trap_frame: &mut TrapFrame) -> SchedulerResult<()> {
         loop {
-            let result = self.0.lock(|scheduler| {
-                scheduler
-                    .as_mut()
-                    .expect("scheduler uninitialized")
-                    .scheduler.get_scheduler()
-                    .schedule_in(trap_frame)
-            }).expect("failed to lock scheduler").map(|_| ());
+            let result = self
+                .0
+                .lock(|scheduler| {
+                    scheduler
+                        .as_mut()
+                        .expect("scheduler uninitialized")
+                        .scheduler
+                        .get_scheduler()
+                        .schedule_in(trap_frame)
+                })
+                .expect("failed to lock scheduler")
+                .map(|_| ());
 
             if result.is_ok() || result.is_err_and(|err| err != SchedulerError::NoRunnableProcess) {
                 return result;
@@ -144,32 +165,40 @@ impl GlobalScheduler {
     }
 
     pub fn on_process<F, R>(&self, trap_frame: &mut TrapFrame, function: F) -> SchedulerResult<R>
-        where F: FnOnce(&mut Process) -> R {
-        self.0.lock(|scheduler| {
-            let scheduler_information = scheduler
-                .as_mut()
-                .expect("scheduler uninitialized");
-            match &mut scheduler_information.scheduler {
-                Schedulers::ProportionalShare(proportional_share) =>
-                    proportional_share.on_process(trap_frame, function),
-                Schedulers::RoundRobin(round_robin) =>
-                    round_robin.on_process(trap_frame, function)
-            }
-        }).expect("failed to lock scheduler")
+    where
+        F: FnOnce(&mut Process) -> R,
+    {
+        self.0
+            .lock(|scheduler| {
+                let scheduler_information = scheduler.as_mut().expect("scheduler uninitialized");
+                match &mut scheduler_information.scheduler {
+                    Schedulers::ProportionalShare(proportional_share) => {
+                        proportional_share.on_process(trap_frame, function)
+                    }
+                    Schedulers::RoundRobin(round_robin) => {
+                        round_robin.on_process(trap_frame, function)
+                    }
+                }
+            })
+            .expect("failed to lock scheduler")
     }
 
     pub fn bootstrap(&self) -> ! {
-        self.0.lock(|scheduler| {
-            scheduler
-                .as_mut()
-                .expect("scheduler uninitialized")
-                .scheduler.get_scheduler()
-                .setup_core(aarch64::affinity())
-                .expect("unable to setup core");
-        }).expect("failed to lock scheduler");
+        self.0
+            .lock(|scheduler| {
+                scheduler
+                    .as_mut()
+                    .expect("scheduler uninitialized")
+                    .scheduler
+                    .get_scheduler()
+                    .setup_core(aarch64::affinity())
+                    .expect("unable to setup core");
+            })
+            .expect("failed to lock scheduler");
 
         let mut trap_frame: TrapFrame = Default::default();
-        self.schedule_in(&mut trap_frame).expect("unable to schedule initial process");
+        self.schedule_in(&mut trap_frame)
+            .expect("unable to schedule initial process");
 
         unsafe {
             asm!(

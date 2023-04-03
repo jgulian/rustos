@@ -19,89 +19,102 @@ pub(crate) enum FieldType {
     Array(Box<FieldType>, usize),
 }
 
-#[derive(Copy, Clone, Debug)]
-#[derive(Default)]
+#[derive(Copy, Clone, Debug, Default)]
 pub(crate) struct FieldSettings {
     pub(crate) endianness: Option<Endianness>,
     pub(crate) padding: Option<usize>,
 }
 
-
-
 #[derive(Copy, Clone, Debug)]
-pub enum Endianness { Native, Little, Big }
+pub enum Endianness {
+    Native,
+    Little,
+    Big,
+}
 
-pub(crate) fn parse_fields(fields: &mut dyn Iterator<Item=&Field>) -> FormatType {
+pub(crate) fn parse_fields(fields: &mut dyn Iterator<Item = &Field>) -> FormatType {
     FormatType {
-        fields: fields.map(|field| {
-            FormatField {
+        fields: fields
+            .map(|field| FormatField {
                 name: field.ident.clone(),
                 field_settings: parse_settings(field),
                 field_type: parse_type(&field.ty),
-            }
-        }).collect(),
+            })
+            .collect(),
     }
 }
 
 fn parse_settings(field: &Field) -> FieldSettings {
-    field.attrs.iter().filter_map(|attribute| {
-        match attribute.parse_meta().ok()? {
+    field
+        .attrs
+        .iter()
+        .filter_map(|attribute| match attribute.parse_meta().ok()? {
             Meta::List(meta_list) => Some(meta_list),
             _ => None,
-        }
-    }).fold(FieldSettings::default(), |mut prev, MetaList { path, paren_token: _, nested }| {
-        if nested.len() != 1 {
-            return prev;
-        }
+        })
+        .fold(
+            FieldSettings::default(),
+            |mut prev,
+             MetaList {
+                 path,
+                 paren_token: _,
+                 nested,
+             }| {
+                if nested.len() != 1 {
+                    return prev;
+                }
 
-        if path.is_ident("endianness") {
-            let nested_meta = match nested.first() {
-                None => panic!("Nested field doesn't have enough metas"),
-                Some(nested_meta) => nested_meta,
-            };
-            if prev.endianness.is_some() {
-                panic!("Field has endianness set twice")
-            }
-            match nested_meta {
-                NestedMeta::Meta(meta) => {
-                    let endianness = meta.path().get_ident()
-                        .expect("Unknown setting for endianness").to_string();
-                    match endianness.to_ascii_lowercase().as_str() {
-                        "native" => prev.endianness = Some(Endianness::Native),
-                        "little" => prev.endianness = Some(Endianness::Little),
-                        "big" => prev.endianness = Some(Endianness::Big),
-                        _ => panic!("Unknown endianness setting"),
+                if path.is_ident("endianness") {
+                    let nested_meta = match nested.first() {
+                        None => panic!("Nested field doesn't have enough metas"),
+                        Some(nested_meta) => nested_meta,
+                    };
+                    if prev.endianness.is_some() {
+                        panic!("Field has endianness set twice")
+                    }
+                    match nested_meta {
+                        NestedMeta::Meta(meta) => {
+                            let endianness = meta
+                                .path()
+                                .get_ident()
+                                .expect("Unknown setting for endianness")
+                                .to_string();
+                            match endianness.to_ascii_lowercase().as_str() {
+                                "native" => prev.endianness = Some(Endianness::Native),
+                                "little" => prev.endianness = Some(Endianness::Little),
+                                "big" => prev.endianness = Some(Endianness::Big),
+                                _ => panic!("Unknown endianness setting"),
+                            }
+                        }
+                        NestedMeta::Lit(_) => {
+                            panic!("Lit is not supported for padding; use Meta")
+                        }
+                    }
+                } else if path.is_ident("padding") {
+                    let nested_meta = match nested.first() {
+                        None => panic!("Nested field doesn't have enough metas"),
+                        Some(nested_meta) => nested_meta,
+                    };
+                    if prev.padding.is_some() {
+                        panic!("Field has padding set twice")
+                    }
+                    match nested_meta {
+                        NestedMeta::Meta(_) => {
+                            panic!("Meta is not supported for padding; use Lit")
+                        }
+                        NestedMeta::Lit(lit) => match lit {
+                            Lit::Int(i) => {
+                                prev.padding =
+                                    Some(i.base10_parse().expect("unable to parse padding"))
+                            }
+                            _ => panic!("unsupported lit value; use int"),
+                        },
                     }
                 }
-                NestedMeta::Lit(_) => {
-                    panic!("Lit is not supported for padding; use Meta")
-                }
-            }
-        } else if path.is_ident("padding") {
-            let nested_meta = match nested.first() {
-                None => panic!("Nested field doesn't have enough metas"),
-                Some(nested_meta) => nested_meta,
-            };
-            if prev.padding.is_some() {
-                panic!("Field has padding set twice")
-            }
-            match nested_meta {
-                NestedMeta::Meta(_) => {
-                    panic!("Meta is not supported for padding; use Lit")
-                }
-                NestedMeta::Lit(lit) => {
-                    match lit {
-                        Lit::Int(i) =>
-                            prev.padding = Some(i.base10_parse()
-                                .expect("unable to parse padding")),
-                        _ => panic!("unsupported lit value; use int")
-                    }
-                }
-            }
-        }
 
-        prev
-    })
+                prev
+            },
+        )
 }
 
 fn parse_type(field_type: &Type) -> FieldType {
@@ -137,14 +150,10 @@ fn parse_type(field_type: &Type) -> FieldType {
             };
 
             match type_size {
-                None => {
-                    FieldType::CustomType(type_ident)
-                }
-                Some(size) => {
-                    FieldType::PrimitiveType(type_ident, size)
-                }
+                None => FieldType::CustomType(type_ident),
+                Some(size) => FieldType::PrimitiveType(type_ident, size),
             }
         }
-        _ => panic!("{:?} is not currently supported", field_type)
+        _ => panic!("{:?} is not currently supported", field_type),
     }
 }

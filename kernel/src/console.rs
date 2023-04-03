@@ -79,10 +79,9 @@ pub static CONSOLE: SpinLock<Console> = SpinLock::new(Console::new());
 /// Internal function called by the `kprint[ln]!` macros.
 #[doc(hidden)]
 pub fn _print(args: fmt::Arguments) {
-    CONSOLE.lock(|console| {
-        console.write_fmt(args).unwrap()
-    }).unwrap()
-
+    CONSOLE
+        .lock(|console| console.write_fmt(args).unwrap())
+        .unwrap()
 }
 
 /// Like `println!`, but for kernel2-space.

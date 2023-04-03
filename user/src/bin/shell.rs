@@ -5,12 +5,11 @@
 
 extern crate alloc;
 
-
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
+use kernel_api::syscall::{execute, exit, fork, wait, File};
 use kernel_api::{print, println};
-use kernel_api::syscall::{execute, exit, File, fork, wait};
 use shim::io::{Read, Write};
 
 mod user;
@@ -42,28 +41,24 @@ fn main() {
                 // down 91, 66
                 // left 91, 68
                 match escape_bytes[1] {
-                    65 => {
-                        match commands.get(command_index - 1) {
-                            None => {}
-                            Some(old_command) => {
-                                print!("{}{}", "\x08 \x08".repeat(command.len()), old_command);
-                                command = old_command.to_string();
-                                command_index -= 1;
-                            }
+                    65 => match commands.get(command_index - 1) {
+                        None => {}
+                        Some(old_command) => {
+                            print!("{}{}", "\x08 \x08".repeat(command.len()), old_command);
+                            command = old_command.to_string();
+                            command_index -= 1;
                         }
                     },
-                    66 => {
-                        match commands.get(command_index + 1) {
-                            None => {
-                                print!("{}", "\x08 \x08".repeat(command.len()));
-                                command = "".to_string();
-                                command_index = commands.len();
-                            }
-                            Some(old_command) => {
-                                print!("{}{}", "\x08 \x08".repeat(command.len()), old_command);
-                                command = old_command.to_string();
-                                command_index += 1;
-                            }
+                    66 => match commands.get(command_index + 1) {
+                        None => {
+                            print!("{}", "\x08 \x08".repeat(command.len()));
+                            command = "".to_string();
+                            command_index = commands.len();
+                        }
+                        Some(old_command) => {
+                            print!("{}{}", "\x08 \x08".repeat(command.len()), old_command);
+                            command = old_command.to_string();
+                            command_index += 1;
                         }
                     },
                     _ => {}
@@ -72,7 +67,9 @@ fn main() {
                 match command.pop() {
                     None => {}
                     Some(_) => {
-                        stdout.write("\x08 \x08".as_bytes()).expect("could not write to stdout");
+                        stdout
+                            .write("\x08 \x08".as_bytes())
+                            .expect("could not write to stdout");
                     }
                 }
             } else {
@@ -103,17 +100,20 @@ fn main() {
         match child_pid {
             None => {
                 println!();
-                let encoded: Vec<u8> = command.chars().map(|c| {
-                    match c {
+                let encoded: Vec<u8> = command
+                    .chars()
+                    .map(|c| match c {
                         ' ' => 0,
                         _ => c as u8,
-                    }
-                }).collect();
+                    })
+                    .collect();
                 match execute(encoded.as_slice(), "".as_ref()) {
                     Ok(_) => {}
                     Err(_) => {
-                        println!("no such command {}",
-                                 command.split(' ').next().unwrap_or(""));
+                        println!(
+                            "no such command {}",
+                            command.split(' ').next().unwrap_or("")
+                        );
                         exit().expect("could not exit");
                     }
                 }

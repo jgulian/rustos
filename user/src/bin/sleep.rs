@@ -11,6 +11,6 @@ use kernel_api::syscall::sleep;
 mod user;
 
 fn main() {
-        let elapsed = sleep(Duration::from_secs(5)).expect("");
-        println!("Slept for {} millis", elapsed.as_millis());
+    let elapsed = sleep(Duration::from_secs(5)).expect("");
+    println!("Slept for {} millis", elapsed.as_millis());
 }

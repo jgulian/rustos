@@ -6,8 +6,8 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 use aarch64::*;
 use sync::Mutex;
 
-use crate::multiprocessing::spin_lock::SpinLock;
 use crate::multiprocessing::per_core::{is_mmu_ready, set_mmu_ready};
+use crate::multiprocessing::spin_lock::SpinLock;
 use crate::param::{KERNEL_MASK_BITS, USER_MASK_BITS};
 
 pub use self::address::{PhysicalAddr, VirtualAddr};
@@ -44,11 +44,17 @@ impl VMManager {
         let kernel_page_table = KernPageTable::new();
         let base_address = kernel_page_table.get_baddr();
 
-        if self.kern_pt.lock(|kern_pt| kern_pt.replace(kernel_page_table)).unwrap().is_some() {
+        if self
+            .kern_pt
+            .lock(|kern_pt| kern_pt.replace(kernel_page_table))
+            .unwrap()
+            .is_some()
+        {
             panic!("VMManager initialize called twice");
         }
 
-        self.kern_pt_addr.store(base_address.as_usize(), Ordering::Relaxed);
+        self.kern_pt_addr
+            .store(base_address.as_usize(), Ordering::Relaxed);
     }
 
     /// Set up the virtual memory manager for the current core.
@@ -120,20 +126,24 @@ impl VMManager {
 
     /// Returns the base address of the kernel2 page table as `PhysicalAddr`.
     pub fn get_baddr(&self) -> PhysicalAddr {
-        self.kern_pt.lock(|kern_pt| kern_pt.as_ref().unwrap().get_baddr()).unwrap()
+        self.kern_pt
+            .lock(|kern_pt| kern_pt.as_ref().unwrap().get_baddr())
+            .unwrap()
     }
 
     pub fn pin_frame(&self, physical_address: PhysicalAddr) {
-        self.frame_reference_counts.lock(|reference_counts| {
-            *reference_counts.entry(physical_address).or_insert(0) += 1;
-        }).unwrap()
+        self.frame_reference_counts
+            .lock(|reference_counts| {
+                *reference_counts.entry(physical_address).or_insert(0) += 1;
+            })
+            .unwrap()
     }
 
     pub fn unpin_frame(&self, physical_address: PhysicalAddr) -> bool {
-        self.frame_reference_counts.lock(|reference_counts| {
-            match reference_counts.entry(physical_address) {
-                Entry::Occupied(mut e) => {
-                    match *e.get() {
+        self.frame_reference_counts
+            .lock(
+                |reference_counts| match reference_counts.entry(physical_address) {
+                    Entry::Occupied(mut e) => match *e.get() {
                         1 => {
                             e.remove();
                             true
@@ -142,16 +152,21 @@ impl VMManager {
                             *e.get_mut() = x - 1;
                             false
                         }
-                    }
-                }
-                Entry::Vacant(_) => false,
-            }
-        }).unwrap()
+                    },
+                    Entry::Vacant(_) => false,
+                },
+            )
+            .unwrap()
     }
 
-    pub fn get_frame_pin_count(&self, physical_address: PhysicalAddr) -> usize  {
-        self.frame_reference_counts.lock(|reference_counts| {
-            reference_counts.get(&physical_address).copied().unwrap_or(0usize)
-        }).unwrap()
+    pub fn get_frame_pin_count(&self, physical_address: PhysicalAddr) -> usize {
+        self.frame_reference_counts
+            .lock(|reference_counts| {
+                reference_counts
+                    .get(&physical_address)
+                    .copied()
+                    .unwrap_or(0usize)
+            })
+            .unwrap()
     }
 }

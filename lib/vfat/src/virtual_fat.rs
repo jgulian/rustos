@@ -18,18 +18,18 @@ use std::vec::Vec;
 use core::mem;
 use log::info;
 
-use filesystem::device::{BlockDevice, stream_read, stream_write};
+use crate::bios_parameter_block::BiosParameterBlock;
+use crate::chain::Chain;
+use crate::cluster::Cluster;
+use crate::directory::Directory;
+use crate::error::{VirtualFatError, VirtualFatResult};
+use crate::fat::{FatEntry, Status};
+use filesystem::device::{stream_read, stream_write, BlockDevice};
 use filesystem::error::FilesystemError;
 use filesystem::partition::BlockPartition;
 use shim::io;
 use shim::io::Cursor;
 use sync::Mutex;
-use crate::cluster::Cluster;
-use crate::bios_parameter_block::BiosParameterBlock;
-use crate::chain::Chain;
-use crate::directory::Directory;
-use crate::error::{VirtualFatError, VirtualFatResult};
-use crate::fat::{FatEntry, Status};
 
 pub struct VirtualFat {
     device: BlockPartition,
@@ -43,25 +43,37 @@ pub struct VirtualFat {
 
 impl VirtualFat {
     fn get_blocks(&self, cluster: Cluster) -> (u64, u64) {
-        let mut first_block = cluster.sector_start(self.data_start_sector, self.sectors_per_cluster);
+        let mut first_block =
+            cluster.sector_start(self.data_start_sector, self.sectors_per_cluster);
         let final_block = first_block + self.sectors_per_cluster as u64;
         (first_block, final_block)
     }
 
-    pub(crate) fn read_cluster(&mut self, cluster: Cluster, offset: usize, buffer: &mut [u8]) -> io::Result<usize> {
+    pub(crate) fn read_cluster(
+        &mut self,
+        cluster: Cluster,
+        offset: usize,
+        buffer: &mut [u8],
+    ) -> io::Result<usize> {
         let (first_block, final_block) = self.get_blocks(cluster);
         stream_read(&mut self.device, offset, first_block..final_block, buffer)
             .map(|(_, amount)| amount)
     }
 
-    pub(crate) fn write_cluster(&mut self, cluster: Cluster, offset: usize, buffer: &[u8]) -> io::Result<usize> {
+    pub(crate) fn write_cluster(
+        &mut self,
+        cluster: Cluster,
+        offset: usize,
+        buffer: &[u8],
+    ) -> io::Result<usize> {
         let (first_block, final_block) = self.get_blocks(cluster);
         stream_write(&mut self.device, offset, first_block..final_block, buffer)
             .map(|(_, amount)| amount)
     }
 
     pub(crate) fn fat_entry(&mut self, cluster: Cluster) -> VirtualFatResult<FatEntry> {
-        let (block, offset) = FatEntry::find(cluster, self.fat_start_sector, self.bytes_per_sector as u64);
+        let (block, offset) =
+            FatEntry::find(cluster, self.fat_start_sector, self.bytes_per_sector as u64);
 
         let mut data = vec![0u8; self.device.block_size() as usize];
         self.device.read_block(block, data.as_mut_slice())?;
@@ -74,36 +86,37 @@ impl VirtualFat {
 
     pub(crate) fn next_cluster(&mut self, cluster: Cluster) -> VirtualFatResult<Option<Cluster>> {
         match self.fat_entry(cluster)?.status() {
-            Status::Eoc(_status) => {
-                Ok(None)
-            }
-            Status::Data(next_cluster) => {
-                Ok(Some(next_cluster))
-            }
-            _ => {
-                Err(VirtualFatError::InvalidClusterForNext)
-            }
+            Status::Eoc(_status) => Ok(None),
+            Status::Data(next_cluster) => Ok(Some(next_cluster)),
+            _ => Err(VirtualFatError::InvalidClusterForNext),
         }
     }
 
     pub(crate) fn next_free_cluster(&mut self) -> VirtualFatResult<Cluster> {
         let number_of_fats = self.number_of_fats() as u32;
-        (0..number_of_fats).find_map(|fat| -> Option<VirtualFatResult<Cluster>> {
-            match self.fat_entry(Cluster::from(fat)) {
-                Ok(fat_entry) => {
-                    if fat_entry.is_free() {
-                        Some(Ok(Cluster::from(fat)))
-                    } else {
-                        None
+        (0..number_of_fats)
+            .find_map(|fat| -> Option<VirtualFatResult<Cluster>> {
+                match self.fat_entry(Cluster::from(fat)) {
+                    Ok(fat_entry) => {
+                        if fat_entry.is_free() {
+                            Some(Ok(Cluster::from(fat)))
+                        } else {
+                            None
+                        }
                     }
+                    Err(err) => Some(Err(err)),
                 }
-                Err(err) => Some(Err(err))
-            }
-        }).ok_or(VirtualFatError::FilesystemOutOfMemory)?
+            })
+            .ok_or(VirtualFatError::FilesystemOutOfMemory)?
     }
 
-    pub(crate) fn update_fat_entry(&mut self, cluster: Cluster, status: Status) -> VirtualFatResult<()> {
-        let (block, offset) = FatEntry::find(cluster, self.fat_start_sector, self.bytes_per_sector as u64);
+    pub(crate) fn update_fat_entry(
+        &mut self,
+        cluster: Cluster,
+        status: Status,
+    ) -> VirtualFatResult<()> {
+        let (block, offset) =
+            FatEntry::find(cluster, self.fat_start_sector, self.bytes_per_sector as u64);
 
         let mut data = vec![0u8; self.device.block_size() as usize];
         self.device.read_block(block, data.as_mut_slice())?;
@@ -134,7 +147,8 @@ impl VirtualFat {
     }
 
     pub(crate) fn get_clear_cluster(&mut self) -> io::Result<Cluster> {
-        let cluster = self.next_free_cluster()
+        let cluster = self
+            .next_free_cluster()
             .map_err(|_| io::Error::new(io::ErrorKind::Unsupported, "no free cluster found"))?;
         let zero_block = vec![0u8; self.block_size()];
 
@@ -175,11 +189,15 @@ impl BlockDevice for VirtualFat {
 
 pub struct VirtualFatFilesystem<M: Mutex<VirtualFat>>(Arc<M>);
 
-impl<M: Mutex<VirtualFat> + 'static> filesystem::filesystem::Filesystem for VirtualFatFilesystem<M> {
+impl<M: Mutex<VirtualFat> + 'static> filesystem::filesystem::Filesystem
+    for VirtualFatFilesystem<M>
+{
     fn root(&mut self) -> io::Result<Box<dyn filesystem::filesystem::Directory>> {
         let virtual_fat = self.0.clone();
 
-        let root_cluster = self.0.lock(|virtual_fat| virtual_fat.root_cluster)
+        let root_cluster = self
+            .0
+            .lock(|virtual_fat| virtual_fat.root_cluster)
             .map_err(|_| io::Error::from(io::ErrorKind::Other))?;
 
         let chain = Chain::new_from_cluster(virtual_fat.clone(), root_cluster)
@@ -191,7 +209,14 @@ impl<M: Mutex<VirtualFat> + 'static> filesystem::filesystem::Filesystem for Virt
         }))
     }
 
-    fn format(device: &mut dyn BlockDevice, partition: &mut filesystem::master_boot_record::PartitionEntry, sector_size: usize) -> io::Result<()> where Self: Sized {
+    fn format(
+        device: &mut dyn BlockDevice,
+        partition: &mut filesystem::master_boot_record::PartitionEntry,
+        sector_size: usize,
+    ) -> io::Result<()>
+    where
+        Self: Sized,
+    {
         partition.partition_type = 0xc;
 
         // TODO: make it have the correct size and location
@@ -217,7 +242,9 @@ impl<M: Mutex<VirtualFat> + 'static> filesystem::filesystem::Filesystem for Virt
         }
 
         for i in 0..bpb.number_of_fats as u32 {
-            let relative_sector = (partition.relative_sector + bpb.reserved_sectors as u32 + i * bpb.sectors_per_fat_two) as u64;
+            let relative_sector = (partition.relative_sector
+                + bpb.reserved_sectors as u32
+                + i * bpb.sectors_per_fat_two) as u64;
             device.write_block(relative_sector, fat_empty.as_slice())?;
             for j in 1..bpb.sectors_per_fat_two as u64 {
                 device.write_block(relative_sector + j, zero.as_slice())?;
@@ -239,8 +266,8 @@ impl<M: Mutex<VirtualFat> + 'static> VirtualFatFilesystem<M> {
             bios_parameter_block.sectors_per_fat_two
         };
 
-        let data_start_sector = bios_parameter_block.reserved_sectors as u64 +
-            (bios_parameter_block.number_of_fats as u64 * sectors_per_fat as u64);
+        let data_start_sector = bios_parameter_block.reserved_sectors as u64
+            + (bios_parameter_block.number_of_fats as u64 * sectors_per_fat as u64);
 
         Ok(VirtualFatFilesystem(Arc::new(M::new(VirtualFat {
             device: value,

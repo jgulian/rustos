@@ -35,7 +35,7 @@ impl<T> Writeable<T> for $type<T> {
 
 #[doc(hidden)]
 pub(crate) macro readable_writeable($type:ident) {
-impl<T> ReadableWriteable<T> for $type<T>
+    impl<T> ReadableWriteable<T> for $type<T>
     where
         T: ::core::ops::BitAnd<Output = T>,
         T: ::core::ops::BitOr<Output = T>,

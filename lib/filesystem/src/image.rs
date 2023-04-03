@@ -1,8 +1,8 @@
-use std::fs::File;
+use crate::device::BlockDevice;
 use shim::io as shim_io;
+use std::fs::File;
 use std::io;
 use std::io::{Read, Seek, SeekFrom, Write};
-use crate::device::BlockDevice;
 
 pub struct ImageFile(File, usize);
 

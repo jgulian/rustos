@@ -8,7 +8,11 @@ impl From<u32> for Cluster {
 }
 
 impl Cluster {
-    pub(crate) fn fat_sector_number(&self, reserved_sector_count: u64, bytes_per_sector: u16) -> u64 {
+    pub(crate) fn fat_sector_number(
+        &self,
+        reserved_sector_count: u64,
+        bytes_per_sector: u16,
+    ) -> u64 {
         reserved_sector_count + (self.0 as u64 * 4 / bytes_per_sector as u64)
     }
 

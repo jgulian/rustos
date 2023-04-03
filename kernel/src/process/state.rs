@@ -24,9 +24,9 @@ pub enum State {
 
 impl PartialEq<Self> for State {
     fn eq(&self, other: &Self) -> bool {
-        matches!(self, State::Ready) && matches!(other, State::Ready) ||
-            matches!(self, State::Running) && matches!(other, State::Running) ||
-            matches!(self, State::Dead) && matches!(other, State::Dead)
+        matches!(self, State::Ready) && matches!(other, State::Ready)
+            || matches!(self, State::Running) && matches!(other, State::Running)
+            || matches!(self, State::Dead) && matches!(other, State::Dead)
     }
 }
 

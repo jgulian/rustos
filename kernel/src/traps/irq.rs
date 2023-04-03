@@ -109,25 +109,27 @@ pub trait IrqHandlerRegistry<I> {
 /// A blanket implementation of `IrqHandlerRegistry` trait for all indexable
 /// struct that returns `IrqHandlerMutex`.
 impl<I, T> IrqHandlerRegistry<I> for T
-    where
-        T: Index<I, Output=IrqHandlerMutex>,
+where
+    T: Index<I, Output = IrqHandlerMutex>,
 {
     /// Register an irq handler for an interrupt.
     /// The caller should assure that `initialize()` has been called before calling this function.
     fn register(&self, int: I, handler: IrqHandler) {
-        self.index(int).lock(|irq_handler| irq_handler.replace(handler)).unwrap();
+        self.index(int)
+            .lock(|irq_handler| irq_handler.replace(handler))
+            .unwrap();
     }
 
     /// Executes an irq handler for the givven interrupt.
     /// The caller should assure that `initialize()` has been called before calling this function.
     fn invoke(&self, int: I, tf: &mut TrapFrame) {
-        self.index(int).lock(|irq_handler| {
-            match irq_handler {
+        self.index(int)
+            .lock(|irq_handler| match irq_handler {
                 None => {}
                 Some(handler) => {
                     (**handler)(tf);
                 }
-            }
-        }).unwrap()
+            })
+            .unwrap()
     }
 }

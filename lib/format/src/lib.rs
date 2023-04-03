@@ -10,7 +10,7 @@ extern crate alloc;
 #[cfg(all(feature = "no_std", feature = "alloc"))]
 use alloc::vec::Vec;
 
-use shim::io::{Cursor, Read, Seek, Result, Write};
+use shim::io::{Cursor, Read, Result, Seek, Write};
 
 pub trait Format: Sized {
     fn load_readable<T: Read>(stream: &mut T) -> Result<Self>;

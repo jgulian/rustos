@@ -1,5 +1,5 @@
-use core::fmt;
 use crate::cluster::Cluster;
+use core::fmt;
 
 use self::Status::*;
 
@@ -74,7 +74,11 @@ impl FatEntry {
         self.status() == Free
     }
 
-    pub(crate) fn find(cluster: Cluster, fat_start_sector: u64, bytes_per_sector: u64) -> (u64, usize) {
+    pub(crate) fn find(
+        cluster: Cluster,
+        fat_start_sector: u64,
+        bytes_per_sector: u64,
+    ) -> (u64, usize) {
         let block = fat_start_sector + cluster.offset() as u64 / bytes_per_sector;
         let offset = (cluster.offset() as u64 % bytes_per_sector) as usize;
         (block, offset)

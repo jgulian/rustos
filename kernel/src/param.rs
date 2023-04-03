@@ -29,4 +29,3 @@ pub const KERN_STACK_SIZE: usize = PAGE_SIZE;
 
 /// The `tick` time.
 pub const TICK: Duration = Duration::from_secs(10);
-

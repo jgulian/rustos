@@ -1,39 +1,42 @@
 #[cfg(feature = "no_std")]
-use alloc::sync::Arc;
-#[cfg(feature = "no_std")]
 use alloc::boxed::Box;
 #[cfg(feature = "no_std")]
 use alloc::string::String;
+#[cfg(feature = "no_std")]
+use alloc::sync::Arc;
 #[cfg(feature = "no_std")]
 use alloc::vec;
 #[cfg(feature = "no_std")]
 use alloc::vec::Vec;
 use log::info;
 #[cfg(not(feature = "no_std"))]
-use std::sync::Arc;
-#[cfg(not(feature = "no_std"))]
 use std::boxed::Box;
 #[cfg(not(feature = "no_std"))]
 use std::string::String;
+#[cfg(not(feature = "no_std"))]
+use std::sync::Arc;
 #[cfg(not(feature = "no_std"))]
 use std::vec;
 #[cfg(not(feature = "no_std"))]
 use std::vec::Vec;
 
-use filesystem::filesystem;
 use crate::chain::Chain;
+use crate::cluster::Cluster;
+use crate::entry::EntryAttribute::LongFileName;
+use crate::entry::{
+    create_long_file_name_entries, parse_entry, parse_name, DirectoryEntry, LongFileNameEntry,
+    RegularDirectoryEntry,
+};
+use crate::error::VirtualFatResult;
+use crate::fat::Status;
+use crate::file::File;
 use crate::metadata::Metadata;
+use crate::virtual_fat::VirtualFat;
+use filesystem::filesystem;
 use format::Format;
 use shim::io;
 use shim::io::{Read, Seek, SeekFrom, Write};
 use sync::Mutex;
-use crate::cluster::Cluster;
-use crate::entry::{create_long_file_name_entries, DirectoryEntry, LongFileNameEntry, parse_entry, parse_name, RegularDirectoryEntry};
-use crate::entry::EntryAttribute::LongFileName;
-use crate::error::VirtualFatResult;
-use crate::fat::Status;
-use crate::file::File;
-use crate::virtual_fat::VirtualFat;
 
 pub(crate) struct Directory<M: Mutex<VirtualFat>> {
     pub(crate) virtual_fat: Arc<M>,
@@ -100,9 +103,11 @@ impl<M: Mutex<VirtualFat>> Directory<M> {
             }
         }
 
-        self.chain.seek(SeekFrom::Current(free_entries_found as i64 * -32))?;
-        long_file_names.iter().try_for_each(|long_file_name|
-            long_file_name.save_writable(&mut self.chain))?;
+        self.chain
+            .seek(SeekFrom::Current(free_entries_found as i64 * -32))?;
+        long_file_names
+            .iter()
+            .try_for_each(|long_file_name| long_file_name.save_writable(&mut self.chain))?;
         entry.save_writable(&mut self.chain)?;
 
         Ok(())
@@ -114,7 +119,7 @@ impl<M: Mutex<VirtualFat>> Directory<M> {
             if span.name().as_str() == file_name {
                 span.regular_entry.update_file_size(new_size)?;
                 span.save()?;
-                return Ok(())
+                return Ok(());
             }
         }
 
@@ -123,12 +128,19 @@ impl<M: Mutex<VirtualFat>> Directory<M> {
 
     //TODO: remove all these map_err s
     fn get_new_cluster(&mut self) -> io::Result<Cluster> {
-        self.virtual_fat.lock(|virtual_fat| -> VirtualFatResult<Cluster> {
-            let cluster = virtual_fat.get_clear_cluster()?;
-            virtual_fat.update_fat_entry(cluster, Status::new_eoc())?;
-            Ok(cluster)
-        }).map_err(|_| io::Error::new(io::ErrorKind::Unsupported, "virtual fat lock poisoned"))?
-            .map_err(|_| io::Error::new(io::ErrorKind::Unsupported, "failed to get and clean cluster"))
+        self.virtual_fat
+            .lock(|virtual_fat| -> VirtualFatResult<Cluster> {
+                let cluster = virtual_fat.get_clear_cluster()?;
+                virtual_fat.update_fat_entry(cluster, Status::new_eoc())?;
+                Ok(cluster)
+            })
+            .map_err(|_| io::Error::new(io::ErrorKind::Unsupported, "virtual fat lock poisoned"))?
+            .map_err(|_| {
+                io::Error::new(
+                    io::ErrorKind::Unsupported,
+                    "failed to get and clean cluster",
+                )
+            })
     }
 }
 
@@ -145,38 +157,32 @@ impl<M: Mutex<VirtualFat> + 'static> filesystem::Directory for Directory<M> {
             let (starting_cluster, metadata, file_size) = span.parse_entry();
 
             let chain = match file_size {
-                None => {
-                    Chain::new_from_cluster(
-                        self.virtual_fat.clone(),
-                        Cluster::from(starting_cluster),
-                    ).map_err(|_| io::Error::from(io::ErrorKind::Other))?
-                }
-                Some(file_size) => {
-                    Chain::new_from_cluster_with_size(
-                        self.virtual_fat.clone(),
-                        Cluster::from(starting_cluster),
-                        file_size as u64,
-                    ).map_err(|_| io::Error::from(io::ErrorKind::Other))?
-                }
+                None => Chain::new_from_cluster(
+                    self.virtual_fat.clone(),
+                    Cluster::from(starting_cluster),
+                )
+                .map_err(|_| io::Error::from(io::ErrorKind::Other))?,
+                Some(file_size) => Chain::new_from_cluster_with_size(
+                    self.virtual_fat.clone(),
+                    Cluster::from(starting_cluster),
+                    file_size as u64,
+                )
+                .map_err(|_| io::Error::from(io::ErrorKind::Other))?,
             };
 
             let entry = match file_size {
-                None => {
-                    filesystem::Entry::Directory(Box::new(Directory {
-                        virtual_fat: self.virtual_fat.clone(),
-                        metadata,
-                        chain,
-                    }))
-                }
-                Some(file_size) => {
-                    filesystem::Entry::File(Box::new(File {
-                        name: String::from(name),
-                        directory: self.clone(),
-                        metadata,
-                        file_size,
-                        chain,
-                    }))
-                }
+                None => filesystem::Entry::Directory(Box::new(Directory {
+                    virtual_fat: self.virtual_fat.clone(),
+                    metadata,
+                    chain,
+                })),
+                Some(file_size) => filesystem::Entry::File(Box::new(File {
+                    name: String::from(name),
+                    directory: self.clone(),
+                    metadata,
+                    file_size,
+                    chain,
+                })),
             };
 
             return Ok(entry);
@@ -251,7 +257,8 @@ impl<'a, M: Mutex<VirtualFat>> DirectoryEntrySpan<'a, M> {
 
     fn save(&mut self) -> io::Result<()> {
         self.chain.seek(SeekFrom::Start(self.start))?;
-        self.long_file_names.iter()
+        self.long_file_names
+            .iter()
             .try_for_each(|long_file_name| long_file_name.save_writable(self.chain))?;
         self.regular_entry.save_writable(self.chain)?;
         Ok(())

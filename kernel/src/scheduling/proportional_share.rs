@@ -1,17 +1,17 @@
+use crate::multiprocessing::per_core::local_irq;
+use crate::process::{Process, ProcessId, State};
+use crate::scheduling::scheduler::{SchedulerError, SchedulerResult};
+use crate::scheduling::{Scheduler, SwitchTrigger};
+use crate::traps::irq::IrqHandlerRegistry;
+use crate::traps::TrapFrame;
+use crate::SCHEDULER;
 use alloc::boxed::Box;
-use alloc::collections::{BinaryHeap, LinkedList};
+
 use alloc::vec::Vec;
 use core::cmp;
 use core::cmp::Ordering;
 use core::time::Duration;
 use pi::local_interrupt::{local_tick_in, LocalController, LocalInterrupt};
-use crate::multiprocessing::per_core::local_irq;
-use crate::process::{Process, ProcessId, State};
-use crate::SCHEDULER;
-use crate::scheduling::{Scheduler, SwitchTrigger};
-use crate::scheduling::scheduler::{SchedulerError, SchedulerResult};
-use crate::traps::irq::IrqHandlerRegistry;
-use crate::traps::TrapFrame;
 
 pub struct ProportionalShareScheduler {
     running: Vec<(ProcessInformation, Duration)>,
@@ -21,12 +21,21 @@ pub struct ProportionalShareScheduler {
 }
 
 impl ProportionalShareScheduler {
-    fn schedule_out(&mut self, trap_frame: &mut TrapFrame, state: State) -> SchedulerResult<ProcessInformation> {
-        let process_index = self.running
+    fn schedule_out(
+        &mut self,
+        trap_frame: &mut TrapFrame,
+        state: State,
+    ) -> SchedulerResult<ProcessInformation> {
+        let process_index = self
+            .running
             .iter()
             .enumerate()
             .find_map(|(i, (process_information, _))| {
-                if process_information.process.context.tpidr == trap_frame.tpidr { Some(i) } else { None }
+                if process_information.process.context.tpidr == trap_frame.tpidr {
+                    Some(i)
+                } else {
+                    None
+                }
             })
             .ok_or(SchedulerError::ProcessNotFound)?;
 
@@ -38,13 +47,19 @@ impl ProportionalShareScheduler {
         Ok(process_information)
     }
 
-    fn all_processes(&mut self) -> impl Iterator<Item=&mut ProcessInformation> {
-        self.running.iter_mut().map(|(p, _)| p).chain(self.processes.iter_mut())
+    fn all_processes(&mut self) -> impl Iterator<Item = &mut ProcessInformation> {
+        self.running
+            .iter_mut()
+            .map(|(p, _)| p)
+            .chain(self.processes.iter_mut())
     }
 }
 
 impl Scheduler for ProportionalShareScheduler {
-    fn new() -> Self where Self: Sized {
+    fn new() -> Self
+    where
+        Self: Sized,
+    {
         Self {
             running: Vec::default(),
             processes: Vec::default(),
@@ -57,10 +72,14 @@ impl Scheduler for ProportionalShareScheduler {
         let mut controller = LocalController::new(core);
         controller.enable_local_timer();
 
-        local_irq().register(LocalInterrupt::CntPnsIrq, Box::new(|trap_frame| {
-            SCHEDULER.switch(trap_frame, SwitchTrigger::Timer, State::Ready)
-                .expect("failed to switch processes");
-        }));
+        local_irq().register(
+            LocalInterrupt::CntPnsIrq,
+            Box::new(|trap_frame| {
+                SCHEDULER
+                    .switch(trap_frame, SwitchTrigger::Timer, State::Ready)
+                    .expect("failed to switch processes");
+            }),
+        );
 
         Ok(())
     }
@@ -79,9 +98,14 @@ impl Scheduler for ProportionalShareScheduler {
         Ok(process_information.process)
     }
 
-    fn switch(&mut self, trap_frame: &mut TrapFrame, _: SwitchTrigger, state: State) -> SchedulerResult<()> {
+    fn switch(
+        &mut self,
+        trap_frame: &mut TrapFrame,
+        _: SwitchTrigger,
+        state: State,
+    ) -> SchedulerResult<()> {
         let is_dying = state == State::Dead;
-        let mut process_information = self.schedule_out(trap_frame, state)?;
+        let process_information = self.schedule_out(trap_frame, state)?;
 
         if is_dying {
             if let Some(parent_id) = process_information.process.parent {
@@ -100,7 +124,10 @@ impl Scheduler for ProportionalShareScheduler {
     }
 
     fn schedule_in(&mut self, trap_frame: &mut TrapFrame) -> SchedulerResult<ProcessId> {
-        let (index, _) = self.processes.iter_mut().enumerate()
+        let (index, _) = self
+            .processes
+            .iter_mut()
+            .enumerate()
             .fold(None, |result, (i, process_information)| {
                 if !process_information.process.can_run() {
                     result
@@ -116,30 +143,41 @@ impl Scheduler for ProportionalShareScheduler {
                         }
                     }
                 }
-            }).ok_or(SchedulerError::NoRunnableProcess)?;
+            })
+            .ok_or(SchedulerError::NoRunnableProcess)?;
 
         let mut process_information = self.processes.remove(index);
         process_information.process.state = State::Running;
         let process_id = process_information.process.id();
         *trap_frame = *process_information.process.context;
-        self.running.push((process_information, pi::timer::current_time()));
+        self.running
+            .push((process_information, pi::timer::current_time()));
 
-        let scheduler_latency = self.scheduler_latency.checked_div(self.processes.len() as u32).unwrap_or(self.scheduler_latency);
+        let scheduler_latency = self
+            .scheduler_latency
+            .checked_div(self.processes.len() as u32)
+            .unwrap_or(self.scheduler_latency);
         let time_slice = cmp::max(scheduler_latency, self.minimum_granularity);
         local_tick_in(aarch64::affinity(), time_slice);
 
         Ok(process_id)
     }
 
-    fn on_process<F, R>(&mut self, trap_frame: &mut TrapFrame, function: F) -> SchedulerResult<R> where F: FnOnce(&mut Process) -> R, Self: Sized {
-        let process = self.all_processes()
+    fn on_process<F, R>(&mut self, trap_frame: &mut TrapFrame, function: F) -> SchedulerResult<R>
+    where
+        F: FnOnce(&mut Process) -> R,
+        Self: Sized,
+    {
+        let process = self
+            .all_processes()
             .find_map(|process_information| {
                 if process_information.process.context.tpidr == trap_frame.tpidr {
                     Some(&mut process_information.process)
                 } else {
                     None
                 }
-            }).ok_or(SchedulerError::ProcessNotFound)?;
+            })
+            .ok_or(SchedulerError::ProcessNotFound)?;
 
         *process.context = *trap_frame;
         let result = function(process);
@@ -150,7 +188,7 @@ impl Scheduler for ProportionalShareScheduler {
 }
 
 impl From<Vec<Process>> for ProportionalShareScheduler {
-    fn from(value: Vec<Process>) -> Self {
+    fn from(_value: Vec<Process>) -> Self {
         todo!()
     }
 }

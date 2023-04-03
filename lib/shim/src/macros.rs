@@ -21,33 +21,33 @@ macro_rules! const_assert_eq {
 
 //
 // TODO. make it
-// 
+//
 //   #[assert_size(N)]
 //   struct S {..}
-//   
+//
 #[macro_export]
 macro_rules! const_assert_size {
     ($struct:ident, $size:expr) => {
         $crate::const_assert_eq!(core::mem::size_of::<$struct>(), ($size));
-    }
+    };
 }
 
 #[macro_export]
 macro_rules! newioerr {
-    ($kind:tt) => (
+    ($kind:tt) => {
         io::Error::from(io::ErrorKind::$kind);
-    );
-    ($kind:tt, $msg:tt) => (
+    };
+    ($kind:tt, $msg:tt) => {
         io::Error::new(io::ErrorKind::$kind, $msg);
-    )
+    };
 }
 
 #[macro_export]
 macro_rules! ioerr {
-    ($kind:tt) => (
+    ($kind:tt) => {
         Err(io::Error::from(io::ErrorKind::$kind));
-    );
-    ($kind:tt, $msg:tt) => (
+    };
+    ($kind:tt, $msg:tt) => {
         Err(io::Error::new(io::ErrorKind::$kind, $msg));
-    )
+    };
 }

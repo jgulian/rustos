@@ -1,7 +1,7 @@
 use core::time::Duration;
 
-use volatile::{ReadVolatile, Volatile};
 use volatile::prelude::*;
+use volatile::{ReadVolatile, Volatile};
 
 use crate::common::IO_BASE;
 

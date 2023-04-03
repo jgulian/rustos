@@ -69,7 +69,10 @@ impl L3Entry {
     }
 
     pub fn permissions(&self) -> PagePermissions {
-        match (self.0.get_value(RawL3Entry::AP), self.0.get_value(RawL3Entry::XN)) {
+        match (
+            self.0.get_value(RawL3Entry::AP),
+            self.0.get_value(RawL3Entry::XN),
+        ) {
             (EntryPerm::USER_RW, EntryNx::Nx) => PagePermissions::RW,
             (EntryPerm::USER_RO, EntryNx::Nx) => PagePermissions::RO,
             (EntryPerm::USER_RW, EntryNx::Ex) => PagePermissions::RWX,
@@ -189,7 +192,10 @@ impl PageTable {
 
         for i in 0..3 {
             let mut page_entry = RawL2Entry::new(0);
-            page_entry.set_value(page_table.l3[i].as_ptr().as_u64() >> PAGE_ALIGN, RawL2Entry::ADDR);
+            page_entry.set_value(
+                page_table.l3[i].as_ptr().as_u64() >> PAGE_ALIGN,
+                RawL2Entry::ADDR,
+            );
             page_entry.set_value(1, RawL2Entry::AF);
             page_entry.set_value(EntrySh::ISh, RawL2Entry::AP);
             page_entry.set_value(perm, RawL2Entry::SH);
@@ -374,7 +380,11 @@ impl UserPageTable {
         return unsafe { core::slice::from_raw_parts_mut(page, PAGE_SIZE) };
     }
 
-    pub fn cow(&mut self, mut virtual_address: VirtualAddr, other_l3_entry: &mut L3Entry) -> OsResult<()> {
+    pub fn cow(
+        &mut self,
+        mut virtual_address: VirtualAddr,
+        other_l3_entry: &mut L3Entry,
+    ) -> OsResult<()> {
         if virtual_address.as_usize() < USER_IMG_BASE {
             panic!("invalid virtual address");
         }
@@ -391,11 +401,11 @@ impl UserPageTable {
         match other_l3_entry.permissions() {
             PagePermissions::RW => {
                 other_l3_entry.set_permissions(PagePermissions::RO);
-            },
+            }
             PagePermissions::RWX => {
                 other_l3_entry.set_permissions(PagePermissions::RX);
-            },
-            _ => {},
+            }
+            _ => {}
         }
 
         if !other_l3_entry.is_cow() {
@@ -447,9 +457,12 @@ impl UserPageTable {
 
             destination_page.copy_from_slice(source_page);
 
-
             if cfg!(feature = "monitor_lab2") {
-                info!("{}: copy at {:x}", pid, virtual_address.as_usize() + USER_IMG_BASE);
+                info!(
+                    "{}: copy at {:x}",
+                    pid,
+                    virtual_address.as_usize() + USER_IMG_BASE
+                );
             }
 
             new_address
@@ -459,7 +472,9 @@ impl UserPageTable {
 
         VMM.unpin_frame(physical_address);
 
-        l3_entry.0.set_value(new_address >> PAGE_ALIGN, RawL3Entry::ADDR);
+        l3_entry
+            .0
+            .set_value(new_address >> PAGE_ALIGN, RawL3Entry::ADDR);
         self.set_entry(virtual_address, l3_entry);
 
         Ok(())
@@ -477,17 +492,22 @@ impl UserPageTable {
         }
     }
 
-    pub fn allocated(&mut self) -> impl Iterator<Item=(VirtualAddr, &mut L3Entry)> {
+    pub fn allocated(&mut self) -> impl Iterator<Item = (VirtualAddr, &mut L3Entry)> {
         self.l3.iter_mut().enumerate().flat_map(|(i, table)| {
-            table.entries.iter_mut().enumerate().filter_map(move |(j, l3_entry)| {
-                let virtual_address = VirtualAddr::from(
-                    USER_IMG_BASE + ((i & ((1 << 14) - 1)) << 29 | (j & ((1 << 14) - 1)) << 16));
-                if l3_entry.is_valid() {
-                    Some((virtual_address, l3_entry))
-                } else {
-                    None
-                }
-            })
+            table
+                .entries
+                .iter_mut()
+                .enumerate()
+                .filter_map(move |(j, l3_entry)| {
+                    let virtual_address = VirtualAddr::from(
+                        USER_IMG_BASE + ((i & ((1 << 14) - 1)) << 29 | (j & ((1 << 14) - 1)) << 16),
+                    );
+                    if l3_entry.is_valid() {
+                        Some((virtual_address, l3_entry))
+                    } else {
+                        None
+                    }
+                })
         })
     }
 }

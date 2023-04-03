@@ -11,8 +11,8 @@ use std::string::ToString;
 #[cfg(not(feature = "no_std"))]
 use std::vec::Vec;
 
-use shim::io;
 use core::fmt::{Display, Formatter};
+use shim::io;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Component {
@@ -23,6 +23,7 @@ pub enum Component {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Default)]
 pub struct Path(String);
 
 impl Path {
@@ -38,7 +39,7 @@ impl Path {
         path
     }
 
-    pub fn components(&self) -> impl Iterator<Item=Component> {
+    pub fn components(&self) -> impl Iterator<Item = Component> {
         PathComponentIterator(self.0.clone(), 0)
     }
 
@@ -74,10 +75,11 @@ impl Path {
     }
 
     pub fn simplify(&self) -> Path {
-        self.components().fold(Default::default(), |mut path, component| {
-            path.push_component(component);
-            path
-        })
+        self.components()
+            .fold(Default::default(), |mut path, component| {
+                path.push_component(component);
+                path
+            })
     }
 
     pub fn starts_with(&self, other: &Path) -> bool {
@@ -112,24 +114,22 @@ impl TryFrom<&str> for Path {
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         let mut result = Path::default();
 
-        value.split('/').try_for_each(|component_str| -> io::Result<()> {
-            if component_str.is_empty() {
-                result.push_component(Component::Root)
-            } else {
-                result.join_str(component_str)?;
-            }
-            Ok(())
-        })?;
+        value
+            .split('/')
+            .try_for_each(|component_str| -> io::Result<()> {
+                if component_str.is_empty() {
+                    result.push_component(Component::Root)
+                } else {
+                    result.join_str(component_str)?;
+                }
+                Ok(())
+            })?;
 
         Ok(result)
     }
 }
 
-impl Default for Path {
-    fn default() -> Self {
-        Self(String::from(""))
-    }
-}
+
 
 impl Display for Path {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
@@ -147,15 +147,18 @@ impl Iterator for PathComponentIterator {
             return None;
         }
 
-        let component: String = self.0.chars().skip(self.1).take_while(|c| *c != '/').collect();
+        let component: String = self
+            .0
+            .chars()
+            .skip(self.1)
+            .take_while(|c| *c != '/')
+            .collect();
         self.1 += component.len() + 1;
-        Some(
-            match component.as_str() {
-                "" => Component::Root,
-                "." => Component::Current,
-                ".." => Component::Parent,
-                _ => Component::Child(component),
-            }
-        )
+        Some(match component.as_str() {
+            "" => Component::Root,
+            "." => Component::Current,
+            ".." => Component::Parent,
+            _ => Component::Child(component),
+        })
     }
 }

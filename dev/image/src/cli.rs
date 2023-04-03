@@ -1,5 +1,5 @@
-use std::path::PathBuf;
 use clap::{Parser, Subcommand, ValueEnum};
+use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -24,10 +24,14 @@ pub enum ImageCommand {
         image_size_mb: u64,
     },
     /// Format the image by adding
-    Format { filesystem: FileSystem, partition: u8, folder: PathBuf },
+    Format {
+        filesystem: FileSystem,
+        partition: u8,
+        folder: PathBuf,
+    },
 }
 
 #[derive(ValueEnum, Debug, Clone)]
 pub enum FileSystem {
-    Fat32
+    Fat32,
 }

@@ -4,9 +4,9 @@ use core::ptr::write_volatile;
 
 use aarch64::*;
 
-use crate::{kernel_main, SCHEDULER};
 use crate::param::*;
 use crate::VMM;
+use crate::{kernel_main, SCHEDULER};
 
 mod oom;
 mod panic;
