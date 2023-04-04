@@ -1,22 +1,14 @@
-
-
 use core::arch::asm;
 use core::ops::Add;
-
-
-
-
-
 
 use sync::Mutex;
 
 use crate::multiprocessing::spin_lock::SpinLock;
 use crate::process::{Process, ProcessId, State};
 use crate::scheduling::proportional_share::ProportionalShareScheduler;
-use crate::scheduling::scheduler::{Scheduler, SchedulerError, SchedulerResult, SwitchTrigger};
 use crate::scheduling::RoundRobinScheduler;
+use crate::scheduling::scheduler::{Scheduler, SchedulerError, SchedulerResult, SwitchTrigger};
 use crate::traps::TrapFrame;
-
 
 extern "C" {
     fn context_restore();
@@ -198,7 +190,7 @@ impl GlobalScheduler {
 
         let mut trap_frame: TrapFrame = Default::default();
         self.schedule_in(&mut trap_frame)
-            .expect("unable to schedule initial process");r
+            .expect("unable to schedule initial process");
 
         unsafe {
             asm!(

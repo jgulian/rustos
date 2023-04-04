@@ -1,6 +1,11 @@
 use alloc::boxed::Box;
 use core::arch::asm;
-use crate::{OsResult, print, println};
+use core::cell::UnsafeCell;
+use core::sync::atomic::{AtomicBool, AtomicUsize};
+
+use sync::{LockError, LockResult};
+
+use crate::OsResult;
 use crate::syscall::{clone, exit, wait};
 
 #[no_mangle]
@@ -35,3 +40,45 @@ impl Drop for Thread {
         wait(self.0, None).expect("unable to join thread");
     }
 }
+
+pub struct SpinLock<T: Send> {
+    data: UnsafeCell<T>,
+    held: AtomicBool,
+    owner: AtomicUsize,
+}
+
+impl<T: Send> sync::Mutex<T> for SpinLock<T> {
+    fn new(value: T) -> Self where Self: Sized {
+        Self {
+            data: UnsafeCell::new(value),
+            held: AtomicBool::new(false),
+            owner: AtomicUsize::new(0),
+        }
+    }
+
+    fn lock<R>(&self, f: impl FnOnce(&mut T) -> R) -> LockResult<R> {
+        while self.held.swap(true, core::sync::atomic::Ordering::SeqCst) {}
+        let result = f(unsafe { &mut *self.data.get() });
+        self.held.store(false, core::sync::atomic::Ordering::SeqCst);
+        Ok(result)
+    }
+
+    fn try_lock<R>(&self, f: impl FnOnce(&mut T) -> R) -> LockResult<R> {
+        let acquired = !self.held.swap(true, core::sync::atomic::Ordering::SeqCst);
+        if acquired {
+            let result = f(unsafe { &mut *self.data.get() });
+            self.held.store(false, core::sync::atomic::Ordering::SeqCst);
+            Ok(result)
+        } else {
+            Err(LockError::WouldBlock)
+        }
+    }
+
+    fn is_poisoned(&self) -> bool {
+        false
+    }
+
+    fn clear_poison(&self) {}
+}
+
+unsafe impl<T: Send> Sync for SpinLock<T> {}

@@ -7,12 +7,14 @@ extern crate alloc;
 use alloc::boxed::Box;
 use alloc::rc::Rc;
 use alloc::string::{String, ToString};
+use alloc::sync::Arc;
 use core::cell::{RefCell, UnsafeCell};
 use core::ops::Deref;
-use core::time::Duration;
-use kernel_api::{print, println};
+
+use kernel_api::println;
 use kernel_api::syscall::{exit, fork, getpid, sbrk, wait};
-use kernel_api::thread::Thread;
+use kernel_api::thread::{SpinLock, Thread};
+use sync::Mutex;
 
 use crate::user::get_arguments;
 
@@ -86,8 +88,9 @@ fn fibonacci(num: usize) -> usize {
     }
 }
 
-fn create_race_thread(test: Rc<UnsafeCell<i32>>) -> Thread {
+fn create_race_thread(data: Arc<(UnsafeCell<i32>, SpinLock<bool>)>) -> Thread {
     Thread::create(Box::new(move || {
+        let (test, spin_lock) = data.deref();
         while unsafe { core::ptr::read_volatile(test.get()) == -1 } {}
         let mut count = 0;
         unsafe {
@@ -95,19 +98,26 @@ fn create_race_thread(test: Rc<UnsafeCell<i32>>) -> Thread {
                 count += 1;
                 core::ptr::write_volatile(test.get(), core::ptr::read_volatile(test.get()) + 1);
             }
+            spin_lock.lock(|_| {
+                println!("Added {}", count);
+            }).unwrap();
         }
-        println!("Added {}", count);
+
     })).unwrap()
 }
 
 fn test_thread_will_race() {
-    let test = Rc::new(UnsafeCell::new(-1));
+    let data = Arc::new((UnsafeCell::new(-1), SpinLock::new(false)));
     {
-        let thread_a = create_race_thread(test.clone());
-        let thread_b = create_race_thread(test.clone());
+        let thread_a = create_race_thread(data.clone());
+        let thread_b = create_race_thread(data.clone());
         println!("Starting experiment");
+        let (test, _) = data.deref();
         unsafe { core::ptr::write_volatile(test.get(), 0) };
     }
 
+    let (test, _) = data.deref();
     println!("thread race {}", unsafe { core::ptr::read_volatile(test.get()) });
 }
+
+fn test_thread_safe() {}
