@@ -8,8 +8,9 @@ use crate::user::get_arguments;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::cmp::{max, min};
-use kernel_api::syscall::{execute, exit, fork, open, time, wait, File};
+use kernel_api::syscall::{execute, exit, fork, open, time, wait};
 use kernel_api::{print, println, OsError, OsResult};
+use kernel_api::file::File;
 use shim::io::Read;
 
 mod user;

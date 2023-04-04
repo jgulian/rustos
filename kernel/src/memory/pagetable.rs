@@ -333,13 +333,13 @@ pub enum PagePermissions {
     RX,
 }
 
-pub struct UserPageTable(Box<PageTable>);
+pub struct UserPageTable(Box<PageTable>, usize);
 
 impl UserPageTable {
     /// Returns a new `UserPageTable` containing a `PageTable` created with
     /// `USER_RW` permission.
     pub fn new() -> UserPageTable {
-        UserPageTable(PageTable::new(EntryPerm::USER_RW))
+        UserPageTable(PageTable::new(EntryPerm::USER_RW), 0)
     }
 
     /// Allocates a page and set an L3 entry translates given virtual address to the
@@ -351,7 +351,7 @@ impl UserPageTable {
     /// Panics if allocator fails to allocate a page.
     ///
     /// TODO. use Result<T> and make it failurable
-    pub fn alloc(&mut self, mut va: VirtualAddr, permissions: PagePermissions) -> &mut [u8] {
+    pub fn alloc(&mut self, mut va: VirtualAddr, permissions: PagePermissions) -> &'static mut [u8] {
         if va.as_usize() < USER_IMG_BASE {
             panic!("invalid virtual address");
         }
@@ -377,7 +377,7 @@ impl UserPageTable {
         l3_entry.set_permissions(permissions);
         self.0.set_entry(va, l3_entry);
 
-        return unsafe { core::slice::from_raw_parts_mut(page, PAGE_SIZE) };
+        return unsafe { slice::from_raw_parts_mut(page, PAGE_SIZE) };
     }
 
     pub fn cow(
@@ -480,6 +480,13 @@ impl UserPageTable {
         Ok(())
     }
 
+    pub fn new_stack(&mut self, stack_base: VirtualAddr) -> (VirtualAddr, &'static mut [u8]) {
+        let address = stack_base - VirtualAddr::from(PAGE_SIZE * self.1);
+        self.1 += 1;
+        let buffer = self.alloc(address, PagePermissions::RW);
+        (address, buffer)
+    }
+
     pub fn translate(&self, virtual_address: VirtualAddr) -> io::Result<PhysicalAddr> {
         let page_aligned = virtual_address.page_aligned();
         let (l2_index, l3_index) = PageTable::locate(page_aligned);
@@ -579,5 +586,3 @@ impl fmt::Debug for UserPageTable {
         Ok(())
     }
 }
-
-// FIXME: Implement `fmt::Debug` as you need.

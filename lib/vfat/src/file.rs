@@ -6,7 +6,7 @@ use crate::virtual_fat::VirtualFat;
 use alloc::boxed::Box;
 #[cfg(feature = "no_std")]
 use alloc::string::String;
-use log::info;
+
 use shim::io::{self, SeekFrom};
 #[cfg(not(feature = "no_std"))]
 use std::boxed::Box;

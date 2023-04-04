@@ -16,7 +16,7 @@ use std::vec;
 use std::vec::Vec;
 
 use core::mem;
-use log::info;
+
 
 use crate::bios_parameter_block::BiosParameterBlock;
 use crate::chain::Chain;
@@ -43,7 +43,7 @@ pub struct VirtualFat {
 
 impl VirtualFat {
     fn get_blocks(&self, cluster: Cluster) -> (u64, u64) {
-        let mut first_block =
+        let first_block =
             cluster.sector_start(self.data_start_sector, self.sectors_per_cluster);
         let final_block = first_block + self.sectors_per_cluster as u64;
         (first_block, final_block)
@@ -231,7 +231,7 @@ impl<M: Mutex<VirtualFat> + 'static> filesystem::filesystem::Filesystem
         bpb.save_writable_seekable(&mut Cursor::new(&mut bpb_data))?;
         device.write_block(partition.relative_sector as u64, bpb_data.as_slice())?;
 
-        let mut zero: Vec<u8> = vec![0u8; sector_size];
+        let zero: Vec<u8> = vec![0u8; sector_size];
         let mut fat_empty: Vec<u8> = vec![0u8; sector_size];
         fat_empty[0x0..0x4].copy_from_slice(&0xfff_fff8_u32.to_le_bytes());
         fat_empty[0x4..0x8].copy_from_slice(&0xfff_ffff_u32.to_le_bytes());

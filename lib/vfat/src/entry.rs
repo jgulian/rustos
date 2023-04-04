@@ -5,9 +5,9 @@ use crate::metadata::Metadata;
 use alloc::string::String;
 #[cfg(feature = "no_std")]
 use alloc::vec::Vec;
-use core::char::TryFromCharError;
+
 use format::Format;
-use log::info;
+
 use shim::io;
 use shim::io::{Read, Seek, Write};
 #[cfg(not(feature = "no_std"))]

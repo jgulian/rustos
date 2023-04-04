@@ -34,6 +34,10 @@ macro_rules! syscall_args {
         syscall_args!($a, $b, $c);
         asm!("mov x3, {}", in(reg) $d);
     );
+    ($a:expr, $b:expr, $c:expr, $d:expr, $e:expr) => (
+        syscall_args!($a, $b, $c, $d);
+        asm!("mov x4, {}", in(reg) $e);
+    );
 }
 
 macro_rules! syscall {
@@ -205,56 +209,11 @@ pub fn wait(process: u64, timeout: Option<u64>) -> OsResult<Option<u64>> {
     }
 }
 
-struct Console;
-
-impl Write for Console {
-    fn write_str(&mut self, s: &str) -> fmt::Result {
-        write(1, s.as_bytes()).expect("unable to write data");
-        Ok(())
-    }
-}
-
-#[macro_export]
-macro_rules! print {
-    ($($arg:tt)*) => ($crate::syscall::vprint(format_args!($($arg)*)));
-}
-
-#[macro_export]
-macro_rules! println {
- () => (print!("\n"));
-    ($($arg:tt)*) => ({
-        $crate::syscall::vprint(format_args!($($arg)*));
-        $crate::print!("\n");
-    })
-}
-
-pub fn vprint(args: fmt::Arguments) {
-    let mut c = Console;
-    c.write_fmt(args).unwrap();
-}
-
-// TODO: move to jlib
-pub struct File(u64);
-//TODO: Drop to close syscall
-
-impl File {
-    pub fn new(inner: u64) -> Self {
-        File(inner)
-    }
-}
-
-impl io::Read for File {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        read(self.0, buf).map_err(|_| newioerr!(Interrupted))
-    }
-}
-
-impl io::Write for File {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        write(self.0, buf).map_err(|_| newioerr!(Interrupted))
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        ioerr!(Unsupported)
+#[inline(never)]
+pub(super) fn clone(start_address: usize, data: usize) -> OsResult<u64> {
+    unsafe {
+        syscall_args!(start_address, data);
+        syscall!(Syscall::Clone);
+        syscall_receive1!()
     }
 }

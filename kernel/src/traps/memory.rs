@@ -1,4 +1,5 @@
 use kernel_api::{OsError, OsResult};
+use sync::Mutex;
 
 use crate::memory::VirtualAddr;
 
@@ -23,8 +24,7 @@ pub(crate) fn handle_memory_abort(
     match fault_status_code {
         FaultStatusCode::PermissionFault3 => SCHEDULER.on_process(trap_frame, |process| {
             process
-                .vmap
-                .remove_cow(faulting_address, process.context.tpidr)
+                .vmap.lock(|vmap| vmap.remove_cow(faulting_address, process.context.tpidr)).unwrap()
         })?,
         _ => Err(OsError::Unknown),
     }

@@ -5,8 +5,9 @@
 
 extern crate alloc;
 
+use kernel_api::file::File;
 use kernel_api::println;
-use kernel_api::syscall::{open, write, File};
+use kernel_api::syscall::{open, write};
 use shim::io::Read;
 
 use crate::user::get_arguments;

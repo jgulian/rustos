@@ -8,21 +8,20 @@ use alloc::sync::Arc;
 use alloc::vec;
 #[cfg(feature = "no_std")]
 use alloc::vec::Vec;
-use log::info;
+
 #[cfg(not(feature = "no_std"))]
 use std::boxed::Box;
 #[cfg(not(feature = "no_std"))]
 use std::string::String;
 #[cfg(not(feature = "no_std"))]
 use std::sync::Arc;
-#[cfg(not(feature = "no_std"))]
-use std::vec;
+
 #[cfg(not(feature = "no_std"))]
 use std::vec::Vec;
 
 use crate::chain::Chain;
 use crate::cluster::Cluster;
-use crate::entry::EntryAttribute::LongFileName;
+
 use crate::entry::{
     create_long_file_name_entries, parse_entry, parse_name, DirectoryEntry, LongFileNameEntry,
     RegularDirectoryEntry,
@@ -35,7 +34,7 @@ use crate::virtual_fat::VirtualFat;
 use filesystem::filesystem;
 use format::Format;
 use shim::io;
-use shim::io::{Read, Seek, SeekFrom, Write};
+use shim::io::{Read, Seek, SeekFrom};
 use sync::Mutex;
 
 pub(crate) struct Directory<M: Mutex<VirtualFat>> {

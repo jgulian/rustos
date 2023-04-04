@@ -150,6 +150,7 @@ impl Scheduler for ProportionalShareScheduler {
         process_information.process.state = State::Running;
         let process_id = process_information.process.id();
         *trap_frame = *process_information.process.context;
+        //info!("scheduled in {} with {:x?} {:x?}", process_information.process.context.tpidr, process_information.process.context.ttbr0, process_information.process.context.ttbr1);
         self.running
             .push((process_information, pi::timer::current_time()));
 

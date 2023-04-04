@@ -8,8 +8,9 @@ extern crate alloc;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
-use kernel_api::syscall::{execute, exit, fork, wait, File};
+use kernel_api::syscall::{execute, exit, fork, wait};
 use kernel_api::{print, println};
+use kernel_api::file::File;
 use shim::io::{Read, Write};
 
 mod user;

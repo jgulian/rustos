@@ -1,5 +1,6 @@
 use alloc::boxed::Box;
 use alloc::string::{String, ToString};
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::borrow::Borrow;
 use core::mem;
@@ -11,12 +12,13 @@ use aarch64::SPSR_EL1;
 use filesystem::filesystem::Filesystem;
 use filesystem::path::Path;
 use kernel_api::{OsError, OsResult};
-use shim::io::Write;
 use shim::{io, newioerr};
+use sync::Mutex;
 
 use crate::{FILESYSTEM, VMM};
 
 use crate::memory::*;
+use crate::multiprocessing::spin_lock::SpinLock;
 use crate::param::*;
 use crate::process::pipe::PipeResource;
 use crate::process::resource::{Resource, ResourceId, ResourceList};
@@ -39,12 +41,11 @@ impl From<u64> for ProcessId {
 }
 
 /// A structure that represents the complete state of a process.
-#[derive(Debug)]
 pub struct Process {
     /// The saved trap frame of a process.
     pub context: Box<TrapFrame>,
     /// The page table describing the Virtual Memory of the process
-    pub vmap: Box<UserPageTable>,
+    pub vmap: Arc<SpinLock<UserPageTable>>,
     /// The scheduling state of the process.
     pub state: State,
     /// The resources (files) open by a process
@@ -66,7 +67,7 @@ impl Process {
     pub fn new() -> OsResult<Process> {
         Ok(Process {
             context: Box::default(),
-            vmap: Box::new(UserPageTable::new()),
+            vmap: Arc::new(SpinLock::new(UserPageTable::new())),
             state: State::Ready,
             resources: ResourceList::new(),
             parent: None,
@@ -90,7 +91,7 @@ impl Process {
         p.context.sp = Process::get_stack_top().as_u64();
         p.context.elr = Process::get_image_base().as_u64();
         p.context.ttbr0 = VMM.get_baddr().as_u64();
-        p.context.ttbr1 = p.vmap.get_baddr().as_u64();
+        p.context.ttbr1 = p.vmap.lock(|vmap| vmap.get_baddr().as_u64()).unwrap();
         p.context.spsr = SPSR_EL1::F | SPSR_EL1::A | SPSR_EL1::D;
 
         Ok(p)
@@ -101,12 +102,10 @@ impl Process {
     /// permission to load file's contents.
     fn do_load(pn: &Path) -> OsResult<Process> {
         let mut process = Process::new()?;
-        process
-            .vmap
-            .alloc(Process::get_stack_base(), PagePermissions::RW);
-        let user_image = process
-            .vmap
-            .alloc(Process::get_image_base(), PagePermissions::RWX);
+        let user_image = process.vmap.lock(|vmap| {
+            vmap.new_stack(Process::get_stack_base());
+            vmap.alloc(Process::get_image_base(), PagePermissions::RWX)
+        }).unwrap();
 
         let mut file = FILESYSTEM
             .borrow()
@@ -223,7 +222,7 @@ impl Process {
     pub fn fork(&mut self) -> OsResult<Process> {
         let mut new_process = Process {
             context: Box::new(*self.context),
-            vmap: Box::new(UserPageTable::new()),
+            vmap: Arc::new(SpinLock::new(UserPageTable::new())),
             state: State::Ready,
             resources: self.resources.duplicate()?,
             parent: Some(ProcessId::from(self.context.tpidr)),
@@ -235,23 +234,26 @@ impl Process {
         new_process.context.xs[1] = 1;
         new_process.context.xs[7] = OsError::Ok as u64;
         new_process.context.ttbr0 = VMM.get_baddr().as_u64();
-        new_process.context.ttbr1 = new_process.vmap.get_baddr().as_u64();
-
-        if cfg!(feature = "cow_fork") {
-            self.vmap
-                .allocated()
-                .try_for_each(|(virtual_address, l3_entry)| {
-                    new_process.vmap.cow(virtual_address, l3_entry)
-                })?;
-        } else {
-            for (virtual_address, l3_entry) in self.vmap.allocated() {
-                let page = new_process
-                    .vmap
-                    .alloc(virtual_address, l3_entry.permissions());
-                let source = unsafe { from_raw_parts(l3_entry.address() as *const u8, PAGE_SIZE) };
-                page.copy_from_slice(source);
-            }
-        }
+        new_process.vmap.lock(|new_vmap| -> OsResult<()> {
+            self.vmap.lock(|old_vmap| -> OsResult<()>  {
+                if cfg!(feature = "cow_fork") {
+                    old_vmap
+                        .allocated()
+                        .try_for_each(|(virtual_address, l3_entry)| {
+                            new_vmap.cow(virtual_address, l3_entry)
+                        })?;
+                } else {
+                    for (virtual_address, l3_entry) in old_vmap.allocated() {
+                        let page = new_vmap
+                            .alloc(virtual_address, l3_entry.permissions());
+                        let source = unsafe { from_raw_parts(l3_entry.address() as *const u8, PAGE_SIZE) };
+                        page.copy_from_slice(source);
+                    }
+                }
+                Ok(())
+            }).unwrap()?;
+            Ok(new_process.context.ttbr1 = new_vmap.get_baddr().as_u64())
+        }).unwrap()?;
 
         Ok(new_process)
     }
@@ -274,11 +276,9 @@ impl Process {
             .into_file()
             .map_err(|_| newioerr!(InvalidFilename))?;
 
-        self.vmap = Box::new(UserPageTable::new());
+        self.vmap = Arc::new(SpinLock::new(UserPageTable::new()));
 
-        let stack = self
-            .vmap
-            .alloc(Process::get_stack_base(), PagePermissions::RW);
+        let (_, stack) = self.vmap.lock(|vmap| vmap.new_stack(Process::get_stack_base())).unwrap();
         let mut stack_data = Vec::new();
 
         // TODO: clean this; actually this is just broken
@@ -296,17 +296,40 @@ impl Process {
         stack[stack_size - stack_data.len()..].copy_from_slice(stack_data.as_slice());
 
         let user_image = self
-            .vmap
-            .alloc(Process::get_image_base(), PagePermissions::RWX);
+            .vmap.lock(|vmap| vmap.alloc(Process::get_image_base(), PagePermissions::RWX)).unwrap();
+
         program_file.read(user_image)?;
 
         self.context.sp = Process::get_stack_top().as_u64() - (stack_data.len() as u64);
         self.context.elr = Process::get_image_base().as_u64();
         self.context.ttbr0 = VMM.get_baddr().as_u64();
-        self.context.ttbr1 = self.vmap.get_baddr().as_u64();
+        self.context.ttbr1 = self.vmap.lock(|vmap| vmap.get_baddr().as_u64()).unwrap();
         self.context.spsr = SPSR_EL1::F | SPSR_EL1::A | SPSR_EL1::D;
 
         Ok(())
+    }
+
+    pub fn clone(&mut self, start_address: u64, argument: u64) -> OsResult<Process> {
+        let mut new_process = Process {
+            context: Box::new(*self.context),
+            vmap: self.vmap.clone(),
+            state: State::Ready,
+            resources: self.resources.duplicate()?,
+            parent: Some(ProcessId::from(self.context.tpidr)),
+            dead_children: Vec::new(),
+            current_directory: self.current_directory.clone(),
+        };
+
+        let (stack_address, _) = self.vmap.lock(|vmap| {
+            vmap.new_stack(Process::get_stack_base())
+        }).unwrap();
+
+        new_process.context.xs[0] = argument;
+        new_process.context.xs[7] = OsError::Ok as u64;
+        new_process.context.sp = stack_address.as_u64() + PAGE_SIZE as u64 - 1;
+        new_process.context.elr = start_address;
+
+        Ok(new_process)
     }
 }
 

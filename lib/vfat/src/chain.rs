@@ -4,15 +4,14 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 #[cfg(not(feature = "no_std"))]
 use std::sync::Arc;
-#[cfg(not(feature = "no_std"))]
-use std::vec::Vec;
+
 
 use crate::cluster::Cluster;
 use crate::error::{VirtualFatError, VirtualFatResult};
 use crate::fat::Status;
 use crate::virtual_fat::VirtualFat;
 use filesystem::device::{stream_read, stream_write, BlockDevice};
-use log::info;
+
 use shim::io;
 use shim::io::SeekFrom;
 use sync::Mutex;

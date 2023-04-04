@@ -7,6 +7,7 @@ use core::time::Duration;
 use kernel_api::OsError::BadAddress;
 use kernel_api::*;
 use pi::timer;
+use sync::Mutex;
 
 use crate::memory::{PagePermissions, VirtualAddr};
 use crate::param::{PAGE_SIZE, USER_IMG_BASE};
@@ -158,15 +159,14 @@ fn sys_sbrk(tf: &mut TrapFrame) -> OsResult<()> {
     let result = SCHEDULER.on_process(tf, |process| -> OsResult<(u64, u64)> {
         //TODO: pick a better heap base / allow more sbrks / something might be wrong with is_valid
         let mut heap_base = USER_IMG_BASE + PAGE_SIZE;
-        while process
-            .vmap
-            .is_valid(VirtualAddr::from(heap_base - USER_IMG_BASE))
-        {
-            heap_base += PAGE_SIZE;
-        }
-        process
-            .vmap
-            .alloc(VirtualAddr::from(heap_base), PagePermissions::RW);
+
+        process.vmap.lock(|vmap| {
+            while vmap.is_valid(VirtualAddr::from(heap_base - USER_IMG_BASE)) {
+                heap_base += PAGE_SIZE;
+            }
+            vmap.alloc(VirtualAddr::from(heap_base), PagePermissions::RW);
+        }).unwrap();
+
         Ok((heap_base as u64, PAGE_SIZE as u64))
     })??;
 
@@ -237,6 +237,17 @@ fn sys_wait(trap_frame: &mut TrapFrame) -> OsResult<()> {
     Ok(())
 }
 
+fn clone(trap_frame: &mut TrapFrame) -> OsResult<()> {
+    let function_address = trap_frame.xs[0];
+    let data = trap_frame.xs[1];
+    let process = SCHEDULER.on_process(trap_frame, |process| process.clone(function_address, data))??;
+    let process_id = SCHEDULER.add(process)?;
+
+    trap_frame.xs[0] = process_id.into();
+
+    Ok(())
+}
+
 //TODO: make the functions work across page boundaries
 //TODO: this is fundamentally unsafe
 fn copy_from_userspace(_: &TrapFrame, ptr: u64, buf: &mut [u8]) -> OsResult<()> {
@@ -279,6 +290,7 @@ fn syscall_to_function(call: Syscall) -> fn(tf: &mut TrapFrame) -> OsResult<()> 
         Syscall::Exit => sys_exit,
         Syscall::Wait => sys_wait,
         Syscall::GetPid => sys_getpid,
+        Syscall::Clone => clone,
         Syscall::Sbrk => sys_sbrk,
         Syscall::Sleep => sys_sleep,
         Syscall::Time => sys_time,

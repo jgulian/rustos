@@ -7,6 +7,7 @@ BINARY := $(TARGET).bin
 USER_DIRECTORY := $(TARGET_DIR)/user
 SDCARD ?= $(ROOT)/user/fs.img
 USER_PROGRAMS := cat echo fib heap init shell stack test
+USER_DEBUG ?= init
 
 QEMU := qemu-system-aarch64
 QEMU_ARGS := -nographic -M raspi3b -serial null -serial mon:stdio \
@@ -48,9 +49,9 @@ user:
 	@rm -rf $(USER_DIRECTORY)
 	@mkdir $(USER_DIRECTORY)
 	@echo "+ Building user programs"
-	for program in $(USER_PROGRAMS) ; do 											\
-		cargo build --bin $$program --target aarch64-unknown-none --release &&											\
-		objcopy -O binary $(TARGET_DIR)/$$program $(USER_DIRECTORY)/$$program;		\
+	for program in $(USER_PROGRAMS) ; do\
+		cargo build --bin $$program --target aarch64-unknown-none --release &&\
+		objcopy -O binary $(TARGET_DIR)/$$program $(USER_DIRECTORY)/$$program;\
     done
 
 image: user
@@ -59,3 +60,6 @@ image: user
 	ls $(USER_DIRECTORY)
 	cargo run --target aarch64-apple-darwin --package image --bin image $(SDCARD) format fat32 0 $(USER_DIRECTORY)
 	qemu-img resize $(SDCARD) 128M
+
+user-objdump:
+	objdump -dS $(TARGET_DIR)/$(USER_DEBUG)

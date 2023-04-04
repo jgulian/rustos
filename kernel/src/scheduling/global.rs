@@ -198,7 +198,7 @@ impl GlobalScheduler {
 
         let mut trap_frame: TrapFrame = Default::default();
         self.schedule_in(&mut trap_frame)
-            .expect("unable to schedule initial process");
+            .expect("unable to schedule initial process");r
 
         unsafe {
             asm!(

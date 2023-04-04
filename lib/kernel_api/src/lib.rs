@@ -1,10 +1,16 @@
 #![no_std]
 #![feature(asm_const)]
 
+extern crate alloc;
+
 use shim::io;
 
 #[cfg(feature = "user-space")]
 pub mod syscall;
+#[cfg(feature = "user-space")]
+pub mod file;
+#[cfg(feature = "user-space")]
+pub mod thread;
 
 pub type OsResult<T> = Result<T, OsError>;
 
@@ -90,6 +96,7 @@ pub enum Syscall {
     Exit = 12,
     Wait = 13,
     GetPid = 14,
+    Clone = 15,
 
     Sbrk = 20,
 
@@ -115,6 +122,7 @@ impl From<u16> for Syscall {
             12 => Syscall::Exit,
             13 => Syscall::Wait,
             14 => Syscall::GetPid,
+            15 => Syscall::Clone,
 
             20 => Syscall::Sbrk,
 
