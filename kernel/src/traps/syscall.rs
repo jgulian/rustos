@@ -4,17 +4,17 @@ use alloc::vec;
 use core::ops::Add;
 use core::time::Duration;
 
-use kernel_api::OsError::BadAddress;
 use kernel_api::*;
+use kernel_api::OsError::BadAddress;
 use pi::timer;
 use sync::Mutex;
 
 use crate::memory::{PagePermissions, VirtualAddr};
 use crate::param::{PAGE_SIZE, USER_IMG_BASE};
 use crate::process::{ResourceId, State};
+use crate::SCHEDULER;
 use crate::scheduling::SwitchTrigger;
 use crate::traps::TrapFrame;
-use crate::SCHEDULER;
 
 /// Sleep for `ms` milliseconds.
 ///
@@ -25,17 +25,16 @@ use crate::SCHEDULER;
 /// when `sleep` returned.
 fn sys_sleep(trap_frame: &mut TrapFrame) -> OsResult<()> {
     let ms = trap_frame.xs[0];
-    info!("sleeping for {} ms", ms);
     let started = timer::current_time();
     let sleep_until = started + Duration::from_millis(ms);
 
     let waiting = State::Waiting(Box::new(move |process| {
         let current_time = timer::current_time();
         let passed = sleep_until < current_time;
-        info!(
-            "checking {:?} < {:?}, {}",
-            sleep_until, current_time, passed
-        );
+        //info!(
+        //    "checking {:?} < {:?}, {}",
+        //    sleep_until, current_time, passed
+        //);
         if passed {
             let millis: u64 = (current_time - started).as_millis() as u64;
             process.context.xs[0] = millis;

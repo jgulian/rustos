@@ -44,7 +44,6 @@ impl Drop for Thread {
 pub struct SpinLock<T: Send> {
     data: UnsafeCell<T>,
     held: AtomicBool,
-    owner: AtomicUsize,
 }
 
 impl<T: Send> sync::Mutex<T> for SpinLock<T> {
@@ -52,7 +51,6 @@ impl<T: Send> sync::Mutex<T> for SpinLock<T> {
         Self {
             data: UnsafeCell::new(value),
             held: AtomicBool::new(false),
-            owner: AtomicUsize::new(0),
         }
     }
 

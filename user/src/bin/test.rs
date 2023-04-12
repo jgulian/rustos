@@ -5,14 +5,15 @@
 extern crate alloc;
 
 use alloc::boxed::Box;
-use alloc::rc::Rc;
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
-use core::cell::{RefCell, UnsafeCell};
+use alloc::vec::Vec;
+use core::cell::UnsafeCell;
 use core::ops::Deref;
+use core::time::Duration;
 
-use kernel_api::println;
-use kernel_api::syscall::{exit, fork, getpid, sbrk, wait};
+use kernel_api::{print, println};
+use kernel_api::syscall::{exit, fork, getpid, sbrk, sleep, wait};
 use kernel_api::thread::{SpinLock, Thread};
 use sync::Mutex;
 
@@ -30,14 +31,18 @@ fn name_to_test(name: &str) -> Box<dyn Fn()> {
     let test_name = name.to_string();
 
     match name {
+        "copy_on_write_a_lot" => Box::new(|| {
+            copy_on_write_a_lot();
+            println!("test over");
+        }),
         "fork_tree" => Box::new(|| {
-            sbrk();
-            sbrk();
-            sbrk();
             fork_tree_test();
         }),
         "thread_race" => Box::new(|| {
             test_thread_will_race();
+        }),
+        "sleep_one" => Box::new(|| {
+            sleep_one();
         }),
         _ => Box::new(move || {
             println!("unknown test: {}", test_name);
@@ -86,6 +91,33 @@ fn fibonacci(num: usize) -> usize {
     } else {
         fibonacci(num - 1) + fibonacci(num - 2)
     }
+}
+
+fn copy_on_write_a_lot() {
+    for _ in 0..20 {
+        sbrk().expect("unable to allocate");
+    }
+
+    let mut children = Vec::new();
+    for _ in 0..20 {
+        let child = fork().expect("unable to fork process");
+        match child {
+            None => {
+                sleep(Duration::from_millis(10)).expect("unable to sleep");
+            }
+            Some(child) => {
+                children.push(child)
+            }
+        }
+    }
+
+    for child in children.into_iter() {
+        wait(child, None).expect("unable to wait on child");
+    }
+}
+
+fn sleep_one() {
+    sleep(Duration::from_secs(1)).expect("unable to sleep");
 }
 
 fn create_race_thread(data: Arc<(UnsafeCell<i32>, SpinLock<bool>)>) -> Thread {

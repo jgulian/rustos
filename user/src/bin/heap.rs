@@ -4,14 +4,16 @@
 
 extern crate alloc;
 
-use crate::user::get_arguments;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::cmp::{max, min};
-use kernel_api::syscall::{execute, exit, fork, open, time, wait};
-use kernel_api::{print, println, OsError, OsResult};
+
+use kernel_api::{OsError, OsResult, print, println};
 use kernel_api::file::File;
+use kernel_api::syscall::{execute, exit, fork, open, time, wait};
 use shim::io::Read;
+
+use crate::user::get_arguments;
 
 mod user;
 
@@ -59,11 +61,10 @@ fn main() {
             let total_number = 2400; // TODO: find a ds to do this instead
             let mut allocator = File::new(open("/allocator").unwrap());
             let mut buffer = [0u8; 256];
-            loop {
-                if let Some(pid) = wait(child, Some(0)).unwrap() {
-                    if pid == child {
-                        break;
-                    }
+            'sampling: loop {
+                let waited = wait(child, Some(0)).unwrap();
+                if let Some(_) = waited {
+                    break 'sampling;
                 }
 
                 let read = allocator

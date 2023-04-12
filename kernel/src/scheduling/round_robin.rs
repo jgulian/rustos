@@ -1,14 +1,16 @@
-use crate::multiprocessing::per_core::local_irq;
-use crate::param::TICK;
-use crate::process::{Process, ProcessId, State};
-use crate::scheduling::scheduler::{Scheduler, SchedulerError, SchedulerResult, SwitchTrigger};
-use crate::traps::irq::IrqHandlerRegistry;
-use crate::traps::TrapFrame;
-use crate::SCHEDULER;
 use alloc::boxed::Box;
 use alloc::collections::VecDeque;
 use core::fmt;
+
 use pi::local_interrupt::{local_tick_in, LocalController, LocalInterrupt};
+
+use crate::multiprocessing::per_core::local_irq;
+use crate::param::TICK;
+use crate::process::{Process, ProcessId, State};
+use crate::SCHEDULER;
+use crate::scheduling::scheduler::{Scheduler, SchedulerError, SchedulerResult, SwitchTrigger};
+use crate::traps::irq::IrqHandlerRegistry;
+use crate::traps::TrapFrame;
 
 /// Internal scheduler struct which is not thread-safe.
 pub struct RoundRobinScheduler {
@@ -126,8 +128,7 @@ impl Scheduler for RoundRobinScheduler {
             .processes
             .iter_mut()
             .enumerate()
-            .filter_map(|(i, process)| if process.can_run() { Some(i) } else { None })
-            .next()
+            .find_map(|(i, process)| if process.can_run() { Some(i) } else { None })
             .ok_or(SchedulerError::NoRunnableProcess)?;
 
         let mut process = self.processes.remove(runnable_process).unwrap();

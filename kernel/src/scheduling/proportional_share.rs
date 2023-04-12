@@ -1,17 +1,18 @@
-use crate::multiprocessing::per_core::local_irq;
-use crate::process::{Process, ProcessId, State};
-use crate::scheduling::scheduler::{SchedulerError, SchedulerResult};
-use crate::scheduling::{Scheduler, SwitchTrigger};
-use crate::traps::irq::IrqHandlerRegistry;
-use crate::traps::TrapFrame;
-use crate::SCHEDULER;
 use alloc::boxed::Box;
-
 use alloc::vec::Vec;
 use core::cmp;
 use core::cmp::Ordering;
 use core::time::Duration;
+
 use pi::local_interrupt::{local_tick_in, LocalController, LocalInterrupt};
+
+use crate::multiprocessing::per_core::local_irq;
+use crate::process::{Process, ProcessId, State};
+use crate::SCHEDULER;
+use crate::scheduling::{Scheduler, SwitchTrigger};
+use crate::scheduling::scheduler::{SchedulerError, SchedulerResult};
+use crate::traps::irq::IrqHandlerRegistry;
+use crate::traps::TrapFrame;
 
 pub struct ProportionalShareScheduler {
     running: Vec<(ProcessInformation, Duration)>,
@@ -129,7 +130,8 @@ impl Scheduler for ProportionalShareScheduler {
             .iter_mut()
             .enumerate()
             .fold(None, |result, (i, process_information)| {
-                if !process_information.process.can_run() {
+                let can_run = process_information.process.can_run();
+                if !can_run {
                     result
                 } else {
                     match result {
@@ -150,7 +152,7 @@ impl Scheduler for ProportionalShareScheduler {
         process_information.process.state = State::Running;
         let process_id = process_information.process.id();
         *trap_frame = *process_information.process.context;
-        //info!("scheduled in {} with {:x?} {:x?}", process_information.process.context.tpidr, process_information.process.context.ttbr0, process_information.process.context.ttbr1);
+        //info!("scheduled in {} with {:x?} {:x?} of {} processes", process_information.process.context.tpidr, process_information.process.context.ttbr0, process_information.process.context.ttbr1, self.processes.len() + self.running.len());
         self.running
             .push((process_information, pi::timer::current_time()));
 
