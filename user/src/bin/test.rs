@@ -94,12 +94,12 @@ fn fibonacci(num: usize) -> usize {
 }
 
 fn copy_on_write_a_lot() {
-    for _ in 0..20 {
+    for _ in 0..40 {
         sbrk().expect("unable to allocate");
     }
 
     let mut children = Vec::new();
-    for _ in 0..20 {
+    for _ in 0..100 {
         let child = fork().expect("unable to fork process");
         match child {
             None => {

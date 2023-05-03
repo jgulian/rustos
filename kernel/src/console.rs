@@ -32,16 +32,6 @@ impl Console {
         self.initialize();
         self.inner.as_mut().unwrap()
     }
-
-    /// Reads a byte from the UART device, blocking until a byte is available.
-    pub fn read_byte(&mut self) -> u8 {
-        self.inner().read_byte()
-    }
-
-    /// Writes the byte `byte` to the UART device.
-    pub fn write_byte(&mut self, byte: u8) {
-        self.inner().write_byte(byte);
-    }
 }
 
 impl io::Read for Console {

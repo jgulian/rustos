@@ -6,12 +6,12 @@ use kernel_api::{OsError, OsResult};
 use pi::interrupt::{Controller, Interrupt};
 use pi::local_interrupt::{LocalController, LocalInterrupt};
 
+use crate::{GLOABAL_IRQ, SCHEDULER};
 use crate::multiprocessing::per_core::local_irq;
 use crate::process::State;
 use crate::scheduling::SwitchTrigger;
 use crate::traps::irq::IrqHandlerRegistry;
 use crate::traps::memory::handle_memory_abort;
-use crate::{GLOABAL_IRQ, SCHEDULER};
 
 pub use self::frame::TrapFrame;
 use self::syndrome::Syndrome;
@@ -26,6 +26,7 @@ pub mod irq;
 
 #[repr(u16)]
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
+#[allow(dead_code)]
 pub enum Kind {
     Synchronous = 0,
     Irq = 1,
@@ -35,6 +36,7 @@ pub enum Kind {
 
 #[repr(u16)]
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
+#[allow(dead_code)]
 pub enum Source {
     CurrentSpEl0 = 0,
     CurrentSpElx = 1,

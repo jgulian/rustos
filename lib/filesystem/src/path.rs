@@ -4,15 +4,15 @@ use alloc::string::String;
 use alloc::string::ToString;
 #[cfg(feature = "no_std")]
 use alloc::vec::Vec;
+use core::fmt::{Display, Formatter};
+
+use shim::io;
 #[cfg(not(feature = "no_std"))]
 use std::string::String;
 #[cfg(not(feature = "no_std"))]
 use std::string::ToString;
 #[cfg(not(feature = "no_std"))]
 use std::vec::Vec;
-
-use core::fmt::{Display, Formatter};
-use shim::io;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Component {
@@ -29,14 +29,6 @@ pub struct Path(String);
 impl Path {
     pub fn root() -> Self {
         Self(String::from("/"))
-    }
-
-    fn new(components: Vec<Component>) -> Path {
-        let mut path = Path(String::new());
-        for component in components {
-            path.push_component(component)
-        }
-        path
     }
 
     pub fn components(&self) -> impl Iterator<Item = Component> {

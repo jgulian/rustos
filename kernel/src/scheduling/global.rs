@@ -1,5 +1,4 @@
 use core::arch::asm;
-use core::ops::Add;
 
 use sync::Mutex;
 
@@ -91,20 +90,6 @@ impl GlobalScheduler {
             .expect("failed to lock scheduler")?;
         aarch64::sev();
         Ok(id)
-    }
-
-    #[deprecated]
-    fn remove(&self, trap_frame: &mut TrapFrame) -> SchedulerResult<Process> {
-        self.0
-            .lock(|scheduler| {
-                scheduler
-                    .as_mut()
-                    .expect("scheduler uninitialized")
-                    .scheduler
-                    .get_scheduler()
-                    .remove(trap_frame)
-            })
-            .expect("failed to lock scheduler")
     }
 
     pub fn switch(

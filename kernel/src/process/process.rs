@@ -4,9 +4,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::borrow::Borrow;
 use core::mem;
-
 use core::slice::from_raw_parts;
-
 
 use aarch64::SPSR_EL1;
 use filesystem::filesystem::Filesystem;
@@ -16,7 +14,6 @@ use shim::{io, newioerr};
 use sync::Mutex;
 
 use crate::{FILESYSTEM, VMM};
-
 use crate::memory::*;
 use crate::multiprocessing::spin_lock::SpinLock;
 use crate::param::*;
@@ -101,7 +98,7 @@ impl Process {
     /// Allocates one page for stack with read/write permission, and N pages with read/write/execute
     /// permission to load file's contents.
     fn do_load(pn: &Path) -> OsResult<Process> {
-        let mut process = Process::new()?;
+        let process = Process::new()?;
         let user_image = process.vmap.lock(|vmap| {
             vmap.new_stack(Process::get_stack_base());
             vmap.alloc(Process::get_image_base(), PagePermissions::RWX)

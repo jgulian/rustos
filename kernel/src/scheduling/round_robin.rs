@@ -15,7 +15,6 @@ use crate::traps::TrapFrame;
 /// Internal scheduler struct which is not thread-safe.
 pub struct RoundRobinScheduler {
     processes: VecDeque<Process>,
-    last_id: Option<ProcessId>,
 }
 
 impl RoundRobinScheduler {
@@ -57,7 +56,6 @@ impl Scheduler for RoundRobinScheduler {
     {
         RoundRobinScheduler {
             processes: Default::default(),
-            last_id: None,
         }
     }
 
