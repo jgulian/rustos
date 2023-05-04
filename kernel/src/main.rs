@@ -17,15 +17,13 @@ extern crate log;
 
 use console::kprintln;
 use disk::FileSystem;
-
 use filesystem::path::Path;
 use memory::VMManager;
-
 use traps::irq::{Fiq, GlobalIrq};
 
 use crate::kalloc::KernelAllocator;
 use crate::process::Process;
-use crate::scheduling::{GlobalScheduler};
+use crate::scheduling::GlobalScheduler;
 
 mod init;
 

@@ -4,7 +4,6 @@ use core::alloc::{GlobalAlloc, Layout};
 use core::fmt::Formatter;
 use core::iter::Chain;
 use core::ops::{Deref, DerefMut, Sub};
-
 use core::slice;
 use core::slice::Iter;
 
@@ -14,7 +13,6 @@ use kernel_api::{OsError, OsResult};
 use shim::{const_assert_size, io, ioerr};
 
 use crate::{ALLOCATOR, VMM};
-
 use crate::memory::{PhysicalAddr, VirtualAddr};
 use crate::param::*;
 
@@ -351,7 +349,11 @@ impl UserPageTable {
     /// Panics if allocator fails to allocate a page.
     ///
     /// TODO. use Result<T> and make it failurable
-    pub fn alloc(&mut self, mut va: VirtualAddr, permissions: PagePermissions) -> &'static mut [u8] {
+    pub fn alloc(
+        &mut self,
+        mut va: VirtualAddr,
+        permissions: PagePermissions,
+    ) -> &'static mut [u8] {
         if va.as_usize() < USER_IMG_BASE {
             panic!("invalid virtual address");
         }

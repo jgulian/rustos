@@ -50,5 +50,9 @@ name = "stack"
 path = "src/bin/stack.rs"
 
 [[bin]]
+name = "switch_scheduler"
+path = "src/bin/switch_scheduler.rs"
+
+[[bin]]
 name = "test"
 path = "src/bin/test.rs"

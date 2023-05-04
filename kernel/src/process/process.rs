@@ -9,7 +9,7 @@ use core::slice::from_raw_parts;
 use aarch64::SPSR_EL1;
 use filesystem::filesystem::Filesystem;
 use filesystem::path::Path;
-use kernel_api::{OsError, OsResult};
+use kernel_api::{OsError, OsResult, println};
 use shim::{io, newioerr};
 use sync::Mutex;
 
@@ -99,10 +99,13 @@ impl Process {
     /// permission to load file's contents.
     fn do_load(pn: &Path) -> OsResult<Process> {
         let process = Process::new()?;
-        let user_image = process.vmap.lock(|vmap| {
-            vmap.new_stack(Process::get_stack_base());
-            vmap.alloc(Process::get_image_base(), PagePermissions::RWX)
-        }).unwrap();
+        let user_image = process
+            .vmap
+            .lock(|vmap| {
+                vmap.new_stack(Process::get_stack_base());
+                vmap.alloc(Process::get_image_base(), PagePermissions::RWX)
+            })
+            .unwrap();
 
         let mut file = FILESYSTEM
             .borrow()
@@ -133,34 +136,20 @@ impl Process {
         VirtualAddr::from(u64::MAX)
     }
 
-    /// Returns `true` if this process is ready to be scheduled.
-    ///
-    /// This functions returns `true` only if one of the following holds:
-    ///
-    ///   * The state is currently `Ready`.
-    ///
-    ///   * An event being waited for has arrived.
-    ///
-    ///     If the process is currently waiting, the corresponding event
-    ///     function is polled to determine if the event being waiting for has
-    ///     occured. If it has, the state is switched to `Ready` and this
-    ///     function returns `true`.
-    ///
-    /// Returns `false` in all other cases.
-    pub fn can_run(&mut self) -> bool {
-        if let State::Waiting(p) = &mut self.state {
-            let mut poll = mem::replace(p, Box::new(|_| false));
-            if poll(self) {
-                self.state = State::Ready;
-            } else if let State::Waiting(pr) = &mut self.state {
-                let _ = mem::replace(pr, poll);
-            }
+    pub fn done_waiting(&mut self) -> bool {
+        let mut state = mem::replace(&mut self.state, State::Ready);
+        let done_waiting = if let State::Waiting(poll) = &mut state {
+            poll(self)
+        } else {
+            false
+        };
+
+        if !done_waiting {
+            let _ = mem::replace(&mut self.state, state);
         }
 
-        match self.state {
-            State::Ready => true,
-            _ => false,
-        }
+        //info!("done_waiting {} {}", self.context.tpidr, done_waiting);
+        done_waiting
     }
 
     pub fn id(&self) -> ProcessId {
@@ -231,26 +220,32 @@ impl Process {
         new_process.context.xs[1] = 1;
         new_process.context.xs[7] = OsError::Ok as u64;
         new_process.context.ttbr0 = VMM.get_baddr().as_u64();
-        new_process.vmap.lock(|new_vmap| -> OsResult<()> {
-            self.vmap.lock(|old_vmap| -> OsResult<()>  {
-                if cfg!(feature = "cow_fork") {
-                    old_vmap
-                        .allocated()
-                        .try_for_each(|(virtual_address, l3_entry)| {
-                            new_vmap.cow(virtual_address, l3_entry)
-                        })?;
-                } else {
-                    for (virtual_address, l3_entry) in old_vmap.allocated() {
-                        let page = new_vmap
-                            .alloc(virtual_address, l3_entry.permissions());
-                        let source = unsafe { from_raw_parts(l3_entry.address() as *const u8, PAGE_SIZE) };
-                        page.copy_from_slice(source);
-                    }
-                }
-                Ok(())
-            }).unwrap()?;
-            Ok(new_process.context.ttbr1 = new_vmap.get_baddr().as_u64())
-        }).unwrap()?;
+        new_process
+            .vmap
+            .lock(|new_vmap| -> OsResult<()> {
+                self.vmap
+                    .lock(|old_vmap| -> OsResult<()> {
+                        if cfg!(feature = "cow_fork") {
+                            old_vmap
+                                .allocated()
+                                .try_for_each(|(virtual_address, l3_entry)| {
+                                    new_vmap.cow(virtual_address, l3_entry)
+                                })?;
+                        } else {
+                            for (virtual_address, l3_entry) in old_vmap.allocated() {
+                                let page = new_vmap.alloc(virtual_address, l3_entry.permissions());
+                                let source = unsafe {
+                                    from_raw_parts(l3_entry.address() as *const u8, PAGE_SIZE)
+                                };
+                                page.copy_from_slice(source);
+                            }
+                        }
+                        Ok(())
+                    })
+                    .unwrap()?;
+                Ok(new_process.context.ttbr1 = new_vmap.get_baddr().as_u64())
+            })
+            .unwrap()?;
 
         Ok(new_process)
     }
@@ -275,7 +270,10 @@ impl Process {
 
         self.vmap = Arc::new(SpinLock::new(UserPageTable::new()));
 
-        let (_, stack) = self.vmap.lock(|vmap| vmap.new_stack(Process::get_stack_base())).unwrap();
+        let (_, stack) = self
+            .vmap
+            .lock(|vmap| vmap.new_stack(Process::get_stack_base()))
+            .unwrap();
         let mut stack_data = Vec::new();
 
         // TODO: clean this; actually this is just broken
@@ -293,7 +291,9 @@ impl Process {
         stack[stack_size - stack_data.len()..].copy_from_slice(stack_data.as_slice());
 
         let user_image = self
-            .vmap.lock(|vmap| vmap.alloc(Process::get_image_base(), PagePermissions::RWX)).unwrap();
+            .vmap
+            .lock(|vmap| vmap.alloc(Process::get_image_base(), PagePermissions::RWX))
+            .unwrap();
 
         program_file.read(user_image)?;
 
@@ -317,9 +317,10 @@ impl Process {
             current_directory: self.current_directory.clone(),
         };
 
-        let (stack_address, _) = self.vmap.lock(|vmap| {
-            vmap.new_stack(Process::get_stack_base())
-        }).unwrap();
+        let (stack_address, _) = self
+            .vmap
+            .lock(|vmap| vmap.new_stack(Process::get_stack_base()))
+            .unwrap();
 
         new_process.context.xs[0] = argument;
         new_process.context.xs[7] = OsError::Ok as u64;

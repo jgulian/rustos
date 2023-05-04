@@ -8,6 +8,7 @@ use kernel_api::OsError::BadAddress;
 use pi::timer;
 use sync::Mutex;
 
+use crate::console::kprintln;
 use crate::memory::{PagePermissions, VirtualAddr};
 use crate::param::{PAGE_SIZE, USER_IMG_BASE};
 use crate::process::{ResourceId, State};
@@ -158,12 +159,15 @@ fn sys_sbrk(tf: &mut TrapFrame) -> OsResult<()> {
         //TODO: pick a better heap base / allow more sbrks / something might be wrong with is_valid
         let mut heap_base = USER_IMG_BASE + PAGE_SIZE;
 
-        process.vmap.lock(|vmap| {
-            while vmap.is_valid(VirtualAddr::from(heap_base - USER_IMG_BASE)) {
-                heap_base += PAGE_SIZE;
-            }
-            vmap.alloc(VirtualAddr::from(heap_base), PagePermissions::RW);
-        }).unwrap();
+        process
+            .vmap
+            .lock(|vmap| {
+                while vmap.is_valid(VirtualAddr::from(heap_base - USER_IMG_BASE)) {
+                    heap_base += PAGE_SIZE;
+                }
+                vmap.alloc(VirtualAddr::from(heap_base), PagePermissions::RW);
+            })
+            .unwrap();
 
         Ok((heap_base as u64, PAGE_SIZE as u64))
     })??;
@@ -238,12 +242,22 @@ fn sys_wait(trap_frame: &mut TrapFrame) -> OsResult<()> {
 fn clone(trap_frame: &mut TrapFrame) -> OsResult<()> {
     let function_address = trap_frame.xs[0];
     let data = trap_frame.xs[1];
-    let process = SCHEDULER.on_process(trap_frame, |process| process.clone(function_address, data))??;
+    let process =
+        SCHEDULER.on_process(trap_frame, |process| process.clone(function_address, data))??;
     let process_id = SCHEDULER.add(process)?;
 
     trap_frame.xs[0] = process_id.into();
 
     Ok(())
+}
+
+fn switch_scheduler(trap_frame: &mut TrapFrame) -> OsResult<()> {
+    if trap_frame.xs[0] <= 1 {
+        SCHEDULER.set_active_scheduler(trap_frame.xs[0] as usize);
+        Ok(())
+    } else {
+        Err(OsError::Unknown)
+    }
 }
 
 //TODO: make the functions work across page boundaries
@@ -292,6 +306,7 @@ fn syscall_to_function(call: Syscall) -> fn(tf: &mut TrapFrame) -> OsResult<()> 
         Syscall::Sbrk => sys_sbrk,
         Syscall::Sleep => sys_sleep,
         Syscall::Time => sys_time,
+        Syscall::SwitchScheduler => switch_scheduler,
         Syscall::Unknown => |_| Err(OsError::Unknown),
     }
 }

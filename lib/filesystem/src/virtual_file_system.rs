@@ -6,6 +6,12 @@ use alloc::string::String;
 use alloc::sync::Arc;
 #[cfg(feature = "no_std")]
 use alloc::vec::Vec;
+use core::ops::Deref;
+
+use log::info;
+
+use shim::io;
+use shim::io::SeekFrom;
 #[cfg(not(feature = "no_std"))]
 use std::boxed::Box;
 #[cfg(not(feature = "no_std"))]
@@ -14,17 +20,11 @@ use std::string::String;
 use std::sync::Arc;
 #[cfg(not(feature = "no_std"))]
 use std::vec::Vec;
-
-use core::ops::{Deref};
-
-use shim::io;
+use sync::Mutex;
 
 use crate::device::{BlockDevice, ByteDevice};
 use crate::filesystem::{Directory, Entry, File, Filesystem, Metadata};
 use crate::master_boot_record::PartitionEntry;
-use shim::io::SeekFrom;
-use sync::Mutex;
-
 use crate::path::Path;
 
 struct Mount {
@@ -113,7 +113,8 @@ impl<M: Mutex<Mounts> + 'static> Directory for VFSDirectory<M> {
             .lock(|mounts| {
                 mounts
                     .0
-                    .iter_mut().find(|mount| mount.mount_point == self.path)
+                    .iter_mut()
+                    .find(|mount| mount.mount_point == self.path)
                     .map(|mount| mount.filesystem.root()?.create_file(name))
                     .unwrap_or(Err(io::Error::from(io::ErrorKind::Unsupported)))
             })

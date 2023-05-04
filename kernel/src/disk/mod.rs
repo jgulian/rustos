@@ -1,8 +1,6 @@
 use alloc::boxed::Box;
-
 use alloc::string::String;
 use alloc::sync::Arc;
-
 
 use filesystem::cache::CachedBlockDevice;
 use filesystem::device::{BlockDevice, ByteDevice};
@@ -11,15 +9,14 @@ use filesystem::master_boot_record::PartitionEntry;
 use filesystem::partition::BlockPartition;
 use filesystem::path::Path;
 use filesystem::virtual_file_system::{ByteDeviceFilesystem, Mounts, VirtualFilesystem};
-use vfat::virtual_fat::{VirtualFat, VirtualFatFilesystem};
-
+use kernel_api::println;
 use pi::uart::MiniUart;
 use shim::{io, ioerr};
+use sync::Mutex;
+use vfat::virtual_fat::{VirtualFat, VirtualFatFilesystem};
 
 use crate::disk::sd::Sd;
 use crate::disk::system::new_system_filesystem;
-use sync::Mutex;
-
 use crate::multiprocessing::spin_lock::SpinLock;
 
 pub mod sd;
@@ -108,6 +105,7 @@ impl ConsoleFile {
 
 impl ByteDevice for ConsoleFile {
     fn read_byte(&mut self) -> io::Result<u8> {
+        info!("sussy bakka");
         Ok(self.0.lock(|byte_device| byte_device.read_byte()).unwrap())
     }
 

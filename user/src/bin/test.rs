@@ -105,9 +105,7 @@ fn copy_on_write_a_lot() {
             None => {
                 sleep(Duration::from_millis(10)).expect("unable to sleep");
             }
-            Some(child) => {
-                children.push(child)
-            }
+            Some(child) => children.push(child),
         }
     }
 
@@ -130,12 +128,14 @@ fn create_race_thread(data: Arc<(UnsafeCell<i32>, SpinLock<bool>)>) -> Thread {
                 count += 1;
                 core::ptr::write_volatile(test.get(), core::ptr::read_volatile(test.get()) + 1);
             }
-            spin_lock.lock(|_| {
-                println!("Added {}", count);
-            }).unwrap();
+            spin_lock
+                .lock(|_| {
+                    println!("Added {}", count);
+                })
+                .unwrap();
         }
-
-    })).unwrap()
+    }))
+        .unwrap()
 }
 
 fn test_thread_will_race() {
@@ -149,7 +149,9 @@ fn test_thread_will_race() {
     }
 
     let (test, _) = data.deref();
-    println!("thread race {}", unsafe { core::ptr::read_volatile(test.get()) });
+    println!("thread race {}", unsafe {
+        core::ptr::read_volatile(test.get())
+    });
 }
 
 fn test_thread_safe() {}

@@ -70,7 +70,8 @@ pub extern "C" fn receive_exception(info: Info, esr: u32, trap_frame: &mut TrapF
 
     match handle_exception(info, syndrome, trap_frame) {
         Ok(_) => {}
-        Err(_) => {
+        Err(err) => {
+            error!("KILLING PROCESS {:?}", err);
             SCHEDULER
                 .switch(trap_frame, SwitchTrigger::Force, State::Dead)
                 .expect("failed to kill trapping process");

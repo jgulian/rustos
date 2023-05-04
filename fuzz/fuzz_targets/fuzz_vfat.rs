@@ -8,6 +8,4 @@ const BLOCK_SIZE: usize = 512;
 
 struct FuzzDevice(HashMap<u64, [u8; BLOCK_SIZE]>);
 
-fuzz_target!(|data: &[u8]| {
-
-});
+fuzz_target!(|data: &[u8]| {});

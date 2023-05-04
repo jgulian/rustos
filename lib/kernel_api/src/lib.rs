@@ -6,9 +6,9 @@ extern crate alloc;
 use shim::io;
 
 #[cfg(feature = "user-space")]
-pub mod syscall;
-#[cfg(feature = "user-space")]
 pub mod file;
+#[cfg(feature = "user-space")]
+pub mod syscall;
 #[cfg(feature = "user-space")]
 pub mod thread;
 
@@ -103,6 +103,8 @@ pub enum Syscall {
     Sleep = 30,
     Time = 31,
 
+    SwitchScheduler = 32,
+
     Unknown = 256,
 }
 
@@ -128,6 +130,8 @@ impl From<u16> for Syscall {
 
             30 => Syscall::Sleep,
             31 => Syscall::Time,
+
+            32 => Syscall::SwitchScheduler,
 
             _ => Syscall::Unknown,
         }

@@ -6,8 +6,8 @@ TARGET := $(TARGET_DIR)/$(KERN)
 BINARY := $(TARGET).bin
 USER_DIRECTORY := $(TARGET_DIR)/user
 SDCARD ?= $(ROOT)/user/fs.img
-USER_PROGRAMS := cat echo fib heap init shell stack test
-USER_DEBUG ?= init
+USER_PROGRAMS := cat echo fib heap init shell switch_scheduler test
+USER_DEBUG ?= shell
 
 QEMU := qemu-system-aarch64
 QEMU_ARGS := -nographic -M raspi3b -serial null -serial mon:stdio \
@@ -39,8 +39,11 @@ qemu-gdb: build
 qemu-asm: build
 	$(QEMU) $(QEMU_ARGS) $(BINARY) -d in_asm
 
+qemu-int: build
+	$(QEMU) $(QEMU_ARGS) $(BINARY) -d int
+
 objdump: build
-	cargo objdump -- -disassemble -no-show-raw-insn -print-imm-hex $(TARGET)
+	objdump -DS $(TARGET)
 
 clean:
 	cargo clean

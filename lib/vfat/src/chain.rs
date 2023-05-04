@@ -2,19 +2,18 @@
 use alloc::sync::Arc;
 #[cfg(feature = "no_std")]
 use alloc::vec::Vec;
+
+use filesystem::device::{BlockDevice, stream_read, stream_write};
+use shim::io;
+use shim::io::SeekFrom;
 #[cfg(not(feature = "no_std"))]
 use std::sync::Arc;
-
+use sync::Mutex;
 
 use crate::cluster::Cluster;
 use crate::error::{VirtualFatError, VirtualFatResult};
 use crate::fat::Status;
 use crate::virtual_fat::VirtualFat;
-use filesystem::device::{stream_read, stream_write, BlockDevice};
-
-use shim::io;
-use shim::io::SeekFrom;
-use sync::Mutex;
 
 pub(crate) struct Chain<M: Mutex<VirtualFat>> {
     virtual_fat: Arc<M>,

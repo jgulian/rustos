@@ -22,8 +22,7 @@ pub enum Component {
     Child(String),
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
-#[derive(Default)]
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Default)]
 pub struct Path(String);
 
 impl Path {
@@ -120,8 +119,6 @@ impl TryFrom<&str> for Path {
         Ok(result)
     }
 }
-
-
 
 impl Display for Path {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {

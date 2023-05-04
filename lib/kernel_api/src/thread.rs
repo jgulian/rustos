@@ -12,9 +12,7 @@ use crate::syscall::{clone, exit, wait};
 unsafe extern "C" fn _create_thread() -> ! {
     let data: u64;
     asm!("mov {}, x0", out(reg) data);
-    let function = unsafe {
-        *Box::from_raw(data as usize as *mut Box<dyn FnOnce()>)
-    };
+    let function = unsafe { *Box::from_raw(data as usize as *mut Box<dyn FnOnce()>) };
 
     function();
 
@@ -47,7 +45,10 @@ pub struct SpinLock<T: Send> {
 }
 
 impl<T: Send> sync::Mutex<T> for SpinLock<T> {
-    fn new(value: T) -> Self where Self: Sized {
+    fn new(value: T) -> Self
+        where
+            Self: Sized,
+    {
         Self {
             data: UnsafeCell::new(value),
             held: AtomicBool::new(false),

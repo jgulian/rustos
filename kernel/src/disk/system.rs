@@ -1,14 +1,16 @@
-use crate::multiprocessing::spin_lock::SpinLock;
-use crate::ALLOCATOR;
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::format;
-use alloc::string::{String};
+use alloc::string::String;
 use alloc::vec::Vec;
 use core::cmp::min;
+
 use filesystem::path::Path;
 use filesystem::pseudo::{EntryType, PseudoDirectory, PseudoDirectoryCollection, PseudoFilesystem};
 use shim::io;
+
+use crate::ALLOCATOR;
+use crate::multiprocessing::spin_lock::SpinLock;
 
 struct AllocatorInformation;
 

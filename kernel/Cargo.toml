@@ -27,6 +27,6 @@ log = "0.4"
 shim = { path = "../lib/shim", features = ["alloc"] }
 
 [features]
-default = ["cow_fork"]
+default = []
 cow_fork = [] # TODO: remove post class
 monitor_lab2 = []

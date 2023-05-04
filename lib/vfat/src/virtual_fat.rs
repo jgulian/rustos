@@ -6,6 +6,13 @@ use alloc::sync::Arc;
 use alloc::vec;
 #[cfg(feature = "no_std")]
 use alloc::vec::Vec;
+use core::mem;
+
+use filesystem::device::{BlockDevice, stream_read, stream_write};
+use filesystem::error::FilesystemError;
+use filesystem::partition::BlockPartition;
+use shim::io;
+use shim::io::Cursor;
 #[cfg(not(feature = "no_std"))]
 use std::boxed::Box;
 #[cfg(not(feature = "no_std"))]
@@ -14,9 +21,7 @@ use std::sync::Arc;
 use std::vec;
 #[cfg(not(feature = "no_std"))]
 use std::vec::Vec;
-
-use core::mem;
-
+use sync::Mutex;
 
 use crate::bios_parameter_block::BiosParameterBlock;
 use crate::chain::Chain;
@@ -24,12 +29,6 @@ use crate::cluster::Cluster;
 use crate::directory::Directory;
 use crate::error::{VirtualFatError, VirtualFatResult};
 use crate::fat::{FatEntry, Status};
-use filesystem::device::{stream_read, stream_write, BlockDevice};
-use filesystem::error::FilesystemError;
-use filesystem::partition::BlockPartition;
-use shim::io;
-use shim::io::Cursor;
-use sync::Mutex;
 
 pub struct VirtualFat {
     device: BlockPartition,
@@ -43,8 +42,7 @@ pub struct VirtualFat {
 
 impl VirtualFat {
     fn get_blocks(&self, cluster: Cluster) -> (u64, u64) {
-        let first_block =
-            cluster.sector_start(self.data_start_sector, self.sectors_per_cluster);
+        let first_block = cluster.sector_start(self.data_start_sector, self.sectors_per_cluster);
         let final_block = first_block + self.sectors_per_cluster as u64;
         (first_block, final_block)
     }

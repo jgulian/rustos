@@ -217,3 +217,11 @@ pub(super) fn clone(start_address: usize, data: usize) -> OsResult<u64> {
         syscall_receive1!()
     }
 }
+
+pub fn switch_scheduler(policy: usize) -> OsResult<u64> {
+    unsafe {
+        syscall_args!(policy as u64);
+        syscall!(Syscall::SwitchScheduler);
+        syscall_receive1!()
+    }
+}

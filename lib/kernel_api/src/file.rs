@@ -1,6 +1,8 @@
 use core::fmt;
 use core::fmt::Write;
+
 use shim::{io, ioerr, newioerr};
+
 use crate::syscall::{read, write};
 
 struct Console;

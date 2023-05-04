@@ -2,10 +2,9 @@ use kernel_api::{OsError, OsResult};
 use sync::Mutex;
 
 use crate::memory::VirtualAddr;
-
+use crate::SCHEDULER;
 use crate::traps::syndrome::{AbortData, FaultStatusCode};
 use crate::traps::TrapFrame;
-use crate::SCHEDULER;
 
 pub(crate) fn handle_memory_abort(
     trap_frame: &mut TrapFrame,
@@ -24,7 +23,9 @@ pub(crate) fn handle_memory_abort(
     match fault_status_code {
         FaultStatusCode::PermissionFault3 => SCHEDULER.on_process(trap_frame, |process| {
             process
-                .vmap.lock(|vmap| vmap.remove_cow(faulting_address, process.context.tpidr)).unwrap()
+                .vmap
+                .lock(|vmap| vmap.remove_cow(faulting_address, process.context.tpidr))
+                .unwrap()
         })?,
         _ => Err(OsError::Unknown),
     }

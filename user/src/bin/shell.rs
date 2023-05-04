@@ -8,9 +8,9 @@ extern crate alloc;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
-use kernel_api::syscall::{execute, exit, fork, wait};
 use kernel_api::{print, println};
 use kernel_api::file::File;
+use kernel_api::syscall::{execute, exit, fork, wait};
 use shim::io::{Read, Write};
 
 mod user;
@@ -89,14 +89,6 @@ fn main() {
             break;
         }
 
-        //if let Some(command) = CommandParser::new(command).parse() {
-        //    if command.run() {
-        //        break;
-        //    }
-        //} else {
-        //    println!("Invalid command");
-        //}
-
         let child_pid = fork().expect("could not fork");
         match child_pid {
             None => {
@@ -127,44 +119,3 @@ fn main() {
         command.clear();
     }
 }
-
-//TODO: add back, though I'm not sure what it is
-//enum Command {
-//    Execute(Box<[u8]>, Box<[u8]>),
-//    Redirect(Box<Command>, String, String),
-//    Pipe(Box<Command>, Box<Command>),
-//    List(Box<Command>, Box<Command>),
-//}
-//
-//impl Command {
-//    fn run(&self) -> bool {
-//        match self {
-//            Command::Execute(arguments, environment) => {}
-//            Command::Redirect(subcommand, file) => {}
-//            Command::Pipe(_, _) => {}
-//            Command::List(_, _) => {}
-//        }
-//    }
-//}
-//
-////TODO: use iterator probably
-//struct CommandParser {
-//    command: String,
-//    location: usize,
-//}
-//
-//impl CommandParser {
-//    fn new(command: String) -> CommandParser {
-//        CommandParser {
-//            command,
-//            location: 0,
-//        }
-//    }
-//
-//    fn parse(&mut self) -> Option<Command> {
-//        Some(Command::Execute("".to_string(), "".to_string()))
-//    }
-//
-//    fn peek(&self) {}
-//}
-//
