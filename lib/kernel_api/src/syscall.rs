@@ -225,3 +225,18 @@ pub fn switch_scheduler(policy: usize) -> OsResult<u64> {
         syscall_receive1!()
     }
 }
+
+pub fn get_user_identity() -> OsResult<u64> {
+    unsafe {
+        syscall!(Syscall::GetUserIdentity);
+        syscall_receive1!()
+    }
+}
+
+pub fn set_user_identity(user_identity: u64) -> OsResult<()> {
+    unsafe {
+        syscall_args!(user_identity);
+        syscall!(Syscall::SetUserIdentity);
+        syscall_receive0!()
+    }
+}

@@ -260,6 +260,23 @@ fn switch_scheduler(trap_frame: &mut TrapFrame) -> OsResult<()> {
     }
 }
 
+fn get_user_identity(trap_frame: &mut TrapFrame) -> OsResult<()> {
+    trap_frame.xs[0] = SCHEDULER.on_process(trap_frame, |process| process.get_user_identity())?;
+    Ok(())
+}
+
+fn set_user_identity(trap_frame: &mut TrapFrame) -> OsResult<()> {
+    let new_user_identity = trap_frame.xs[0];
+    let switched = SCHEDULER.on_process(trap_frame, |process| {
+        process.set_user_identity(new_user_identity)
+    })?;
+    if switched {
+        Ok(())
+    } else {
+        Err(OsError::InvalidPermissions)
+    }
+}
+
 //TODO: make the functions work across page boundaries
 //TODO: this is fundamentally unsafe
 fn copy_from_userspace(_: &TrapFrame, ptr: u64, buf: &mut [u8]) -> OsResult<()> {
@@ -307,6 +324,8 @@ fn syscall_to_function(call: Syscall) -> fn(tf: &mut TrapFrame) -> OsResult<()> 
         Syscall::Sleep => sys_sleep,
         Syscall::Time => sys_time,
         Syscall::SwitchScheduler => switch_scheduler,
+        Syscall::GetUserIdentity => get_user_identity,
+        Syscall::SetUserIdentity => set_user_identity,
         Syscall::Unknown => |_| Err(OsError::Unknown),
     }
 }

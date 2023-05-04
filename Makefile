@@ -6,7 +6,7 @@ TARGET := $(TARGET_DIR)/$(KERN)
 BINARY := $(TARGET).bin
 USER_DIRECTORY := $(TARGET_DIR)/user
 SDCARD ?= $(ROOT)/user/fs.img
-USER_PROGRAMS := cat echo fib heap init shell switch_scheduler test
+USER_PROGRAMS := cat echo heap init login shell switch_scheduler test
 USER_DEBUG ?= shell
 
 QEMU := qemu-system-aarch64

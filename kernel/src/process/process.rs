@@ -53,6 +53,8 @@ pub struct Process {
     pub(crate) dead_children: Vec<ProcessId>,
     /// Current Working Directory
     current_directory: Path,
+    /// User Identifier
+    user_identity: u64,
 }
 
 impl Process {
@@ -70,6 +72,7 @@ impl Process {
             parent: None,
             dead_children: Vec::new(),
             current_directory: Path::root(),
+            user_identity: 0,
         })
     }
 
@@ -214,6 +217,7 @@ impl Process {
             parent: Some(ProcessId::from(self.context.tpidr)),
             dead_children: Vec::new(),
             current_directory: self.current_directory.clone(),
+            user_identity: self.user_identity,
         };
 
         new_process.context.xs[0] = 0;
@@ -315,6 +319,7 @@ impl Process {
             parent: Some(ProcessId::from(self.context.tpidr)),
             dead_children: Vec::new(),
             current_directory: self.current_directory.clone(),
+            user_identity: self.user_identity,
         };
 
         let (stack_address, _) = self
@@ -328,6 +333,19 @@ impl Process {
         new_process.context.elr = start_address;
 
         Ok(new_process)
+    }
+
+    pub fn get_user_identity(&mut self) -> u64 {
+        self.user_identity
+    }
+
+    pub fn set_user_identity(&mut self, identity: u64) -> bool {
+        if self.user_identity == 0 {
+            self.user_identity = identity;
+            true
+        } else {
+            false
+        }
     }
 }
 

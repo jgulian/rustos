@@ -39,6 +39,8 @@ pub enum OsError {
     IllegalSocketOperation = 201,
 
     SchedulerError = 210,
+
+    InvalidPermissions = 220,
 }
 
 impl From<u64> for OsError {
@@ -62,6 +64,8 @@ impl From<u64> for OsError {
             200 => OsError::InvalidSocket,
             201 => OsError::IllegalSocketOperation,
             210 => OsError::SchedulerError,
+
+            220 => OsError::InvalidPermissions,
 
             _ => OsError::Unknown,
         }
@@ -105,6 +109,9 @@ pub enum Syscall {
 
     SwitchScheduler = 32,
 
+    GetUserIdentity = 40,
+    SetUserIdentity = 41,
+
     Unknown = 256,
 }
 
@@ -132,6 +139,9 @@ impl From<u16> for Syscall {
             31 => Syscall::Time,
 
             32 => Syscall::SwitchScheduler,
+
+            40 => Syscall::GetUserIdentity,
+            41 => Syscall::SetUserIdentity,
 
             _ => Syscall::Unknown,
         }
