@@ -1,4 +1,6 @@
-pub use std::ffi;
 pub use std::io;
-pub use std::path;
 
+#[cfg(feature = "alloc")]
+pub use std::ffi;
+#[cfg(feature = "alloc")]
+pub use std::path;

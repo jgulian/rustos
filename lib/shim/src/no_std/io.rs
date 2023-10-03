@@ -1,7 +1,10 @@
+#[cfg(feature = "alloc")]
 use alloc::boxed::Box;
+#[cfg(feature = "alloc")]
 use alloc::vec::Vec;
-use core::{cmp, result};
+
 use core::fmt::{Debug, Formatter};
+use core::{cmp, result};
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum ErrorKind {
@@ -54,17 +57,11 @@ pub struct Error {
 
 impl Error {
     pub fn new(kind: ErrorKind, repr: &'static str) -> Error {
-        Error {
-            kind,
-            repr,
-        }
+        Error { kind, repr }
     }
 
     pub fn from(kind: ErrorKind) -> Error {
-        Error {
-            kind,
-            repr: "",
-        }
+        Error { kind, repr: "" }
     }
 
     pub fn kind(&self) -> ErrorKind {
@@ -72,7 +69,7 @@ impl Error {
     }
 }
 
-impl core::fmt::Debug for Error {
+impl Debug for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         f.write_fmt(format_args!("{:?}: {}", self.kind, self.repr))
     }
@@ -112,9 +109,7 @@ pub trait Read {
         let mut i = 0;
         while i < buf.len() {
             match self.read(&mut buf[i..]) {
-                Ok(0) => {
-                    Err(Error::from(ErrorKind::UnexpectedEof))
-                }
+                Ok(0) => Err(Error::from(ErrorKind::UnexpectedEof)),
                 Ok(n) => {
                     i += n;
                     Ok(())
@@ -132,6 +127,7 @@ pub trait Read {
         Ok(())
     }
 
+    #[cfg(feature = "alloc")]
     fn read_to_end(&mut self, buf: &mut Vec<u8>) -> Result<usize> {
         let starting_size = buf.len();
         while {
@@ -178,13 +174,23 @@ pub struct Cursor<T> {
     position: u64,
 }
 
-impl<T> Seek for Cursor<T> where T: AsRef<[u8]> {
+impl<T> Cursor<T> {
+    pub fn new(data: T) -> Self {
+        Self { data, position: 0 }
+    }
+}
+
+impl<T> Seek for Cursor<T>
+where
+    T: AsRef<[u8]>,
+{
     fn seek(&mut self, pos: SeekFrom) -> Result<u64> {
         let new_position = match pos {
             SeekFrom::Start(n) => Some(n as i64),
             SeekFrom::End(n) => (self.data.as_ref().len() as i64).checked_sub(n),
             SeekFrom::Current(n) => (self.position as i64).checked_add(n),
-        }.ok_or(Error::from(ErrorKind::InvalidInput))?;
+        }
+        .ok_or(Error::from(ErrorKind::InvalidInput))?;
 
         if new_position < 0 || self.data.as_ref().len() <= new_position as usize {
             Err(Error::from(ErrorKind::InvalidInput))
@@ -211,12 +217,14 @@ fn read_with_buf(buf: &mut [u8], position: &mut u64, target: &mut [u8]) -> Resul
     Ok(read)
 }
 
+#[cfg(feature = "alloc")]
 impl Read for Cursor<Box<[u8]>> {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
         read_with_buf((*self.data).as_mut(), &mut self.position, buf)
     }
 }
 
+#[cfg(feature = "alloc")]
 impl Read for Cursor<Vec<u8>> {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
         read_with_buf(self.data.as_mut_slice(), &mut self.position, buf)
@@ -226,6 +234,13 @@ impl Read for Cursor<Vec<u8>> {
 impl Read for Cursor<&mut [u8]> {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
         read_with_buf(self.data, &mut self.position, buf)
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl Read for Cursor<&mut Vec<u8>> {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
+        read_with_buf(self.data.as_mut_slice(), &mut self.position, buf)
     }
 }
 
@@ -251,6 +266,7 @@ fn write_with_buf(buf: &mut [u8], position: &mut u64, target: &[u8]) -> Result<u
     Ok(written)
 }
 
+#[cfg(feature = "alloc")]
 impl Write for Cursor<Vec<u8>> {
     fn write(&mut self, buf: &[u8]) -> Result<usize> {
         write_with_buf(self.data.as_mut_slice(), &mut self.position, buf)
@@ -261,6 +277,7 @@ impl Write for Cursor<Vec<u8>> {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl Write for Cursor<Box<[u8]>> {
     fn write(&mut self, buf: &[u8]) -> Result<usize> {
         write_with_buf((*self.data).as_mut(), &mut self.position, buf)
@@ -274,6 +291,17 @@ impl Write for Cursor<Box<[u8]>> {
 impl Write for Cursor<&mut [u8]> {
     fn write(&mut self, buf: &[u8]) -> Result<usize> {
         write_with_buf(self.data, &mut self.position, buf)
+    }
+
+    fn flush(&mut self) -> Result<()> {
+        Ok(())
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl Write for Cursor<&mut Vec<u8>> {
+    fn write(&mut self, buf: &[u8]) -> Result<usize> {
+        write_with_buf(self.data.as_mut_slice(), &mut self.position, buf)
     }
 
     fn flush(&mut self) -> Result<()> {

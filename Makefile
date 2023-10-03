@@ -1,11 +1,13 @@
 ROOT := $(shell git rev-parse --show-toplevel)
 
 KERN := kernel
-TARGET_DIR := target/aarch64-unknown-none/release/
+TARGET_DIR := target/aarch64-unknown-none/release
 TARGET := $(TARGET_DIR)/$(KERN)
 BINARY := $(TARGET).bin
+USER_DIRECTORY := $(TARGET_DIR)/user
 SDCARD ?= $(ROOT)/user/fs.img
-USER_PROGRAMS := cat echo fib heap init shell stack
+USER_PROGRAMS := cat echo heap init login shell switch_scheduler test
+USER_DEBUG ?= shell
 
 QEMU := qemu-system-aarch64
 QEMU_ARGS := -nographic -M raspi3b -serial null -serial mon:stdio \
@@ -17,7 +19,7 @@ all: build
 
 build:
 	@echo "+ Building build/$(KERN).elf [build/$@]"
-	@cargo build --bin kernel --release
+	@cargo build --bin kernel --release --target aarch64-unknown-none
 
 	@echo "+ Building build/$(KERN).bin [objcopy]"
 	@objcopy -O binary $(TARGET) $(BINARY)
@@ -37,18 +39,30 @@ qemu-gdb: build
 qemu-asm: build
 	$(QEMU) $(QEMU_ARGS) $(BINARY) -d in_asm
 
+qemu-int: build
+	$(QEMU) $(QEMU_ARGS) $(BINARY) -d int
+
 objdump: build
-	cargo objdump -- -disassemble -no-show-raw-insn -print-imm-hex $(TARGET)
+	objdump -DS $(TARGET)
 
 clean:
 	cargo clean
 
 user:
+	@rm -rf $(USER_DIRECTORY)
+	@mkdir $(USER_DIRECTORY)
 	@echo "+ Building user programs"
-	@for program in $(USER_PROGRAMS) ; do 											\
-		cargo build --bin $$program --release;											\
-		objcopy -O binary $(TARGET_DIR)/$$program $(TARGET_DIR)/$$program.bin;		\
+	for program in $(USER_PROGRAMS) ; do\
+		cargo build --bin $$program --target aarch64-unknown-none --release &&\
+		objcopy -O binary $(TARGET_DIR)/$$program $(USER_DIRECTORY)/$$program;\
     done
 
-image:
-	cd user; ./build.sh
+image: user
+	rm -f $(SDCARD)
+	cargo run --target aarch64-apple-darwin --package image --bin image $(SDCARD) create
+	ls $(USER_DIRECTORY)
+	cargo run --target aarch64-apple-darwin --package image --bin image $(SDCARD) format fat32 0 $(USER_DIRECTORY)
+	qemu-img resize $(SDCARD) 128M
+
+user-objdump:
+	objdump -dS $(TARGET_DIR)/$(USER_DEBUG)

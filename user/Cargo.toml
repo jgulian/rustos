@@ -15,6 +15,7 @@ edition = "2021"
 aarch64 = { path = "../lib/aarch64/" }
 kernel_api = { path = "../lib/kernel_api" }
 shim = { path = "../lib/shim", features = ["no_std"] }
+sync = { path = "../lib/sync" }
 
 [[bin]]
 name = "cat"
@@ -37,6 +38,10 @@ name = "init"
 path = "src/bin/init.rs"
 
 [[bin]]
+name = "login"
+path = "src/bin/login.rs"
+
+[[bin]]
 name = "shell"
 path = "src/bin/shell.rs"
 
@@ -47,3 +52,11 @@ path = "src/bin/sleep.rs"
 [[bin]]
 name = "stack"
 path = "src/bin/stack.rs"
+
+[[bin]]
+name = "switch_scheduler"
+path = "src/bin/switch_scheduler.rs"
+
+[[bin]]
+name = "test"
+path = "src/bin/test.rs"

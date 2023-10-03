@@ -5,9 +5,10 @@
 
 extern crate alloc;
 
+use kernel_api::file::File;
 use kernel_api::println;
-use kernel_api::syscall::{File, open, write};
-use shim::io::{Read, Write};
+use kernel_api::syscall::{open, write};
+use shim::io::Read;
 
 use crate::user::get_arguments;
 
@@ -30,19 +31,15 @@ fn cat(mut file: File) {
 }
 
 fn main() {
-    match get_arguments().skip(1).next() {
-        Some(file) => {
-            match open(file.trim_matches(0 as char)) {
-                Ok(id) => {
-                    cat(File::new(id));
-                }
-                Err(_) => {
-                    println!("Unable to open file");
-                }
+    match get_arguments().nth(1) {
+        Some(file) => match open(file.trim_matches(0 as char)) {
+            Ok(id) => {
+                cat(File::new(id));
             }
-        }
-        None => {
-            cat(File::new(0))
-        }
+            Err(_) => {
+                println!("Unable to open file");
+            }
+        },
+        None => cat(File::new(0)),
     }
 }

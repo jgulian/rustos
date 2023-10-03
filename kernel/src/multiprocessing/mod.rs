@@ -1,2 +1,2 @@
-pub mod mutex;
 pub mod per_core;
+pub mod spin_lock;

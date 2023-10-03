@@ -30,4 +30,3 @@ impl fmt::Display for TrapFrame {
             .finish()
     }
 }
-

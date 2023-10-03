@@ -6,6 +6,9 @@ use core::ops::{Add, AddAssign, BitAnd, BitOr, Sub, SubAssign};
 #[derive(Copy, Clone, PartialEq)]
 pub struct VirtualAddr(usize);
 
+// TODO: add separate type for user virtual address and kernel virtual address, so there's no
+// confusion
+
 impl VirtualAddr {
     pub fn level2_index(&self) -> u64 {
         (self.as_u64() & ((1 << 42) - (1 << 29))) >> 29
@@ -15,17 +18,18 @@ impl VirtualAddr {
         (self.as_u64() & ((1 << 29) - (1 << 16))) >> 16
     }
 
+    // TODO: fix
     pub fn offset(&self) -> u64 {
         self.as_u64() & ((1 << 16) - 1)
     }
 
-    pub fn page_aligned(&self) -> u64 {
-        self.as_u64() & (!((1u64 << 16) - 1))
+    pub fn page_aligned(&self) -> VirtualAddr {
+        VirtualAddr::from(self.as_u64() & (!((1u64 << 16) - 1)))
     }
 }
 
 /// A physical address.
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Ord, PartialOrd, Eq)]
 pub struct PhysicalAddr(usize);
 
 macro_rules! impl_for {

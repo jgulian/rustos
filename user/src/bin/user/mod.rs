@@ -67,15 +67,19 @@ impl GlobalAllocator {
 unsafe impl GlobalAlloc for GlobalAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         unsafe {
-            let (beg, end) = &mut *self.0.0.get();
-            if *beg == 0 {
+            let (beg, end) = &mut *self.0 .0.get();
+            if *end - *beg < layout.size() {
                 let (alloc_beg, alloc_len) = sbrk().expect("unable to alloc");
-                *beg = alloc_beg;
-                *end = alloc_beg + alloc_len;
+                if *end != alloc_beg {
+                    *beg = alloc_beg;
+                    *end = alloc_beg + alloc_len;
+                } else {
+                    *end += alloc_len;
+                }
             }
 
             if *beg & (layout.align() - 1) != 0 {
-                *beg = *beg & (!(layout.align() - 1)) + layout.align();
+                *beg = (*beg & (!(layout.align() - 1))) + layout.align();
             }
 
             let location = *beg as *mut u8;
@@ -93,6 +97,8 @@ pub static ALLOCATOR: GlobalAllocator = GlobalAllocator::new();
 
 pub struct ArgumentIterator(usize, usize);
 
+// TODO: remove
+#[warn(dead_code)]
 pub fn get_arguments() -> ArgumentIterator {
     let usize_size = mem::size_of::<usize>();
     let argument_count_bytes = unsafe { *((usize::MAX - usize_size + 1) as *const [u8; 8]) };
@@ -117,7 +123,8 @@ impl Iterator for ArgumentIterator {
             self.0 -= length;
             self.1 -= length;
 
-            let slice = unsafe { core::slice::from_raw_parts(location as *const u8, length) };
+            let slice =
+                unsafe { core::slice::from_raw_parts((location + 1) as *const u8, length - 1) };
             Some(unsafe { core::str::from_utf8_unchecked(slice) })
         }
     }

@@ -5,8 +5,6 @@
 
 extern crate alloc;
 
-use alloc::string::ToString;
-
 use kernel_api::println;
 use kernel_api::syscall::{duplicate, execute, fork, open, wait};
 
@@ -17,20 +15,19 @@ fn main() {
     duplicate(console, 1).expect("unable to duplicate console");
     duplicate(console, 2).expect("unable to duplicate console");
 
-    println!("init");
     loop {
         println!("init: starting shell");
         let shell_pid = fork().expect("unable to fork");
 
         match shell_pid {
             None => {
-                execute("shell".as_bytes(), "".as_bytes())
-                    .expect("unable to execute shell");
+                execute("shell".as_bytes(), "".as_bytes()).expect("unable to execute shell");
             }
             Some(child_pid) => {
                 while {
-                    let wait_pid = wait(child_pid)
-                        .expect("unable to wait for process");
+                    let wait_pid = wait(child_pid, None)
+                        .expect("unable to wait for process")
+                        .unwrap();
                     wait_pid != child_pid
                 } {}
             }

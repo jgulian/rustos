@@ -20,11 +20,25 @@ settings in the Makefile.
 
 ## Roadmap
 
-* Allow processes to open files
-* Add more system calls read, write (beyond single characters), fork, exec, wait, and pipe (maybe more?)
-* Implement shell and have stdin, stdout, and stderr
-* Make the file system writable*
-    * Move from the current c library to a rust library
+### Spring 2023
+* pseudo filesystem
+* Use RAII to handle freeing, allocating, and cow
+* Scheduler refactor
+  * Add more than one scheduler
+* Promised
+  * Zero Page Initilization
+  * Ticketing Scheduler
+  * Scheduler adjustment through file system
+  * Clone system call
+  * thread_create, thread_wait, locking
+  * UID get, set
+  * chown, chmod
+  * create user / login user
+  * Require login on boot
+
+### Backburner
+
+* Move from the current c library to a rust library
 * Add page swapping mechanisms
 * Allow the stack to grow downwards (ie outside one page of memory)
 * Use smaller pages
@@ -35,7 +49,5 @@ settings in the Makefile.
 * Networking
 * Use cargo fuzz and miri to libraries for security.
 * Update bootloader
-* Create a mkfs tool to make filesystem without needing to worry about OS/architecture (like xv6-riscv)
-* Use cargo clippy
 
 \* Asterisks suggest features are in a partially complete state, but require more work or coverage testing.

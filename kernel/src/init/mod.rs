@@ -4,9 +4,9 @@ use core::ptr::write_volatile;
 
 use aarch64::*;
 
-use crate::{kernel_main, SCHEDULER};
 use crate::param::*;
 use crate::VMM;
+use crate::{kernel_main, SCHEDULER};
 
 mod oom;
 mod panic;
@@ -71,7 +71,7 @@ unsafe fn switch_to_el1() {
 
     if current_el() == 2 {
         // set the stack-pointer for EL1
-        SP_EL1.set(SP.get() as u64);
+        SP_EL1.set(SP.get());
 
         // enable CNTP for EL1/EL0 (ref: D7.5.2, D7.5.13)
         // NOTE: This doesn't actually enable the counter stream.
@@ -136,7 +136,7 @@ unsafe fn kmain2() -> ! {
     address.write_volatile(0);
     VMM.wait();
 
-    SCHEDULER.start();
+    SCHEDULER.bootstrap();
 }
 
 /// Wakes up each app core by writing the address of `init::start2`
@@ -147,7 +147,7 @@ pub unsafe fn initialize_app_cores() {
         address.write_volatile(start2 as usize);
     }
 
-    aarch64::sev();
+    sev();
 
     for i in 1..4 {
         let address = SPINNING_BASE.add(i);

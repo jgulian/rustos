@@ -10,14 +10,13 @@ authors = [
 ]
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-shim = { path = "../../lib/shim", features = ["no_std"] }
+shim = { path = "../shim", features = ["no_std"] }
+sync = { path = "../sync" }
 cfg-if = "1.0.0"
 
 [dev-dependencies]
-shim = { path = "../../lib/shim" }
+shim = { path = "../shim" }
 
 [features]
 default = ["user-space"]

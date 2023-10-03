@@ -1,20 +1,21 @@
 use core::alloc::Layout;
 use core::ptr;
 
-use crate::GenericAllocator;
 use crate::linked_list::LinkedList;
+use crate::statistics::AllocatorStatistics;
 use crate::util::{align_down, align_up};
+use crate::GenericAllocator;
 
 const BIN_COUNT: usize = 20;
 
 fn log_two(number: usize) -> Option<usize> {
-    return if number == 0 {
+    if number == 0 {
         None
     } else if number == 1 {
         Some(0)
     } else {
         Some(log_two(number / 2)? + 1)
-    };
+    }
 }
 
 fn is_aligned(ptr: *mut usize, align: usize) -> bool {
@@ -23,6 +24,7 @@ fn is_aligned(ptr: *mut usize, align: usize) -> bool {
 
 /// bin n (2^(n + 3) bytes)
 pub struct BinAllocator {
+    statistics: AllocatorStatistics,
     bins: [LinkedList; BIN_COUNT],
 }
 
@@ -30,10 +32,16 @@ impl BinAllocator {
     /// Creates a new bin allocator that will allocate memory from the region
     /// starting at address `start` and ending at address `end`.
     pub fn new(start: usize, end: usize) -> Self {
+        let statistics = AllocatorStatistics {
+            allocated_size: 0,
+            allocation_count: 0,
+            total_memory: end - start,
+        };
+
         let mut bins = [LinkedList::new(); BIN_COUNT];
         Self::allocate_bins(&mut bins, BIN_COUNT - 1, start, end);
 
-        Self { bins }
+        Self { statistics, bins }
     }
 
     fn buddy_up(&mut self, ptr: *mut usize, bin: usize) {
@@ -127,12 +135,23 @@ impl BinAllocator {
 
 impl GenericAllocator for BinAllocator {
     unsafe fn alloc(&mut self, layout: Layout) -> *mut u8 {
+        self.statistics.allocated_size += layout.size(); // technically this needs to be rounded
+        self.statistics.allocation_count += 1;
+
         let bin = Self::size_to_bin(layout.size()).unwrap_or(0);
-        self.buddy_down(bin, layout.align()).unwrap_or(ptr::null_mut()) as *mut u8
+        self.buddy_down(bin, layout.align())
+            .unwrap_or(ptr::null_mut()) as *mut u8
     }
 
     unsafe fn dealloc(&mut self, ptr: *mut u8, layout: Layout) {
+        self.statistics.allocated_size -= layout.size(); // technically this needs to be rounded
+        self.statistics.allocation_count -= 1;
+
         let bin = Self::size_to_bin(layout.size()).unwrap_or(0);
         self.buddy_up(ptr as *mut usize, bin);
+    }
+
+    fn statistics(&mut self) -> AllocatorStatistics {
+        self.statistics
     }
 }

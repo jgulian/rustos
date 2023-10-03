@@ -6,11 +6,14 @@ use core::time::Duration;
 use kernel_api::*;
 use kernel_api::OsError::BadAddress;
 use pi::timer;
+use sync::Mutex;
 
-use crate::{kprintln, SCHEDULER};
-use crate::memory::{PagePerm, VirtualAddr};
+use crate::console::kprintln;
+use crate::memory::{PagePermissions, VirtualAddr};
 use crate::param::{PAGE_SIZE, USER_IMG_BASE};
 use crate::process::{ResourceId, State};
+use crate::SCHEDULER;
+use crate::scheduling::SwitchTrigger;
 use crate::traps::TrapFrame;
 
 /// Sleep for `ms` milliseconds.
@@ -20,24 +23,27 @@ use crate::traps::TrapFrame;
 /// In addition to the usual status value, this system call returns one
 /// parameter: the approximate true elapsed time from when `sleep` was called to
 /// when `sleep` returned.
-pub fn sys_sleep(tf: &mut TrapFrame) -> OsResult<()> {
-    let ms = tf.xs[0];
+fn sys_sleep(trap_frame: &mut TrapFrame) -> OsResult<()> {
+    let ms = trap_frame.xs[0];
     let started = timer::current_time();
-    let sleep_until = started + Duration::from_millis(ms as u64);
+    let sleep_until = started + Duration::from_millis(ms);
 
     let waiting = State::Waiting(Box::new(move |process| {
         let current_time = timer::current_time();
         let passed = sleep_until < current_time;
+        //info!(
+        //    "checking {:?} < {:?}, {}",
+        //    sleep_until, current_time, passed
+        //);
         if passed {
             let millis: u64 = (current_time - started).as_millis() as u64;
-            kprintln!("{}", millis);
             process.context.xs[0] = millis;
             process.context.xs[8] = 0;
         }
         passed
     }));
 
-    SCHEDULER.switch(waiting, tf);
+    SCHEDULER.switch(trap_frame, SwitchTrigger::Force, waiting)?;
 
     Ok(())
 }
@@ -50,7 +56,7 @@ pub fn sys_sleep(tf: &mut TrapFrame) -> OsResult<()> {
 /// parameter:
 ///  - current time as seconds
 ///  - fractional part of the current time, in nanoseconds.
-pub fn sys_time(tf: &mut TrapFrame) -> OsResult<()> {
+fn sys_time(tf: &mut TrapFrame) -> OsResult<()> {
     tf.xs[0] = timer::current_time().as_secs();
     tf.xs[1] = timer::current_time().as_nanos() as u64;
 
@@ -60,14 +66,12 @@ pub fn sys_time(tf: &mut TrapFrame) -> OsResult<()> {
 /// Kills the current process.
 ///
 /// This system call does not take paramer and does not return any value.
-pub fn sys_exit(tf: &mut TrapFrame) -> OsResult<()> {
-    SCHEDULER.kill(tf).expect("failed to kill process");
-    SCHEDULER.switch_to(tf);
-
+fn sys_exit(trap_frame: &mut TrapFrame) -> OsResult<()> {
+    SCHEDULER.switch(trap_frame, SwitchTrigger::Force, State::Dead)?;
     Ok(())
 }
 
-pub fn sys_open(tf: &mut TrapFrame) -> OsResult<()> {
+fn sys_open(tf: &mut TrapFrame) -> OsResult<()> {
     let ptr = tf.xs[0];
     let len = tf.xs[1] as usize;
 
@@ -75,9 +79,9 @@ pub fn sys_open(tf: &mut TrapFrame) -> OsResult<()> {
     copy_from_userspace(tf, ptr, buffer.as_mut_slice())?;
     let path = String::from_utf8_lossy(buffer.as_slice()).to_string();
 
-    tf.xs[0] = SCHEDULER.on_process(tf, |process| {
-        process.open(path)
-    })??.into();
+    tf.xs[0] = SCHEDULER
+        .on_process(tf, |process| process.open(path))??
+        .into();
 
     Ok(())
 }
@@ -90,7 +94,7 @@ fn sys_close(tf: &mut TrapFrame) -> OsResult<()> {
     })?
 }
 
-pub fn sys_read(tf: &mut TrapFrame) -> OsResult<()> {
+fn sys_read(tf: &mut TrapFrame) -> OsResult<()> {
     let descriptor = tf.xs[0];
     let ptr = tf.xs[1];
     let len = tf.xs[2] as usize;
@@ -107,7 +111,7 @@ pub fn sys_read(tf: &mut TrapFrame) -> OsResult<()> {
     Ok(())
 }
 
-pub fn sys_write(tf: &mut TrapFrame) -> OsResult<()> {
+fn sys_write(tf: &mut TrapFrame) -> OsResult<()> {
     let descriptor = tf.xs[0];
     let ptr = tf.xs[1];
     let len = tf.xs[2] as usize;
@@ -124,9 +128,7 @@ pub fn sys_write(tf: &mut TrapFrame) -> OsResult<()> {
 }
 
 fn sys_pipe(tf: &mut TrapFrame) -> OsResult<()> {
-    let (ingress, egress) = SCHEDULER.on_process(tf, |process| {
-        process.pipe()
-    })??;
+    let (ingress, egress) = SCHEDULER.on_process(tf, |process| process.pipe())??;
 
     tf.xs[0] = ingress.into();
     tf.xs[1] = egress.into();
@@ -139,7 +141,7 @@ fn sys_pipe(tf: &mut TrapFrame) -> OsResult<()> {
 ///
 /// In addition to the usual status value, this system call returns a
 /// parameter: the current process's ID.
-pub fn sys_getpid(tf: &mut TrapFrame) -> OsResult<()> {
+fn sys_getpid(tf: &mut TrapFrame) -> OsResult<()> {
     tf.xs[0] = tf.tpidr;
     Ok(())
 }
@@ -152,11 +154,21 @@ pub fn sys_getpid(tf: &mut TrapFrame) -> OsResult<()> {
 /// parameter:
 ///  - current time as seconds
 ///  - fractional part of the current time, in nanoseconds.
-pub fn sys_sbrk(tf: &mut TrapFrame) -> OsResult<()> {
+fn sys_sbrk(tf: &mut TrapFrame) -> OsResult<()> {
     let result = SCHEDULER.on_process(tf, |process| -> OsResult<(u64, u64)> {
         //TODO: pick a better heap base / allow more sbrks / something might be wrong with is_valid
-        let heap_base = USER_IMG_BASE + PAGE_SIZE;
-        process.vmap.alloc(VirtualAddr::from(heap_base), PagePerm::RW);
+        let mut heap_base = USER_IMG_BASE + PAGE_SIZE;
+
+        process
+            .vmap
+            .lock(|vmap| {
+                while vmap.is_valid(VirtualAddr::from(heap_base - USER_IMG_BASE)) {
+                    heap_base += PAGE_SIZE;
+                }
+                vmap.alloc(VirtualAddr::from(heap_base), PagePermissions::RW);
+            })
+            .unwrap();
+
         Ok((heap_base as u64, PAGE_SIZE as u64))
     })??;
 
@@ -170,9 +182,7 @@ fn sys_duplicate(tf: &mut TrapFrame) -> OsResult<()> {
     let descriptor = ResourceId::from(tf.xs[0]);
     let new_descriptor = ResourceId::from(tf.xs[1]);
 
-    SCHEDULER.on_process(tf, |process| {
-        process.duplicate(descriptor, new_descriptor)
-    })??;
+    SCHEDULER.on_process(tf, |process| process.duplicate(descriptor, new_descriptor))??;
 
     Ok(())
 }
@@ -181,9 +191,12 @@ fn sys_seek(_tf: &mut TrapFrame) -> OsResult<()> {
     Err(OsError::Unknown)
 }
 
-fn sys_fork(tf: &mut TrapFrame) -> OsResult<()> {
-    tf.xs[0] = SCHEDULER.fork(tf).ok_or(OsError::NoVmSpace)?;
-    tf.xs[1] = 0;
+fn sys_fork(trap_frame: &mut TrapFrame) -> OsResult<()> {
+    let process = SCHEDULER.on_process(trap_frame, |process| process.fork())??;
+    let process_id = SCHEDULER.add(process)?;
+
+    trap_frame.xs[0] = process_id.into();
+    trap_frame.xs[1] = 0;
 
     Ok(())
 }
@@ -195,24 +208,77 @@ fn sys_execute(tf: &mut TrapFrame) -> OsResult<()> {
     copy_from_userspace(tf, tf.xs[0], arguments.as_mut_slice())?;
     copy_from_userspace(tf, tf.xs[2], environment.as_mut_slice())?;
 
-    SCHEDULER.on_process(tf, |process|
-        process.execute(arguments.as_slice(), environment.as_slice()))??;
+    SCHEDULER.on_process(tf, |process| {
+        process.execute(arguments.as_slice(), environment.as_slice())
+    })??;
     Ok(())
 }
 
-fn sys_wait(tf: &mut TrapFrame) -> OsResult<()> {
-    SCHEDULER.switch(State::Waiting(Box::new(|process| {
-        if let Some(id) = process.dead_children.pop() {
-            process.context.xs[0] = id;
-            true
-        } else {
-            false
-        }
-    })), tf);
+fn sys_wait(trap_frame: &mut TrapFrame) -> OsResult<()> {
+    let use_timeout = trap_frame.xs[1] == 1;
+    let timeout_end = pi::timer::current_time() + Duration::from_millis(trap_frame.xs[2]);
+
+    SCHEDULER.switch(
+        trap_frame,
+        SwitchTrigger::Force,
+        State::Waiting(Box::new(move |process| {
+            if let Some(id) = process.dead_children.pop() {
+                process.context.xs[0] = id.into();
+                process.context.xs[1] = 0;
+                true
+            } else if use_timeout && timeout_end < timer::current_time() {
+                process.context.xs[0] = 0;
+                process.context.xs[1] = 1;
+                true
+            } else {
+                false
+            }
+        })),
+    )?;
+
     Ok(())
+}
+
+fn clone(trap_frame: &mut TrapFrame) -> OsResult<()> {
+    let function_address = trap_frame.xs[0];
+    let data = trap_frame.xs[1];
+    let process =
+        SCHEDULER.on_process(trap_frame, |process| process.clone(function_address, data))??;
+    let process_id = SCHEDULER.add(process)?;
+
+    trap_frame.xs[0] = process_id.into();
+
+    Ok(())
+}
+
+fn switch_scheduler(trap_frame: &mut TrapFrame) -> OsResult<()> {
+    if trap_frame.xs[0] <= 1 {
+        SCHEDULER.set_active_scheduler(trap_frame.xs[0] as usize);
+        Ok(())
+    } else {
+        Err(OsError::Unknown)
+    }
+}
+
+fn get_user_identity(trap_frame: &mut TrapFrame) -> OsResult<()> {
+    trap_frame.xs[0] = SCHEDULER.on_process(trap_frame, |process| process.get_user_identity())?;
+    Ok(())
+}
+
+fn set_user_identity(trap_frame: &mut TrapFrame) -> OsResult<()> {
+    let new_user_identity = trap_frame.xs[0];
+    let switched = SCHEDULER.on_process(trap_frame, |process| {
+        process.set_user_identity(new_user_identity)
+    })?;
+    if switched {
+        Ok(())
+    } else {
+        Err(OsError::InvalidPermissions)
+    }
 }
 
 //TODO: make the functions work across page boundaries
+//TODO: this is fundamentally unsafe
 fn copy_from_userspace(_: &TrapFrame, ptr: u64, buf: &mut [u8]) -> OsResult<()> {
     let virtual_address = VirtualAddr::from(ptr);
 
@@ -253,18 +319,22 @@ fn syscall_to_function(call: Syscall) -> fn(tf: &mut TrapFrame) -> OsResult<()> 
         Syscall::Exit => sys_exit,
         Syscall::Wait => sys_wait,
         Syscall::GetPid => sys_getpid,
+        Syscall::Clone => clone,
         Syscall::Sbrk => sys_sbrk,
         Syscall::Sleep => sys_sleep,
         Syscall::Time => sys_time,
-        Syscall::Unknown => |_| Err(OsError::Unknown)
+        Syscall::SwitchScheduler => switch_scheduler,
+        Syscall::GetUserIdentity => get_user_identity,
+        Syscall::SetUserIdentity => set_user_identity,
+        Syscall::Unknown => |_| Err(OsError::Unknown),
     }
 }
 
-pub fn handle_syscall(num: u16, tf: &mut TrapFrame) {
+pub fn handle_syscall(num: u16, trap_frame: &mut TrapFrame) {
     let call = Syscall::from(num);
-    let result = syscall_to_function(call)(tf);
-    tf.xs[7] = match result {
+    let result = syscall_to_function(call)(trap_frame);
+    trap_frame.xs[7] = match result {
         Ok(_) => 1,
-        Err(err) => err as u64
+        Err(err) => err as u64,
     }
 }

@@ -1,6 +1,6 @@
 use core::time::Duration;
+use filesystem::device::BlockDevice;
 
-use filesystem::BlockDevice;
 use shim::io;
 
 extern "C" {
@@ -55,47 +55,36 @@ impl Sd {
 }
 
 impl BlockDevice for Sd {
-    /// Reads sector `n` from the SD card into `buf`. On success, the number of
-    /// bytes read is returned.
-    ///
-    /// # Errors
-    ///
-    /// An I/O error of kind `InvalidInput` is returned if `buf.len() < 512` or
-    /// `n > 2^31 - 1` (the maximum value for an `i32`).
-    ///
-    /// An error of kind `TimedOut` is returned if a timeout occurs while
-    /// reading from the SD card.
-    ///
-    /// An error of kind `Other` is returned for all other errors.
-    fn read_sector(&mut self, n: u64, buf: &mut [u8]) -> io::Result<usize> {
-        if buf.len() < 512 || n > (1 << 31 - 1) {
+    fn block_size(&self) -> usize {
+        512
+    }
+
+    fn read_block(&mut self, block: u64, data: &mut [u8]) -> io::Result<()> {
+        if data.len() < 512 || block > (1 << (31 - 1)) {
             return Err(io::Error::from(io::ErrorKind::InvalidInput));
         }
 
+        // Check alignment
         let did_err = unsafe {
-            let ptr = buf.as_mut_ptr();
+            let ptr = data.as_mut_ptr();
             if (ptr as usize) % 4 != 0 {
                 return Err(io::Error::from(io::ErrorKind::InvalidInput));
             }
 
-            sd_readsector(n as i32, ptr) == 0
+            sd_readsector(block as i32, ptr) == 0
         };
 
         if did_err {
             match unsafe { sd_err } {
                 -1 => Err(io::Error::from(io::ErrorKind::TimedOut)),
-                _ => Err(io::Error::from(io::ErrorKind::Other))
+                _ => Err(io::Error::from(io::ErrorKind::Other)),
             }
         } else {
-            Ok(512)
+            Ok(())
         }
     }
 
-    fn write_sector(&mut self, _n: u64, _buf: &[u8]) -> io::Result<usize> {
-        unimplemented!("SD card and file system are read only")
-    }
-
-    fn flush_sector(&mut self, _n: u64) -> io::Result<()> {
+    fn write_block(&mut self, _block: u64, _data: &[u8]) -> io::Result<()> {
         unimplemented!("SD card and file system are read only")
     }
 }

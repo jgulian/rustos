@@ -14,5 +14,5 @@ edition = "2021"
 [dependencies]
 aarch64 = { path = "../aarch64" }
 volatile = { path = "../volatile" }
-filesystem = { path = "../filesystem" }
+filesystem = { path = "../filesystem", features = ["no_std"] }
 shim = { path = "../shim", features = ["no_std"] }

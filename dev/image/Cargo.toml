@@ -1,0 +1,17 @@
+cargo-features = ["per-package-target"]
+
+[package]
+name = "image"
+version = "0.1.0"
+edition = "2021"
+forced-target = "aarch64-apple-darwin"   # TODO: remove
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+vfat = { path = "../../lib/vfat" }
+filesystem = { path = "../../lib/filesystem" }
+format = { path = "../../lib/format" }
+shim = { path = "../../lib/shim" }
+sync = { path = "../../lib/sync" }
+
+log = "0.4" #FIXME: remove

@@ -6,7 +6,7 @@ mod assert {
         S1(1);
 
         struct S2(u16, u16);
-        const_assert_size!(S2, 2+2);
+        const_assert_size!(S2, 2 + 2);
         S2(2, 2);
     }
 }

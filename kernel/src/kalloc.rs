@@ -3,14 +3,16 @@ use core::cmp::max;
 use core::fmt;
 
 use allocator::bin::BinAllocator;
-use allocator::GenericAllocator;
+use allocator::statistics::AllocatorStatistics;
 use allocator::util::{align_down, align_up};
+use allocator::GenericAllocator;
 use pi::atags::Atags;
+use sync::Mutex;
 
-use crate::multiprocessing::mutex::Mutex;
+use crate::multiprocessing::spin_lock::SpinLock;
 
 /// Thread-safe (locking) wrapper around a particular memory allocator.
-pub struct KernelAllocator(Mutex<Option<BinAllocator>>);
+pub struct KernelAllocator(SpinLock<Option<BinAllocator>>);
 
 impl KernelAllocator {
     /// Returns an uninitialized `Allocator`.
@@ -18,7 +20,7 @@ impl KernelAllocator {
     /// The allocator must be initialized by calling `initialize()` before the
     /// first memory allocation. Failure to do will result in panics.
     pub const fn uninitialized() -> Self {
-        KernelAllocator(Mutex::new(None))
+        KernelAllocator(SpinLock::new(None))
     }
 
     /// Initializes the memory allocator.
@@ -30,26 +32,46 @@ impl KernelAllocator {
     /// Panics if the system's memory map could not be retrieved.
     pub unsafe fn initialize(&self) {
         let (start, end) = memory_map().expect("failed to find memory map");
-        info!("heap beg: {:x}, end: {:x}", start, end);
-        *self.0.lock() = Some(BinAllocator::new(start, end));
+        self.0
+            .lock(|allocator| {
+                *allocator = Some(BinAllocator::new(start, end));
+            })
+            .unwrap()
+    }
+
+    pub fn stats(&self) -> AllocatorStatistics {
+        self.0
+            .lock(|allocator| {
+                allocator
+                    .as_mut()
+                    .expect("allocator uninitialized")
+                    .statistics()
+            })
+            .unwrap()
     }
 }
 
 unsafe impl GlobalAlloc for KernelAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         self.0
-            .lock()
-            .as_mut()
-            .expect("allocator uninitialized")
-            .alloc(layout)
+            .lock(|allocator| {
+                allocator
+                    .as_mut()
+                    .expect("allocator uninitialized")
+                    .alloc(layout)
+            })
+            .unwrap()
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
         self.0
-            .lock()
-            .as_mut()
-            .expect("allocator uninitialized")
-            .dealloc(ptr, layout);
+            .lock(|allocator| {
+                allocator
+                    .as_mut()
+                    .expect("allocator uninitialized")
+                    .dealloc(ptr, layout)
+            })
+            .unwrap()
     }
 }
 
@@ -82,10 +104,14 @@ pub fn memory_map() -> Option<(usize, usize)> {
 
 impl fmt::Debug for KernelAllocator {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.0.lock().as_mut() {
-            Some(_) => write!(f, "Initialized")?,
-            None => write!(f, "Not yet initialized")?,
-        }
-        Ok(())
+        self.0
+            .lock(|allocator| {
+                match allocator {
+                    Some(_) => write!(f, "Initialized")?,
+                    None => write!(f, "Not yet initialized")?,
+                }
+                Ok(())
+            })
+            .unwrap()
     }
 }

@@ -1,111 +1,101 @@
-use alloc::string::{String, ToString};
-use alloc::vec;
+#[cfg(feature = "no_std")]
+use alloc::string::String;
+#[cfg(feature = "no_std")]
+use alloc::string::ToString;
+#[cfg(feature = "no_std")]
 use alloc::vec::Vec;
-use core::any::Any;
-use core::borrow::Borrow;
-use core::fmt::{Display, Formatter, Write};
-use core::ops::Index;
+use core::fmt::{Display, Formatter};
 
-use log::info;
+use shim::io;
+#[cfg(not(feature = "no_std"))]
+use std::string::String;
+#[cfg(not(feature = "no_std"))]
+use std::string::ToString;
+#[cfg(not(feature = "no_std"))]
+use std::vec::Vec;
 
-use shim::{io, ioerr};
-
-use crate::path::Component::Parent;
-
-#[derive(PartialEq, Debug)]
-pub struct Path(Vec<Component>);
-
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Component {
     Root,
-    Current,
     Parent,
+    Current,
     Child(String),
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Default)]
+pub struct Path(String);
+
 impl Path {
-    pub fn new(path: &str) -> io::Result<Self> {
-        Path::try_from(path)
-    }
-
     pub fn root() -> Self {
-        Path(vec![Component::Root])
+        Self(String::from("/"))
     }
 
-    pub fn append(&mut self, path: &Path) {
-        self.0.extend_from_slice(path.0.as_slice());
+    pub fn components(&self) -> impl Iterator<Item = Component> {
+        PathComponentIterator(self.0.clone(), 0)
     }
 
-    pub fn append_child<T>(&mut self, name: T) where T: ToString {
-        self.0.push(Component::Child(name.to_string()))
+    pub fn join(&mut self, other: &Path) {
+        other.components().for_each(|component| {
+            self.push_component(component);
+        });
     }
 
-    pub fn starts_with(&self, path: &Path) -> bool {
-        self.components().starts_with(path.components())
+    pub fn file_name(&self) -> Option<String> {
+        match self.components().last()? {
+            Component::Root => None,
+            Component::Parent => Some(String::from("..")),
+            Component::Current => Some(String::from(".")),
+            Component::Child(child) => Some(child),
+        }
     }
 
-    pub fn split_from_start(&self, path: &Path) -> Option<Path> {
-        if !self.starts_with(path) {
+    pub fn join_str(&mut self, other: &str) -> io::Result<()> {
+        let new_component = match other {
+            "/" => Component::Root,
+            "." => Component::Root,
+            ".." => Component::Root,
+            _ => {
+                if other.contains('/') {
+                    return Err(io::Error::from(io::ErrorKind::InvalidInput));
+                }
+                Component::Child(other.replace('/', ""))
+            }
+        };
+        self.push_component(new_component);
+        Ok(())
+    }
+
+    pub fn simplify(&self) -> Path {
+        self.components()
+            .fold(Default::default(), |mut path, component| {
+                path.push_component(component);
+                path
+            })
+    }
+
+    pub fn starts_with(&self, other: &Path) -> bool {
+        self.0.starts_with(other.0.as_str())
+    }
+
+    pub fn relative_from(&self, other: &Path) -> Option<Path> {
+        if !self.starts_with(other) {
             None
         } else {
-            self.suffix(path.0.len())
+            Some(Path(self.0[..other.0.len()].to_string()))
         }
     }
 
-    pub fn sub_path(&self, i: usize, j: usize) -> Option<Path> {
-        match self.0.get(i..j) {
-            None => None,
-            Some(slice) => Some(Path(Vec::from(slice))),
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+
+    fn push_component(&mut self, component: Component) {
+        match component {
+            Component::Root => self.0.push('/'),
+            Component::Parent => self.0.push_str(".."),
+            Component::Current => self.0.push('/'),
+            Component::Child(child) => self.0.push_str(child.as_str()),
         }
-    }
-
-    pub fn prefix(&self, i: usize) -> Option<Path> {
-        self.sub_path(0, i)
-    }
-
-    pub fn suffix(&self, i: usize) -> Option<Path> {
-        self.sub_path(i, self.0.len())
-    }
-
-    pub fn at(&self, i: usize) -> Option<Component> {
-        self.0.get(i).map(|component| component.clone())
-    }
-
-    pub fn components(&self) -> &Vec<Component> {
-        &self.0
-    }
-
-    pub fn simplify(&self) -> io::Result<Path> {
-        let mut simplified = Vec::new();
-
-        for component in &self.0 {
-            match component {
-                Component::Root => {
-                    simplified.clear();
-                    simplified.push(Component::Root);
-                }
-                Component::Current => {}
-                Parent => {
-                    match simplified.last() {
-                        Some(last) if *last != Component::Root => {
-                            simplified.pop();
-                        }
-                        _ => {
-                            return ioerr!(InvalidFilename);
-                        }
-                    }
-                }
-                Component::Child(child) => {
-                    simplified.push(Component::Child(child.clone()))
-                }
-            }
-        }
-
-        Ok(Path(simplified))
-    }
-
-    pub fn len(&self) -> usize {
-        self.0.len()
     }
 }
 
@@ -113,90 +103,51 @@ impl TryFrom<&str> for Path {
     type Error = io::Error;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        let mut result = Vec::new();
-        let mut children = value.split("/").peekable();
-        while let Some(child) = children.next() {
-            match child {
-                "" => {
-                    if children.peek().is_some() {
-                        result.push(Component::Root)
-                    }
+        let mut result = Path::default();
+
+        value
+            .split('/')
+            .try_for_each(|component_str| -> io::Result<()> {
+                if component_str.is_empty() {
+                    result.push_component(Component::Root)
+                } else {
+                    result.join_str(component_str)?;
                 }
-                "." => {
-                    result.push(Component::Current);
-                }
-                ".." => {
-                    result.push(Component::Parent)
-                }
-                _ => {
-                    if !is_valid_entry(child) {
-                        return ioerr!(InvalidFilename);
-                    } else {
-                        result.push(Component::Child(child.to_string()))
-                    }
-                }
-            }
-        }
+                Ok(())
+            })?;
 
-        Ok(Path(result))
+        Ok(result)
     }
-}
-
-impl TryFrom<String> for Path {
-    type Error = io::Error;
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        Path::try_from(value.as_str())
-    }
-}
-
-impl From<&[Component]> for Path {
-    fn from(value: &[Component]) -> Self {
-        Path(Vec::from(value))
-    }
-}
-
-impl Clone for Path {
-    fn clone(&self) -> Self {
-        Path(self.0.clone())
-    }
-}
-
-fn is_valid_entry(name: &str) -> bool {
-    name.chars().all(|c| {
-        match c {
-            'A'..='Z' | 'a'..='z' | '0'..='9' | '_' | ' ' | '.' => true,
-            _ => {
-                info!("invalid character {}", c as u8);
-                false
-            },
-        }
-    })
 }
 
 impl Display for Path {
-    fn fmt(&self, f: &mut Formatter) -> core::fmt::Result {
-        let mut components = self.0.iter().peekable();
-        while let Some(component) = components.next() {
-            match component {
-                Component::Root => {
-                    f.write_char('/')?;
-                }
-                Component::Current => {
-                    f.write_str("./")?;
-                }
-                Parent => {
-                    f.write_str("../")?;
-                }
-                Component::Child(child) => {
-                    f.write_str(child.as_str())?;
-                    if components.peek().is_some() {
-                        f.write_char('/')?;
-                    }
-                }
-            }
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        f.write_str(self.0.as_str())
+    }
+}
+
+struct PathComponentIterator(String, usize);
+
+impl Iterator for PathComponentIterator {
+    type Item = Component;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.1 >= self.0.len() {
+            return None;
         }
 
-        Ok(())
+        let component: String = self
+            .0
+            .chars()
+            .skip(self.1)
+            .take_while(|c| *c != '/')
+            .collect();
+        self.1 += component.len() + 1;
+        Some(match component.as_str() {
+            "" => Component::Root,
+            "." => Component::Current,
+            ".." => Component::Parent,
+            _ => Component::Child(component),
+        })
     }
 }

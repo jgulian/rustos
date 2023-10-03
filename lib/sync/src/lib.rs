@@ -1,17 +1,28 @@
-#![no_std]
+#![feature(negative_impls)]
+#![cfg_attr(feature = "no_std", no_std)]
 
-use core::marker::Sized;
-use core::ops::{Deref, DerefMut, Drop};
+#[cfg(feature = "no_std")]
+extern crate alloc;
 
-pub struct PoisonError<G>(G);
+use core::ops::DerefMut;
+use core::ops::FnOnce;
+use core::result::Result;
 
-pub type LockResult<Guard> = Result<Guard, PoisonError<Guard>>;
+#[derive(Debug)]
+pub enum LockError {
+    Poisoned,
+    InvalidState,
+    WouldBlock,
+}
 
-pub trait Guard<'a, T: Sized + 'a>: Deref<Target=T> + DerefMut<Target=T> {}
+pub type LockResult<T> = Result<T, LockError>;
 
-pub trait Mutex<'a, T: Sized + 'a> {
-    type Guard: Guard<'a, T>;
-
-    fn new(data: T) -> Self;
-    fn lock(&mut self) -> LockResult<Self::Guard>;
+pub trait Mutex<T: Send>: Send + Sync {
+    fn new(value: T) -> Self
+    where
+        Self: Sized;
+    fn lock<R>(&self, f: impl FnOnce(&mut T) -> R) -> LockResult<R>;
+    fn try_lock<R>(&self, f: impl FnOnce(&mut T) -> R) -> LockResult<R>;
+    fn is_poisoned(&self) -> bool;
+    fn clear_poison(&self);
 }

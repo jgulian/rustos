@@ -5,7 +5,7 @@
 #![feature(negative_impls)]
 #![feature(raw_vec_internals)]
 #![feature(panic_info_message)]
-
+#![feature(is_some_and)]
 #![no_std]
 #![no_main]
 // #![cfg_attr(not(test), no_std)]
@@ -15,34 +15,28 @@ extern crate alloc;
 #[macro_use]
 extern crate log;
 
-
-
-
 use console::kprintln;
 use disk::FileSystem;
-
-
 use filesystem::path::Path;
 use memory::VMManager;
-use process::GlobalScheduler;
-
 use traps::irq::{Fiq, GlobalIrq};
 
 use crate::kalloc::KernelAllocator;
 use crate::process::Process;
+use crate::scheduling::GlobalScheduler;
 
-// #[cfg(not(test))]
 mod init;
 
-pub mod kalloc;
-pub mod console;
-pub mod disk;
-pub mod logger;
-pub mod param;
-pub mod process;
-pub mod traps;
-pub mod memory;
-pub mod multiprocessing;
+mod console;
+mod disk;
+mod kalloc;
+mod logger;
+mod memory;
+mod multiprocessing;
+mod param;
+mod process;
+mod scheduling;
+mod traps;
 
 #[cfg_attr(not(test), global_allocator)]
 pub static ALLOCATOR: KernelAllocator = KernelAllocator::uninitialized();
@@ -63,8 +57,11 @@ unsafe fn kernel_main() -> ! {
     init::initialize_app_cores();
     VMM.wait();
 
-    let init = Path::new("/init").expect("unable to open init");
-    SCHEDULER.add(Process::load(&init).expect("unable to run init"));
+    let init = Path::try_from("/init").expect("unable to open init");
+    let init_process = Process::load(&init).expect("unable to setup init");
+    SCHEDULER
+        .add(init_process)
+        .expect("unable to add init process");
 
-    SCHEDULER.start();
+    SCHEDULER.bootstrap();
 }

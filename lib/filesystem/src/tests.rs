@@ -1,16 +1,8 @@
-#![test]
+use crate::path::{Component, Path};
 
-use alloc::string::{String, ToString};
-
-use crate::path::Path;
-
-fn test_path() {
-    let mut root = Path::root();
-    assert_eq!(root.to_string(), String::from("/"));
-
-    let sub_path = Path::from("a/b/c");
-    assert_eq!(sub_path.to_string(), String::from("a/b/c"));
-
-    root.append(&sub_path);
-    assert_eq!(root.to_string(), String::from("/a/b/c"));
+#[test]
+fn test_path_buf() {
+    let mut components_iter = Path::root().components();
+    assert_eq!(components_iter.next(), Some(Component::Root));
+    assert_eq!(components_iter.next(), None);
 }

@@ -27,8 +27,8 @@ pub enum LocalInterrupt {
 impl LocalInterrupt {
     pub const MAX: usize = 12;
 
-    pub fn iter() -> impl Iterator<Item=LocalInterrupt> {
-        (0..LocalInterrupt::MAX).map(|n| LocalInterrupt::from(n))
+    pub fn iter() -> impl Iterator<Item = LocalInterrupt> {
+        (0..LocalInterrupt::MAX).map(LocalInterrupt::from)
     }
 }
 
@@ -89,15 +89,18 @@ impl LocalController {
     /// Returns a new handle to the interrupt controller.
     pub fn new(core: usize) -> LocalController {
         LocalController {
-            core: core,
+            core,
             registers: unsafe { &mut *(INT_BASE as *mut Registers) },
         }
     }
 
     pub fn enable_local_timer(&mut self) {
         unsafe {
-            aarch64::CNTP_CTL_EL0.set(aarch64::CNTP_CTL_EL0.get() |
-                aarch64::CNTP_CTL_EL0::ENABLE | aarch64::CNTP_CTL_EL0::IMASK);
+            aarch64::CNTP_CTL_EL0.set(
+                aarch64::CNTP_CTL_EL0.get()
+                    | aarch64::CNTP_CTL_EL0::ENABLE
+                    | aarch64::CNTP_CTL_EL0::IMASK,
+            );
             self.registers.core_timer[self.core].write(0b10);
             self.registers.core_irq_source[self.core].write(0b10);
         }
@@ -108,10 +111,12 @@ impl LocalController {
     }
 
     pub fn tick_in(&mut self, t: Duration) {
-        let additional_time = (t.as_nanos() * unsafe { aarch64::CNTFRQ_EL0.get() as u128 } / 1_000_000_000u128) as u64;
+        let additional_time = (t.as_nanos() * unsafe { aarch64::CNTFRQ_EL0.get() as u128 }
+            / 1_000_000_000u128) as u64;
         unsafe {
             aarch64::CNTP_TVAL_EL0.set(additional_time);
-            aarch64::CNTP_CTL_EL0.set(aarch64::CNTP_CTL_EL0.get() & (!aarch64::CNTP_CTL_EL0::IMASK));
+            aarch64::CNTP_CTL_EL0
+                .set(aarch64::CNTP_CTL_EL0.get() & (!aarch64::CNTP_CTL_EL0::IMASK));
         }
     }
 }

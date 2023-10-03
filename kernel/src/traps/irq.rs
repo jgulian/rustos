@@ -3,14 +3,15 @@ use core::ops::Index;
 
 use pi::interrupt::Interrupt;
 use pi::local_interrupt::LocalInterrupt;
+use sync::Mutex;
 
-use crate::multiprocessing::mutex::Mutex;
+use crate::multiprocessing::spin_lock::SpinLock;
 use crate::traps::TrapFrame;
 
 // Programmer Guide Chapter 10
 // AArch64 Exception Handling
 pub type IrqHandler = Box<dyn FnMut(&mut TrapFrame) + Send>;
-type IrqHandlerMutex = Mutex<Option<IrqHandler>>;
+type IrqHandlerMutex = SpinLock<Option<IrqHandler>>;
 
 type GlobalIrqHandlers = [IrqHandlerMutex; Interrupt::MAX];
 type LocalIrqHandlers = [IrqHandlerMutex; LocalInterrupt::MAX];
@@ -27,14 +28,14 @@ pub struct Fiq(IrqHandlerMutex);
 impl GlobalIrq {
     pub const fn new() -> GlobalIrq {
         GlobalIrq([
-            Mutex::new(None),
-            Mutex::new(None),
-            Mutex::new(None),
-            Mutex::new(None),
-            Mutex::new(None),
-            Mutex::new(None),
-            Mutex::new(None),
-            Mutex::new(None),
+            SpinLock::new(None),
+            SpinLock::new(None),
+            SpinLock::new(None),
+            SpinLock::new(None),
+            SpinLock::new(None),
+            SpinLock::new(None),
+            SpinLock::new(None),
+            SpinLock::new(None),
         ])
     }
 }
@@ -42,25 +43,25 @@ impl GlobalIrq {
 impl LocalIrq {
     pub const fn new() -> LocalIrq {
         LocalIrq([
-            Mutex::new(None),
-            Mutex::new(None),
-            Mutex::new(None),
-            Mutex::new(None),
-            Mutex::new(None),
-            Mutex::new(None),
-            Mutex::new(None),
-            Mutex::new(None),
-            Mutex::new(None),
-            Mutex::new(None),
-            Mutex::new(None),
-            Mutex::new(None),
+            SpinLock::new(None),
+            SpinLock::new(None),
+            SpinLock::new(None),
+            SpinLock::new(None),
+            SpinLock::new(None),
+            SpinLock::new(None),
+            SpinLock::new(None),
+            SpinLock::new(None),
+            SpinLock::new(None),
+            SpinLock::new(None),
+            SpinLock::new(None),
+            SpinLock::new(None),
         ])
     }
 }
 
 impl Fiq {
     pub const fn new() -> Fiq {
-        Fiq(Mutex::new(None))
+        Fiq(SpinLock::new(None))
     }
 }
 
@@ -108,23 +109,27 @@ pub trait IrqHandlerRegistry<I> {
 /// A blanket implementation of `IrqHandlerRegistry` trait for all indexable
 /// struct that returns `IrqHandlerMutex`.
 impl<I, T> IrqHandlerRegistry<I> for T
-    where
-        T: Index<I, Output=IrqHandlerMutex>,
+where
+    T: Index<I, Output = IrqHandlerMutex>,
 {
     /// Register an irq handler for an interrupt.
     /// The caller should assure that `initialize()` has been called before calling this function.
     fn register(&self, int: I, handler: IrqHandler) {
-        self.index(int).lock().replace(handler);
+        self.index(int)
+            .lock(|irq_handler| irq_handler.replace(handler))
+            .unwrap();
     }
 
     /// Executes an irq handler for the givven interrupt.
     /// The caller should assure that `initialize()` has been called before calling this function.
     fn invoke(&self, int: I, tf: &mut TrapFrame) {
-        match self.index(int).lock().as_mut() {
-            Some(handler) => {
-                (**handler)(tf);
-            }
-            _ => {}
-        }
+        self.index(int)
+            .lock(|irq_handler| match irq_handler {
+                None => {}
+                Some(handler) => {
+                    (**handler)(tf);
+                }
+            })
+            .unwrap()
     }
 }

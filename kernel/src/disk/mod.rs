@@ -1,90 +1,28 @@
 use alloc::boxed::Box;
-use alloc::rc::Rc;
-use alloc::string::{ToString};
+use alloc::string::String;
 use alloc::sync::Arc;
 
-use core::cell::UnsafeCell;
-use core::fmt::{self, Debug};
-
-use fat32::vfat::{HandleReference, VFat, VFatHandle};
-use filesystem;
-use filesystem::devices::CharDeviceFileSystem;
-use filesystem::fs2::{Directory2, FileSystem2};
+use filesystem::cache::CachedBlockDevice;
+use filesystem::device::{BlockDevice, ByteDevice};
+use filesystem::filesystem::{Directory, Filesystem};
+use filesystem::master_boot_record::PartitionEntry;
+use filesystem::partition::BlockPartition;
 use filesystem::path::Path;
-use filesystem::{CharDevice, VirtualFileSystem};
+use filesystem::virtual_file_system::{ByteDeviceFilesystem, Mounts, VirtualFilesystem};
+use kernel_api::println;
 use pi::uart::MiniUart;
-use shim::{io, newioerr};
-use shim::io::{Read, Write};
+use shim::{io, ioerr};
+use sync::Mutex;
+use vfat::virtual_fat::{VirtualFat, VirtualFatFilesystem};
 
-
-use crate::FILESYSTEM;
-use crate::multiprocessing::mutex::Mutex;
+use crate::disk::sd::Sd;
+use crate::disk::system::new_system_filesystem;
+use crate::multiprocessing::spin_lock::SpinLock;
 
 pub mod sd;
+mod system;
 
-#[derive(Clone)]
-pub struct PiVFatHandle(Rc<Mutex<VFat<Self>>>);
-
-// These impls are *unsound*. We should use `Arc` instead of `Rc` to implement
-// `Sync` and `Send` trait for `PiVFatHandle`. However, `Arc` uses atomic memory
-// access, which requires MMU to be initialized on ARM architecture. Since we
-// have enabled only one core of the board, these unsound impls will not cause
-// any immediate harm for now. We will fix this in the future.
-unsafe impl Send for PiVFatHandle {}
-
-unsafe impl Sync for PiVFatHandle {}
-
-impl Debug for PiVFatHandle {
-    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(f, "PiVFatHandle")
-    }
-}
-
-impl VFatHandle for PiVFatHandle {
-    fn new(val: VFat<PiVFatHandle>) -> Self {
-        PiVFatHandle(Rc::new(Mutex::new(val)))
-    }
-
-    fn lock<R>(&self, f: impl FnOnce(&mut VFat<PiVFatHandle>) -> R) -> R {
-        f(&mut self.0.lock())
-    }
-}
-
-struct PiVFatWrapper(UnsafeCell<Option<PiVFatHandle>>);
-
-impl PiVFatWrapper {
-    pub const fn uninitialized() -> Self {
-        PiVFatWrapper(UnsafeCell::new(None))
-    }
-
-    pub unsafe fn initialize(&self) {
-        let sd = sd::Sd::new().expect("filesystem failed to initialize");
-        let vfat = VFat::<PiVFatHandle>::from(sd).expect("failed to initialize vfat");
-        (&mut *self.0.get()).replace(vfat);
-    }
-
-    fn handle(&self) -> &PiVFatHandle {
-        unsafe { self.0.get().as_ref() }.unwrap().as_ref().unwrap()
-    }
-}
-
-unsafe impl Sync for PiVFatWrapper {}
-
-static PI_VFAT_HANDLE_WRAPPER: PiVFatWrapper = PiVFatWrapper::uninitialized();
-
-pub struct DiskFileSystem<'a>(&'a PiVFatHandle);
-
-impl<'a> FileSystem2 for DiskFileSystem<'a> {
-    fn root(&mut self) -> io::Result<Box<dyn Directory2>> {
-        HandleReference(self.0).root()
-    }
-
-    fn copy_entry(&mut self, source: &Path, destination: &Path) -> io::Result<()> {
-        HandleReference(self.0).copy_entry(source, destination)
-    }
-}
-
-pub struct FileSystem(Mutex<Option<VirtualFileSystem>>);
+pub struct FileSystem(SpinLock<Option<VirtualFilesystem<SpinLock<Mounts>>>>);
 
 impl FileSystem {
     /// Returns an uninitialized `FileSystem`.
@@ -92,70 +30,120 @@ impl FileSystem {
     /// The file system must be initialized by calling `initialize()` before the
     /// first memory allocation. Failure to do will result in panics.
     pub const fn uninitialized() -> Self {
-        FileSystem(Mutex::new(None))
+        FileSystem(SpinLock::new(None))
     }
 
     /// Initializes the file system.
     /// The caller should assure that the method is invoked only once during the
-    /// kernel2 initialization.
+    /// kernel initialization.
     ///
     /// # Panics
     ///
     /// Panics if the underlying disk or file sytem failed to initialize.
     pub unsafe fn initialize(&self) {
-        self.0.lock().replace(VirtualFileSystem::new());
-        PI_VFAT_HANDLE_WRAPPER.initialize();
+        let mut virtual_file_system = VirtualFilesystem::default();
 
-        let disk_file_system = Box::new(DiskFileSystem(PI_VFAT_HANDLE_WRAPPER.handle()));
-        FILESYSTEM.0.lock().as_mut().unwrap().mount(Path::root(), disk_file_system);
+        let sd_device = Sd::new().unwrap();
+        let cached_sd_device = CachedBlockDevice::new(sd_device, None);
+        let virtual_fat_block_partition =
+            BlockPartition::new(Box::new(cached_sd_device), 0xc).unwrap();
+        let disk_file_system =
+            VirtualFatFilesystem::<SpinLock<VirtualFat>>::new(virtual_fat_block_partition).unwrap();
+
+        virtual_file_system
+            .mount(Path::root(), Box::new(disk_file_system))
+            .unwrap();
 
         let console_path = Path::root();
+        let console_filesystem = Box::new(ByteDeviceFilesystem::new(
+            ConsoleFile::new(),
+            String::from("console"),
+        ));
+        virtual_file_system
+            .mount(console_path, console_filesystem)
+            .unwrap();
 
-        let console_filesystem = Box::new(CharDeviceFileSystem::new(
-            "console".to_string(), ConsoleFile::new())
-        );
-        FILESYSTEM.0.lock().as_mut().unwrap().mount(console_path, console_filesystem);
+        let system_filesystem =
+            new_system_filesystem().expect("unable to create system pseudo filesystem");
+        virtual_file_system
+            .mount(Path::root(), Box::new(system_filesystem))
+            .expect("unable to mount system pseudo filesystem");
+
+        self.0
+            .lock(|filesystem| {
+                filesystem.replace(virtual_file_system);
+            })
+            .unwrap();
     }
 }
 
-impl FileSystem2 for &FileSystem {
-    fn root(&mut self) -> io::Result<Box<dyn Directory2>> {
-        self.0.lock().as_mut().ok_or(newioerr!(Unsupported))?.root()
+impl Filesystem for &FileSystem {
+    fn root(&mut self) -> io::Result<Box<dyn Directory>> {
+        self.0
+            .lock(|filesystem| match filesystem {
+                None => ioerr!(Unsupported),
+                Some(fs) => fs.root(),
+            })
+            .unwrap()
     }
 
-    fn copy_entry(&mut self, source: &Path, destination: &Path) -> io::Result<()> {
-        self.0.lock().as_mut().ok_or(newioerr!(Unsupported))?.copy_entry(source, destination)
+    fn format(_: &mut dyn BlockDevice, _: &mut PartitionEntry, _: usize) -> io::Result<()>
+    where
+        Self: Sized,
+    {
+        todo!()
     }
 }
 
-struct ConsoleFile(Arc<Mutex<MiniUart>>);
+struct ConsoleFile(Arc<SpinLock<MiniUart>>);
 
-impl Read for ConsoleFile {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.0.lock().read(buf)
+impl ConsoleFile {
+    fn new() -> Self {
+        ConsoleFile(Arc::new(SpinLock::new(MiniUart::new())))
     }
 }
 
-impl Write for ConsoleFile {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.0.lock().write(buf)
+impl ByteDevice for ConsoleFile {
+    fn read_byte(&mut self) -> io::Result<u8> {
+        info!("sussy bakka");
+        Ok(self.0.lock(|byte_device| byte_device.read_byte()).unwrap())
     }
 
-    fn flush(&mut self) -> io::Result<()> {
-        self.0.lock().flush()
+    fn write_byte(&mut self, byte: u8) -> io::Result<()> {
+        self.0
+            .lock(|byte_device| byte_device.write_byte(byte))
+            .unwrap();
+        Ok(())
+    }
+
+    fn try_read_byte(&mut self) -> io::Result<u8> {
+        self.0
+            .lock(|byte_device| {
+                if byte_device.has_byte() {
+                    Ok(byte_device.read_byte())
+                } else {
+                    Err(io::Error::from(io::ErrorKind::WouldBlock))
+                }
+            })
+            .unwrap()
+    }
+
+    fn try_write_byte(&mut self, byte: u8) -> io::Result<()> {
+        self.0
+            .lock(|byte_device| {
+                if byte_device.can_write() {
+                    byte_device.write_byte(byte);
+                    Ok(())
+                } else {
+                    Err(io::Error::from(io::ErrorKind::WouldBlock))
+                }
+            })
+            .unwrap()
     }
 }
 
 impl Clone for ConsoleFile {
     fn clone(&self) -> Self {
         ConsoleFile(self.0.clone())
-    }
-}
-
-impl CharDevice for ConsoleFile {}
-
-impl ConsoleFile {
-    fn new() -> Self {
-        ConsoleFile(Arc::new(Mutex::new(MiniUart::new())))
     }
 }

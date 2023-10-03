@@ -1,11 +1,16 @@
 #![no_std]
-
 #![feature(asm_const)]
+
+extern crate alloc;
 
 use shim::io;
 
 #[cfg(feature = "user-space")]
+pub mod file;
+#[cfg(feature = "user-space")]
 pub mod syscall;
+#[cfg(feature = "user-space")]
+pub mod thread;
 
 pub type OsResult<T> = Result<T, OsError>;
 
@@ -21,8 +26,8 @@ pub enum OsError {
     BadAddress = 50,
     FileExists = 60,
     InvalidArgument = 70,
-
     UnknownResourceId = 80,
+    WouldBlock = 90,
 
     IoError = 101,
     IoErrorEof = 102,
@@ -32,6 +37,10 @@ pub enum OsError {
 
     InvalidSocket = 200,
     IllegalSocketOperation = 201,
+
+    SchedulerError = 210,
+
+    InvalidPermissions = 220,
 }
 
 impl From<u64> for OsError {
@@ -54,6 +63,9 @@ impl From<u64> for OsError {
 
             200 => OsError::InvalidSocket,
             201 => OsError::IllegalSocketOperation,
+            210 => OsError::SchedulerError,
+
+            220 => OsError::InvalidPermissions,
 
             _ => OsError::Unknown,
         }
@@ -88,11 +100,17 @@ pub enum Syscall {
     Exit = 12,
     Wait = 13,
     GetPid = 14,
+    Clone = 15,
 
     Sbrk = 20,
 
     Sleep = 30,
     Time = 31,
+
+    SwitchScheduler = 32,
+
+    GetUserIdentity = 40,
+    SetUserIdentity = 41,
 
     Unknown = 256,
 }
@@ -113,11 +131,17 @@ impl From<u16> for Syscall {
             12 => Syscall::Exit,
             13 => Syscall::Wait,
             14 => Syscall::GetPid,
+            15 => Syscall::Clone,
 
             20 => Syscall::Sbrk,
 
             30 => Syscall::Sleep,
             31 => Syscall::Time,
+
+            32 => Syscall::SwitchScheduler,
+
+            40 => Syscall::GetUserIdentity,
+            41 => Syscall::SetUserIdentity,
 
             _ => Syscall::Unknown,
         }

@@ -106,11 +106,11 @@ mod allocator {
     }
 
     macro layout($size:expr, $align:expr) {
-    Layout::from_size_align($size, $align).unwrap()
+        Layout::from_size_align($size, $align).unwrap()
     }
 
     macro test_layouts($layouts:expr, $start:expr, $end:expr, $a:expr) {
-    let (layouts, start, end, mut a) = ($layouts, $start, $end, $a);
+        let (layouts, start, end, mut a) = ($layouts, $start, $end, $a);
 
         let mut pointers: Vec<(usize, Layout)> = vec![];
         for layout in &layouts {

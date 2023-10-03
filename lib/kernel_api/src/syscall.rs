@@ -3,7 +3,7 @@ use core::fmt;
 use core::fmt::Write;
 use core::time::Duration;
 
-use shim::ioerr;
+use shim::{ioerr, newioerr};
 
 use crate::*;
 
@@ -34,12 +34,16 @@ macro_rules! syscall_args {
         syscall_args!($a, $b, $c);
         asm!("mov x3, {}", in(reg) $d);
     );
+    ($a:expr, $b:expr, $c:expr, $d:expr, $e:expr) => (
+        syscall_args!($a, $b, $c, $d);
+        asm!("mov x4, {}", in(reg) $e);
+    );
 }
 
 macro_rules! syscall {
-    ($syscall_number:expr) => (
+    ($syscall_number:expr) => {
         asm!("svc {}", const { $syscall_number as u16 })
-    );
+    };
 }
 
 macro_rules! syscall_receive0 {
@@ -120,19 +124,19 @@ pub fn open(file: &str) -> OsResult<u64> {
 }
 
 //TODO: make the semantics match io::Read
-pub fn read(file: u64, bytes: &mut [u8]) -> OsResult<()> {
+pub fn read(file: u64, bytes: &mut [u8]) -> OsResult<usize> {
     unsafe {
         syscall_args!(file, (bytes.as_ptr()) as u64, bytes.len() as u64);
         syscall!(Syscall::Read);
-        syscall_receive0!()
+        syscall_receive1!().map(|size| size as usize)
     }
 }
 
-pub fn write(file: u64, bytes: &[u8]) -> OsResult<()> {
+pub fn write(file: u64, bytes: &[u8]) -> OsResult<usize> {
     unsafe {
         syscall_args!(file, (bytes.as_ptr()) as u64, bytes.len() as u64);
         syscall!(Syscall::Write);
-        syscall_receive0!()
+        syscall_receive1!().map(|size| size as usize)
     }
 }
 
@@ -166,7 +170,7 @@ pub fn fork() -> OsResult<Option<u64>> {
 
     match is_child {
         0 => Ok(Some(child_id)),
-        _ => Ok(None)
+        _ => Ok(None),
     }
 }
 
@@ -181,78 +185,58 @@ pub fn duplicate(file: u64, new: u64) -> OsResult<u64> {
 //TODO: this should not return on success; codify that
 pub fn execute(arguments: &[u8], environment: &[u8]) -> OsResult<u64> {
     unsafe {
-        syscall_args!(arguments.as_ptr() as u64, arguments.len() as u64,
-            environment.as_ptr() as u64, environment.len() as u64);
+        syscall_args!(
+            arguments.as_ptr() as u64,
+            arguments.len() as u64,
+            environment.as_ptr() as u64,
+            environment.len() as u64
+        );
         syscall!(Syscall::Execute);
         syscall_receive1!()
     }
 }
 
-pub fn wait(process: u64) -> OsResult<u64> {
-    unsafe {
-        syscall_args!(process);
+pub fn wait(process: u64, timeout: Option<u64>) -> OsResult<Option<u64>> {
+    let (pid, timed_out) = unsafe {
+        syscall_args!(process, timeout.is_some() as u64, timeout.unwrap_or(0));
         syscall!(Syscall::Wait);
+        syscall_receive2!()
+    }?;
+    if timed_out == 1 {
+        Ok(None)
+    } else {
+        Ok(Some(pid))
+    }
+}
+
+#[inline(never)]
+pub(super) fn clone(start_address: usize, data: usize) -> OsResult<u64> {
+    unsafe {
+        syscall_args!(start_address, data);
+        syscall!(Syscall::Clone);
         syscall_receive1!()
     }
 }
 
-struct Console;
-
-impl Write for Console {
-    fn write_str(&mut self, s: &str) -> fmt::Result {
-        write(1, s.as_bytes()).expect("unable to write data");
-        Ok(())
+pub fn switch_scheduler(policy: usize) -> OsResult<u64> {
+    unsafe {
+        syscall_args!(policy as u64);
+        syscall!(Syscall::SwitchScheduler);
+        syscall_receive1!()
     }
 }
 
-#[macro_export]
-macro_rules! print {
-    ($($arg:tt)*) => ($crate::syscall::vprint(format_args!($($arg)*)));
-}
-
-#[macro_export]
-macro_rules! println {
- () => (print!("\n"));
-    ($($arg:tt)*) => ({
-        $crate::syscall::vprint(format_args!($($arg)*));
-        $crate::print!("\n");
-    })
-}
-
-pub fn vprint(args: fmt::Arguments) {
-    let mut c = Console;
-    c.write_fmt(args).unwrap();
-}
-
-
-// TODO: move to jlib
-pub struct File(u64);
-//TODO: Drop to close syscall
-
-impl File {
-    pub fn new(inner: u64) -> Self {
-        File(inner)
+pub fn get_user_identity() -> OsResult<u64> {
+    unsafe {
+        syscall!(Syscall::GetUserIdentity);
+        syscall_receive1!()
     }
 }
 
-impl io::Read for File {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        match read(self.0, buf) {
-            Ok(_) => Ok(buf.len()),
-            Err(_) => ioerr!(Interrupted),
-        }
-    }
-}
-
-impl io::Write for File {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        match write(self.0, buf) {
-            Ok(_) => Ok(buf.len()),
-            Err(_) => ioerr!(Interrupted),
-        }
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        ioerr!(Unsupported)
+pub fn set_user_identity(user_identity: u64) -> OsResult<()> {
+    unsafe {
+        syscall_args!(user_identity);
+        syscall!(Syscall::SetUserIdentity);
+        syscall_receive0!()
     }
 }

@@ -3,8 +3,9 @@ use core::fmt::Write;
 
 use pi::uart::MiniUart;
 use shim::io;
+use sync::Mutex;
 
-use crate::multiprocessing::mutex::Mutex;
+use crate::multiprocessing::spin_lock::SpinLock;
 
 /// A global singleton allowing read/write access to the console.
 pub struct Console {
@@ -30,16 +31,6 @@ impl Console {
     fn inner(&mut self) -> &mut MiniUart {
         self.initialize();
         self.inner.as_mut().unwrap()
-    }
-
-    /// Reads a byte from the UART device, blocking until a byte is available.
-    pub fn read_byte(&mut self) -> u8 {
-        self.inner().read_byte()
-    }
-
-    /// Writes the byte `byte` to the UART device.
-    pub fn write_byte(&mut self, byte: u8) {
-        self.inner().write_byte(byte);
     }
 }
 
@@ -73,21 +64,14 @@ impl fmt::Write for Console {
 }
 
 /// Global `Console` singleton.
-pub static CONSOLE: Mutex<Console> = Mutex::new(Console::new());
+pub static CONSOLE: SpinLock<Console> = SpinLock::new(Console::new());
 
 /// Internal function called by the `kprint[ln]!` macros.
 #[doc(hidden)]
 pub fn _print(args: fmt::Arguments) {
-    #[cfg(not(test))]
-    {
-        let mut console = CONSOLE.lock();
-        console.write_fmt(args).unwrap();
-    }
-
-    #[cfg(test)]
-    {
-        print!("{}", args);
-    }
+    CONSOLE
+        .lock(|console| console.write_fmt(args).unwrap())
+        .unwrap()
 }
 
 /// Like `println!`, but for kernel2-space.

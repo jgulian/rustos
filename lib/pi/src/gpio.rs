@@ -1,9 +1,9 @@
 use core::marker::PhantomData;
 
-use volatile::{ReadVolatile, Reserved, Volatile, WriteVolatile};
 use volatile::prelude::*;
+use volatile::{ReadVolatile, Reserved, Volatile, WriteVolatile};
 
-use crate::common::{GPIO_BASE, states};
+use crate::common::{states, GPIO_BASE};
 
 /// An alternative GPIO function.
 #[repr(u8)]
@@ -91,7 +91,7 @@ impl Gpio<Uninitialized> {
 
         Gpio {
             registers: unsafe { &mut *(GPIO_BASE as *mut Registers) },
-            pin: pin,
+            pin,
             _state: PhantomData,
         }
     }

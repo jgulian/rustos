@@ -4,7 +4,7 @@ use core::cmp::Ordering;
 use core::fmt;
 use core::fmt::Formatter;
 
-use filesystem::fs2::File2;
+use filesystem::filesystem::File;
 use kernel_api::{OsError, OsResult};
 
 #[derive(Clone, Copy, PartialOrd, PartialEq, Debug)]
@@ -16,9 +16,9 @@ impl From<u64> for ResourceId {
     }
 }
 
-impl Into<u64> for ResourceId {
-    fn into(self) -> u64 {
-        self.0
+impl From<ResourceId> for u64 {
+    fn from(val: ResourceId) -> Self {
+        val.0
     }
 }
 
@@ -35,7 +35,7 @@ impl PartialOrd<u64> for ResourceId {
 }
 
 pub enum Resource {
-    File(Box<dyn File2>),
+    File(Box<dyn File>),
 }
 
 pub struct ResourceEntry {
@@ -58,41 +58,45 @@ pub struct ResourceList {
 
 impl ResourceList {
     pub(crate) fn new() -> Self {
-        ResourceList {
-            list: Vec::new(),
-        }
+        ResourceList { list: Vec::new() }
     }
 
     pub(crate) fn insert(&mut self, resource: Resource) -> ResourceId {
-        let index = self.list.iter().enumerate()
+        let index = self
+            .list
+            .iter()
+            .enumerate()
             .filter_map(|(i, resource)| {
                 if resource.id != i as u64 {
                     Some(i)
                 } else {
                     None
                 }
-            }).next().unwrap_or(0);
+            })
+            .next()
+            .unwrap_or(0);
         let id = ResourceId::from(index as u64);
         self.list.insert(index, ResourceEntry { id, resource });
         id
     }
 
     pub(crate) fn insert_with_id(&mut self, id: ResourceId, resource: Resource) -> OsResult<()> {
-        let index = self.list.iter().enumerate()
+        let index = self
+            .list
+            .iter()
+            .enumerate()
             .filter_map(|(i, resource)| {
                 if resource.id <= i as u64 {
                     Some(i)
                 } else {
                     None
                 }
-            }).next();
+            })
+            .next();
 
         match index {
             None => {
-                self.list.push(ResourceEntry {
-                    id,
-                    resource,
-                });
+                self.list.push(ResourceEntry { id, resource });
 
                 Ok(())
             }
@@ -101,10 +105,7 @@ impl ResourceList {
                     return Err(OsError::UnknownResourceId);
                 }
 
-                self.list.insert(idx, ResourceEntry {
-                    id,
-                    resource,
-                });
+                self.list.insert(idx, ResourceEntry { id, resource });
 
                 Ok(())
             }
@@ -112,12 +113,14 @@ impl ResourceList {
     }
 
     pub(crate) fn remove(&mut self, id: ResourceId) -> OsResult<()> {
-        let index = self.list.iter().enumerate().filter_map(|(i, res)|
-            { if res.id == id { Some(i) } else { None } }).next();
+        let index = self
+            .list
+            .iter()
+            .enumerate()
+            .filter_map(|(i, res)| if res.id == id { Some(i) } else { None })
+            .next();
         match index {
-            None => {
-                Err(OsError::UnknownResourceId)
-            }
+            None => Err(OsError::UnknownResourceId),
             Some(idx) => {
                 self.list.remove(idx);
                 Ok(())
@@ -126,29 +129,35 @@ impl ResourceList {
     }
 
     pub(crate) fn get(&mut self, id: ResourceId) -> OsResult<&mut Resource> {
-        self.list.iter_mut().filter_map(|resource| {
-            if resource.id == id {
-                None
-            } else {
-                Some(&mut resource.resource)
-            }
-        }).next().ok_or(OsError::UnknownResourceId)
+        self.list
+            .iter_mut()
+            .filter_map(|resource| {
+                if resource.id == id {
+                    Some(&mut resource.resource)
+                } else {
+                    None
+                }
+            })
+            .next()
+            .ok_or(OsError::UnknownResourceId)
     }
 
     pub(crate) fn duplicate(&mut self) -> OsResult<ResourceList> {
-        let list: Vec<ResourceEntry> = self.list.iter_mut().map_while(|entry| {
-            let resource = match &mut entry.resource {
-                Resource::File(ref mut file) => Resource::File(file.duplicate().ok()?),
-            };
+        let list: Vec<ResourceEntry> = self
+            .list
+            .iter_mut()
+            .map_while(|entry| {
+                let resource = match &mut entry.resource {
+                    Resource::File(ref mut file) => Resource::File(file.duplicate().ok()?),
+                };
 
-            Some(ResourceEntry {
-                id: entry.id,
-                resource,
+                Some(ResourceEntry {
+                    id: entry.id,
+                    resource,
+                })
             })
-        }).collect();
+            .collect();
 
-        Ok(ResourceList {
-            list,
-        })
+        Ok(ResourceList { list })
     }
 }
